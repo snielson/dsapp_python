@@ -71,17 +71,17 @@ dsappupload = dsappDirectory + "/upload"
 rootDownloads = "/root/Downloads"
 
 # Configuration Files
-# mconf = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/mobility/connector.xml"
-# gconf = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/groupwise/connector.xml"
-# ceconf = "/etc/datasync/configengine/configengine.xml"
+mconf = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/mobility/connector.xml"
+gconf = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/groupwise/connector.xml"
+ceconf = "/etc/datasync/configengine/configengine.xml"
 econf = "/etc/datasync/configengine/engines/default/engine.xml"
-# wconf = "/etc/datasync/webadmin/server.xml"
+wconf = "/etc/datasync/webadmin/server.xml"
 
 # Test server paths
-mconf = "/root/Desktop/confXML/mobility/connector.xml"
-gconf = "/root/Desktop/confXML/groupwise/connector.xml"
-ceconf = "/root/Desktop/confXML/configengine.xml"
-wconf = "/root/Desktop/confXML/server.xml"
+#mconf = "/root/Desktop/confXML/mobility/connector.xml"
+#gconf = "/root/Desktop/confXML/groupwise/connector.xml"
+#ceconf = "/root/Desktop/confXML/configengine.xml"
+#wconf = "/root/Desktop/confXML/server.xml"
 
 # Misc variables
 serverinfo = "/etc/*release"
@@ -133,6 +133,7 @@ ghcLog = dsappConf + "/generalHealthCheck.log"
 # TODO: Change logger level via switch
 logging.config.fileConfig(dsappLogSettings)
 logger = logging.getLogger(__name__)
+logger.info('----------------------- Starting dsapp -----------------------')
 
 ##################################################################################################
 #	Setup local definitions
@@ -237,7 +238,7 @@ dsHostname = Config.get('Settings', 'hostname')
 
 # Get Console Size
 windowSize = rows, columns = os.popen('stty size', 'r').read().split()
-if windowSize[0] < '24' or windowSize[1] < '80':
+if int(windowSize[0]) < int(24) or int(windowSize[1]) < int(80):
 	print ("Terminal window does not meet size requirements\nCurrent Size: [%s x %s]\nPlease resize window to [80 x 24] or greater\n" % (windowSize[1],windowSize[0]))
 	sys.exit(1)
 
@@ -296,7 +297,8 @@ if len(sys.argv) == 0:
 		spinner.start()
 		time1 = time.time()
 		# XML tree of each XML file
-		logger.info('Loading XML files - Start')
+		logger.info('Loading XML files started')
+		time1 = time.time()
 		logger.debug('Building %s tree from: %s' % ('mconfXML', mconf))
 		mconfXML = ds.getXMLTree(mconf)
 		logger.debug('Building %s tree from: %s' % ('ceconfXML', ceconf))
@@ -305,7 +307,9 @@ if len(sys.argv) == 0:
 		wconfXML = ds.getXMLTree(wconf)
 		logger.debug('Building %s tree from: %s' % ('gconfXML', gconf))
 		gconfXML = ds.getXMLTree(gconf)
-		logger.info('Loading XML files - End')
+		time2 = time.time()
+		logger.info('Loading XML files completed')
+		logger.debug("Loading XMLs took %0.3f ms" % ((time2 - time1) * 1000))
 
 		logger.info('Assigning variables from XML started')
 		logger.debug('Assigning %s from %s' % ('ldapSecure', 'ceconfXML'))
