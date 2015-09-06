@@ -1,0 +1,11 @@
+/opt/novell/datasync/tools/dsapp/logs/*.log {
+    compress
+    compresscmd /usr/bin/gzip
+    dateext
+    maxage 14
+    rotate 99
+    missingok
+    notifempty
+    size +4096k
+    create 640 root root
+}
