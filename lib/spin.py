@@ -11,14 +11,13 @@ class progress_bar_loading(threading.Thread):
  
     def stop(self):
         self.event.set()
-        print '\n',
 
     def run(self):
         spinner = itertools.cycle(['[-]', '[/]', '[|]', '[\\]'])
         while (not self.event.is_set()):
             sys.stdout.write(spinner.next())
-            sys.stdout.flush()
             time.sleep(0.1)
+            sys.stdout.flush()
             if not self.event.is_set():
                 sys.stdout.write('\b\b\b')
 

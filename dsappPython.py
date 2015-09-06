@@ -23,6 +23,10 @@ import logging
 import logging.config
 import time
 import atexit
+import re
+import tarfile, zipfile
+import rpm
+ts = rpm.TransactionSet()
 import ConfigParser
 Config = ConfigParser.ConfigParser()
 
@@ -71,17 +75,17 @@ dsappupload = dsappDirectory + "/upload"
 rootDownloads = "/root/Downloads"
 
 # Configuration Files
-mconf = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/mobility/connector.xml"
-gconf = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/groupwise/connector.xml"
-ceconf = "/etc/datasync/configengine/configengine.xml"
+# mconf = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/mobility/connector.xml"
+# gconf = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/groupwise/connector.xml"
+# ceconf = "/etc/datasync/configengine/configengine.xml"
 econf = "/etc/datasync/configengine/engines/default/engine.xml"
-wconf = "/etc/datasync/webadmin/server.xml"
+# wconf = "/etc/datasync/webadmin/server.xml"
 
 # Test server paths
-#mconf = "/root/Desktop/confXML/mobility/connector.xml"
-#gconf = "/root/Desktop/confXML/groupwise/connector.xml"
-#ceconf = "/root/Desktop/confXML/configengine.xml"
-#wconf = "/root/Desktop/confXML/server.xml"
+mconf = "/root/Desktop/confXML/mobility/connector.xml"
+gconf = "/root/Desktop/confXML/groupwise/connector.xml"
+ceconf = "/root/Desktop/confXML/configengine.xml"
+wconf = "/root/Desktop/confXML/server.xml"
 
 # Misc variables
 serverinfo = "/etc/*release"
@@ -133,7 +137,7 @@ ghcLog = dsappConf + "/generalHealthCheck.log"
 # TODO: Change logger level via switch
 logging.config.fileConfig(dsappLogSettings)
 logger = logging.getLogger(__name__)
-logger.info('----------------------- Starting dsapp -----------------------')
+logger.info('------------- Starting dsapp -------------')
 
 ##################################################################################################
 #	Setup local definitions
@@ -156,6 +160,12 @@ def declareVariables1():
 	# TODO: rcScript="rcdatasync"
 
 def exit_cleanup():
+	try:
+		if spinner.isAlive():
+			spinner.stop()
+	except NameError:
+		pass
+
 	# Clear dsapp/tmp
 	ds.removeAllFiles("/opt/novell/datasync/tools/dsapp/tmp/")
 
@@ -183,6 +193,55 @@ def signal_handler_SIGINT(signal, frame):
 		# Reset the terminal
 		sys.exit(1)
 
+def set_spinner():
+	spinner = spin.progress_bar_loading()
+	spinner.setDaemon(True)
+	return spinner
+
+def announceNewFeature():
+	if newFeature:
+		ds.datasyncBanner(dsappversion)
+		ds.logger.debug('Prompt feature')
+		print "General Health Check.\nLocated in the Checks & Queries menu.\n"
+		if ds.askYesOrNo("Would you like to run it now?"):
+			pass
+			# TODO: generalHealthCheck()
+
+	with open(dsappSettings, 'w') as cfgfile:
+		Config.set('Misc', 'new.feature', False)
+		Config.write(cfgfile)
+
+def updateDsapp():
+	print 'Updating dsapp'
+	ds.logger.info('header Updating dsapp')
+
+	# Download new version & extract
+	ds.dlfile('ftp://ftp.novell.com/outgoing/%s' % (dsapp_tar))
+	print
+	tar = tarfile.open(dsapp_tar, 'r:gz')
+	rpmFile = re.search('.*.rpm' ,'%s' % (tar.getnames()[0])).group(0)
+	tar.close()
+	ds.uncompressIt(dsapp_tar)
+	if ds.checkRPM(rpmFile):
+		ds.setupRPM(rpmFile)
+	else:
+		print ('%s is older than installed version' % (rpmFile))
+		ds.logger.warning('%s is older than installed version' % (rpmFile))
+
+	# Clean up files
+	try:
+		os.remove('dsapp.sh')
+	except OSError:
+		ds.logger.warning('No such file: dsapp.sh')
+	try:
+		os.remove(rpmFile)
+	except OSError:
+		ds.logger.warning('No such file: %s' % (rpmFile))
+	try:
+		os.remove(dsapp_tar)
+	except OSError:
+		ds.logger.warning('No such file: %s' % (dsapp_tar))
+	# TODO: Close script, and relaunch
 
 ##################################################################################################
 #	Set up script
@@ -235,6 +294,7 @@ if not os.path.isfile(dsappSettings):
 Config.read(dsappSettings)
 pgpass = Config.getboolean('Settings', 'pgpass')
 dsHostname = Config.get('Settings', 'hostname')
+newFeature = Config.getboolean('Misc', 'new.feature')
 
 # Get Console Size
 windowSize = rows, columns = os.popen('stty size', 'r').read().split()
@@ -291,13 +351,12 @@ if len(sys.argv) == 0:
 
 	# Read values from XML config
 	if isInstalled:
-		spinner = spin.progress_bar_loading()
 		print "Loading settings... ",
 		# Start spinner
-		spinner.start()
-		time1 = time.time()
+		spinner = set_spinner()
+		spinner.start(); time.sleep(.000001)
 		# XML tree of each XML file
-		logger.info('Loading XML files started')
+		logger.info('Building XML trees started')
 		time1 = time.time()
 		logger.debug('Building %s tree from: %s' % ('mconfXML', mconf))
 		mconfXML = ds.getXMLTree(mconf)
@@ -308,9 +367,10 @@ if len(sys.argv) == 0:
 		logger.debug('Building %s tree from: %s' % ('gconfXML', gconf))
 		gconfXML = ds.getXMLTree(gconf)
 		time2 = time.time()
-		logger.info('Loading XML files completed')
-		logger.debug("Loading XMLs took %0.3f ms" % ((time2 - time1) * 1000))
+		logger.info('Building XML trees complete')
+		logger.debug("Building XML trees took %0.3f ms" % ((time2 - time1) * 1000))
 
+		time1 = time.time()
 		logger.info('Assigning variables from XML started')
 		logger.debug('Assigning %s from %s' % ('ldapSecure', 'ceconfXML'))
 		ldapSecure = ds.xmlpath('.//configengine/ldap/secure', ceconfXML)
@@ -362,10 +422,10 @@ if len(sys.argv) == 0:
 		logger.debug('Assigning %s from %s' % ('wPort', 'wconfXML'))
 		wPort = ds.xmlpath('.//server/port', wconfXML)
 		time2 = time.time()
-		logger.info('Assigning variables from XML completed')
+		logger.info('Assigning variables from XML complete')
 		logger.debug("Assigning variables took %0.3f ms" % ((time2 - time1) * 1000))
 		# Stop spinner
-		spinner.stop()
+		spinner.stop(); print '\n'
 
 else:
 	ds.clear()
@@ -374,7 +434,13 @@ else:
 #	Main
 ##################################################################################################
 
+# TEST CODE / Definitions
 
 ds.datasyncBanner(dsappversion)
+# ds.dlfile('ftp://ftp.novell.com/outgoing/dsapp.tgz')
+# ds.uncompressIt('dsapp.tgz')
+# print ds.findRPM('dsapp')
+updateDsapp()
+# ds.setupRPM('dsapp-1.00-223.noarch.rpm')
 ds.eContinue()
 sys.exit(0)
