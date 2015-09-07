@@ -187,7 +187,7 @@ def DoesServiceExist(host, port):
     host_addr = ""
 
     try:
-        captive_dns_addr = socket.gethostbyname("thisURLdoesntexist.com")
+        captive_dns_addr = socket.gethostbyname("thisURLdoesntexistfakefakefake.com")
     except:
         pass
 
@@ -195,7 +195,7 @@ def DoesServiceExist(host, port):
         host_addr = socket.gethostbyname(host)
 
         if (captive_dns_addr == host_addr):
-        	logger.info('Failed to test to %s:%s' %(host,port))
+        	logger.warning('Failed to test to %s:%s' %(host,port))
         	return False
 
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -203,7 +203,7 @@ def DoesServiceExist(host, port):
         s.connect((host, port))
         s.close()
     except:
-    	logger.info('Failed to test to %s:%s' %(host,port))
+    	logger.warning('Failed to test to %s:%s' %(host,port))
     	return False
 
     logger.info('Successfully tested to %s:%s' %(host,port))
