@@ -9,7 +9,7 @@
 #
 ##################################################################################################
 
-dsappversion='221'
+dsappversion='223'
 
 ##################################################################################################
 #	Imports
@@ -26,6 +26,7 @@ import atexit
 import re
 import tarfile, zipfile
 import rpm
+import urllib2
 ts = rpm.TransactionSet()
 import ConfigParser
 Config = ConfigParser.ConfigParser()
@@ -43,8 +44,12 @@ if not os.path.exists('/opt/novell/datasync/tools/dsapp/logs/'):
 	os.makedirs('/opt/novell/datasync/tools/dsapp/logs/')
 
 sys.path.append('./lib')
+# TODO : uncomment on mobility server
+# sys.path.append('/opt/novell/datasync/common/lib/')
+sys.path.append('/root/Desktop/scripts/python/lib')
 import dsappDefinitions as ds
 import spin
+import psycopg2
 
 ##################################################################################################
 #	Start up check
@@ -211,11 +216,12 @@ def announceNewFeature():
 		Config.set('Misc', 'new.feature', False)
 		Config.write(cfgfile)
 
-def updateDsapp():
-	print 'Updating dsapp'
-	ds.logger.info('header Updating dsapp')
+def updateDsapp(publicVersion):
+	print 'Updating dsapp to v%s' % (publicVersion)
+	ds.logger.info('Updating dsapp to v%s' % (publicVersion))
 
 	# Download new version & extract
+	# TODO : Test if service exists
 	ds.dlfile('ftp://ftp.novell.com/outgoing/%s' % (dsapp_tar))
 	print
 	tar = tarfile.open(dsapp_tar, 'r:gz')
@@ -242,6 +248,49 @@ def updateDsapp():
 	except OSError:
 		ds.logger.warning('No such file: %s' % (dsapp_tar))
 	# TODO: Close script, and relaunch
+
+def autoUpdateDsapp():
+	# Variable declared above autoUpdate=true
+	if autoUpdate:
+		# Check FTP connectivity
+		if ds.DoesServiceExist('ftp.novell.com', 21):
+			# Fetch online dsapp and store to memory, check version
+			spinner = set_spinner()
+			ds.logger.info('Checking for a newer version of dsapp')
+			print 'Checking for a newer version of dsapp... ',
+			spinner.start(); time.sleep(.000001)
+			for line in urllib2.urlopen('ftp://ftp.novell.com/outgoing/dsapp-version.info'):
+				publicVersion = line.split("'")[1]
+			spinner.stop(); print
+			ds.clear()
+			
+			# Download if newer version is available
+			if dsappversion < publicVersion and publicVersion is not None:
+				print 'v%s (v%s available)' % (dsappversion, publicVersion)
+				ds.logger.info('Updating dsapp v%s to v%s' % (dsappversion, publicVersion))
+				updateDsapp(publicVersion)
+			elif dsappversion >= publicVersion and publicVersion is not None:
+				ds.logger.info('dsapp is up-to-date at')
+
+def getDSVersion():
+	if isInstalled:
+		with open(version) as f:
+			value = f.read().translate(None, '.')[0:4]
+		return value
+
+def checkPostgresql():
+	# TODO: Finish this code
+	try:
+		conn = psycopg2.connect("dbname='datasync' user='%s' host='localhost' password='novell'" % (dbUsername))
+	except:
+		print "I am unable to connect to the database"
+
+	# cur = conn.cursor()
+	# cur.execute("""SELECT dn from targets""")
+	# for row in rows:
+	# 	print "   ", row[0]
+
+
 
 ##################################################################################################
 #	Set up script
@@ -285,16 +334,18 @@ if not os.path.isfile(dsappSettings):
 		Config.add_section('Misc')
 		Config.add_section('Settings')
 		Config.set('Settings', 'pgpass', True)
-		Config.set('Settings', 'hostname', dsHostname)
-		Config.set('Misc', 'new.feature', False)
+		Config.set('Misc', 'hostname', dsHostname)
+		Config.set('Settings', 'new.feature', False)
 		Config.set('Misc', 'dsapp.version', dsappversion)
+		Config.set('Settings', 'auto.update', True)
 		Config.write(cfgfile)
 
 # Assign variables based on settings.cfg
 Config.read(dsappSettings)
 pgpass = Config.getboolean('Settings', 'pgpass')
-dsHostname = Config.get('Settings', 'hostname')
-newFeature = Config.getboolean('Misc', 'new.feature')
+dsHostname = Config.get('Misc', 'hostname')
+newFeature = Config.getboolean('Settings', 'new.feature')
+autoUpdate = Config.getboolean('Settings', 'auto.update')
 
 # Get Console Size
 windowSize = rows, columns = os.popen('stty size', 'r').read().split()
@@ -340,6 +391,9 @@ mobilityVersion = ds.getVersion(isInstalled, version)
 
 # Get current working directory
 cPWD = os.getcwd()
+
+# Get mobility version
+dsVersion = getDSVersion()
 
 ##################################################################################################
 #	Initialization
@@ -388,6 +442,8 @@ if len(sys.argv) == 0:
 		userContainer = ds.xmlpath('.//configengine/ldap/userContainer', ceconfXML)
 		logger.debug('Assigning %s from %s' % ('webAdmins', 'ceconfXML'))
 		webAdmins = ds.xmlpath('.//configengine/ldap/admins/dn', ceconfXML)
+		logger.debug('Assigning %s from %s' % ('dbUsername', 'ceconfXML'))
+		dbUsername = ds.xmlpath('.//configengine/database/username', ceconfXML)
 
 		logger.debug('Assigning %s from %s' % ('ldapAddress', 'mconfXML'))
 		ldapAddress = ds.xmlpath('.//settings/custom/ldapAddress', mconfXML)
@@ -437,10 +493,8 @@ else:
 # TEST CODE / Definitions
 
 ds.datasyncBanner(dsappversion)
-# ds.dlfile('ftp://ftp.novell.com/outgoing/dsapp.tgz')
-# ds.uncompressIt('dsapp.tgz')
-# print ds.findRPM('dsapp')
-updateDsapp()
-# ds.setupRPM('dsapp-1.00-223.noarch.rpm')
+
+# autoUpdateDsapp()
+
 ds.eContinue()
 sys.exit(0)
