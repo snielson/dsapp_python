@@ -1,20 +1,21 @@
 from __future__ import print_function
-import os
-import sys
-import signal
-import getpass
-import shutil
-import fileinput
-import glob
-import atexit
-import time
-import itertools
+import os,base64,sys,signal,getpass,shutil,fileinput,glob,atexit,time,itertools
+# import sys
+# import signal
+# import getpass
+# import shutil
+# import fileinput
+# import glob
+# import atexit
+# import time
+# import itertools
 import subprocess
 import socket
 import re
 import rpm
 import contextlib
 import tarfile, zipfile
+from pipes import quote
 from urllib2 import urlopen, URLError, HTTPError
 import xml.etree.ElementTree as ET
 from xml.parsers.expat import ExpatError
@@ -137,8 +138,7 @@ def xmlpath (elem, tree):
 	try:
 		return (tree.find(elem).text)
 	except AttributeError:
-		logger.exception('Got an exception error:')
-		sys.exit(1)
+		logger.warning('Unable to find %s' % (elem))
 
 def askYesOrNo(question, default=None):
 
@@ -355,3 +355,28 @@ def setupRPM(rpmName,flag='u'):
 	else:
 	    print ("Error: Unresolved dependencies, transaction failed.")
 	    print (unresolved_dependencies)
+
+#################### End of RPM definitions ###################
+
+def protect(msg, encode, key = None):
+# Code from GroupWise Mobility Service (GMS) datasync.util
+    if encode:
+        return base64.urlsafe_b64encode(os.popen('echo -n %s | openssl enc -aes-256-cbc -a -k `hostname -f`' % quote(msg)).read().rstrip())
+    else:
+        msg = base64.urlsafe_b64decode(msg)
+        return os.popen('echo %s | openssl enc -d -aes-256-cbc -a -k `hostname -f`' % quote(msg)).read().rstrip()
+
+def getDecrypted(check_path, tree, pro_path):
+	try:
+		protected = xmlpath(pro_path, tree)
+	except:
+		pass
+
+	if protected is None:
+		return xmlpath(check_path, tree)
+	elif int(protected) == 1:
+		return protect(xmlpath(check_path, tree), 0)
+	elif int(protected) == 0:
+		return xmlpath(check_path,tree)
+
+

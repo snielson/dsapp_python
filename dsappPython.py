@@ -46,7 +46,7 @@ if not os.path.exists('/opt/novell/datasync/tools/dsapp/logs/'):
 sys.path.append('./lib')
 # TODO : uncomment on mobility server
 # sys.path.append('/opt/novell/datasync/common/lib/')
-sys.path.append('/root/Desktop/scripts/python/lib')
+# sys.path.append('/root/Desktop/scripts/python/lib')
 import dsappDefinitions as ds
 import spin
 import psycopg2
@@ -80,17 +80,17 @@ dsappupload = dsappDirectory + "/upload"
 rootDownloads = "/root/Downloads"
 
 # Configuration Files
-# mconf = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/mobility/connector.xml"
-# gconf = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/groupwise/connector.xml"
-# ceconf = "/etc/datasync/configengine/configengine.xml"
+mconf = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/mobility/connector.xml"
+gconf = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/groupwise/connector.xml"
+ceconf = "/etc/datasync/configengine/configengine.xml"
 econf = "/etc/datasync/configengine/engines/default/engine.xml"
-# wconf = "/etc/datasync/webadmin/server.xml"
+wconf = "/etc/datasync/webadmin/server.xml"
 
 # Test server paths
-mconf = "/root/Desktop/confXML/mobility/connector.xml"
-gconf = "/root/Desktop/confXML/groupwise/connector.xml"
-ceconf = "/root/Desktop/confXML/configengine.xml"
-wconf = "/root/Desktop/confXML/server.xml"
+# mconf = "/root/Desktop/confXML/mobility/connector.xml"
+# gconf = "/root/Desktop/confXML/groupwise/connector.xml"
+# ceconf = "/root/Desktop/confXML/configengine.xml"
+# wconf = "/root/Desktop/confXML/server.xml"
 
 # Misc variables
 serverinfo = "/etc/*release"
@@ -279,16 +279,25 @@ def getDSVersion():
 		return value
 
 def checkPostgresql():
-	# TODO: Finish this code
 	try:
-		conn = psycopg2.connect("dbname='datasync' user='%s' host='localhost' password='novell'" % (dbUsername))
+		conn = psycopg2.connect("dbname='postgres' user='%s' host='%s' password='%s'" % (dbConfig['user'],dbConfig['host'],dbConfig['pass']))
+		ds.logger.info('Successfully connected to postgresql [user=%s,pass=******]' % (dbConfig['user']))
 	except:
-		print "I am unable to connect to the database"
+		print "Unable to connect to the database"
+		logger.error('Unable to connect to postgresql [user=%s,pass=******]' % (dbConfig['user']))
+		return False
+	return True
+		# TODO: Add option for connection failure
 
 	# cur = conn.cursor()
 	# cur.execute("""SELECT dn from targets""")
 	# for row in rows:
 	# 	print "   ", row[0]
+
+	# var['command'] = '"SELECT dn from targets;"| tr -d \' \''
+	# check = 'PGPASSWORD=%(password)s psql -d %(db)s -U %(user)s -h %(host)s -p %(port)s -c %(command)s' % var
+	# cmd = subprocess.Popen(check, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
+	# result = cmd.wait()
 
 
 
@@ -426,24 +435,41 @@ if len(sys.argv) == 0:
 
 		time1 = time.time()
 		logger.info('Assigning variables from XML started')
-		logger.debug('Assigning %s from %s' % ('ldapSecure', 'ceconfXML'))
-		ldapSecure = ds.xmlpath('.//configengine/ldap/secure', ceconfXML)
-		logger.debug('Assigning %s from %s' % ('ldapAdmin', 'ceconfXML'))
-		ldapAdmin = ds.xmlpath('.//configengine/ldap/login/dn', ceconfXML)
+		
 		logger.debug('Assigning %s from %s' % ('provisioning', 'ceconfXML'))
 		provisioning = ds.xmlpath('.//configengine/source/provisioning', ceconfXML)
 		logger.debug('Assigning %s from %s' % ('authentication', 'ceconfXML'))
 		authentication = ds.xmlpath('.//configengine/source/authentication', ceconfXML)
-		logger.debug('Assigning %s from %s' % ('ldapEnabled', 'ceconfXML'))
-		ldapEnabled = ds.xmlpath('.//configengine/ldap/enabled', ceconfXML)
-		logger.debug('Assigning %s from %s' % ('groupContainer', 'ceconfXML'))
-		groupContainer = ds.xmlpath('.//configengine/ldap/groupContainer', ceconfXML)
-		logger.debug('Assigning %s from %s' % ('userContainer', 'ceconfXML'))
-		userContainer = ds.xmlpath('.//configengine/ldap/userContainer', ceconfXML)
-		logger.debug('Assigning %s from %s' % ('webAdmins', 'ceconfXML'))
-		webAdmins = ds.xmlpath('.//configengine/ldap/admins/dn', ceconfXML)
-		logger.debug('Assigning %s from %s' % ('dbUsername', 'ceconfXML'))
-		dbUsername = ds.xmlpath('.//configengine/database/username', ceconfXML)
+		
+		# LDAP values
+		ldapConfig = {}
+		logger.debug('Assigning %s from %s' % ('ldap secure', 'ceconfXML'))
+		ldapConfig['secure'] = ds.xmlpath('.//configengine/ldap/secure', ceconfXML)
+		logger.debug('Assigning %s from %s' % ('login', 'ceconfXML'))
+		ldapConfig['login'] = ds.xmlpath('.//configengine/ldap/login/dn', ceconfXML)
+		logger.debug('Assigning %s from %s' % ('password', 'ceconfXML'))
+		ldapConfig['pass'] = ds.getDecrypted('.//configengine/ldap/login/password', ceconfXML, './/configengine/ldap/login/protected')
+		logger.debug('Assigning %s from %s' % ('ldap enabled', 'ceconfXML'))
+		ldapConfig['enabled'] = ds.xmlpath('.//configengine/ldap/enabled', ceconfXML)
+		logger.debug('Assigning %s from %s' % ('group container', 'ceconfXML'))
+		ldapConfig['group'] = ds.xmlpath('.//configengine/ldap/groupContainer', ceconfXML)
+		logger.debug('Assigning %s from %s' % ('user container', 'ceconfXML'))
+		ldapConfig['user'] = ds.xmlpath('.//configengine/ldap/userContainer', ceconfXML)
+		logger.debug('Assigning %s from %s' % ('admins', 'ceconfXML'))
+		ldapConfig['admins'] = ds.xmlpath('.//configengine/ldap/admins/dn', ceconfXML)
+
+		# Postgresql values
+		dbConfig = {}
+		logger.debug('Assigning %s from %s' % ('Postgresql Username', 'ceconfXML'))
+		dbConfig['user'] = ds.xmlpath('.//configengine/database/username', ceconfXML)
+		logger.debug('Assigning %s from %s' % ('Postgresql Hostname', 'ceconfXML'))
+		dbConfig['host'] = ds.xmlpath('.//configengine/database/hostname', ceconfXML)
+		logger.debug('Assigning %s from %s' % ('Postgresql Port', 'ceconfXML'))
+		dbConfig['port'] = ds.xmlpath('.//configengine/database/port', ceconfXML)
+		logger.debug('Assigning %s from %s' % ('Postgresql Database', 'ceconfXML'))
+		dbConfig['db'] = ds.xmlpath('.//configengine/database/db', ceconfXML)
+		logger.debug('Assigning %s from %s' % ('Postgresql Password', 'ceconfXML'))
+		dbConfig['pass'] = ds.getDecrypted('.//configengine/database/password', ceconfXML, './/configengine/database/protected')
 
 		logger.debug('Assigning %s from %s' % ('ldapAddress', 'mconfXML'))
 		ldapAddress = ds.xmlpath('.//settings/custom/ldapAddress', mconfXML)
@@ -462,8 +488,6 @@ if len(sys.argv) == 0:
 
 		logger.debug('Assigning %s from %s' % ('sListenAddress', 'gconfXML'))
 		sListenAddress = ds.xmlpath('.//settings/custom/listeningLocation', gconfXML)
-		logger.debug('Assigning %s from %s' % ('trustedName', 'gconfXML'))
-		trustedName = ds.xmlpath('.//settings/custom/trustedAppName', gconfXML)
 		logger.debug('Assigning %s from %s' % ('gPort', 'gconfXML'))
 		gPort = ds.xmlpath('.//settings/custom/port', gconfXML)
 		logger.debug('Assigning %s from %s' % ('gAttachSize', 'gconfXML'))
@@ -474,9 +498,16 @@ if len(sys.argv) == 0:
 		sPort = ds.xmlpath('.//settings/custom/soapServer', gconfXML).split("://",1)[1].split(":",1)[1].split("/",1)[0]
 		logger.debug('Assigning %s from %s' % ('sSecure', 'gconfXML'))
 		sSecure = ds.xmlpath('.//settings/custom/soapServer', gconfXML).split("://",1)[0]
+		# Trusted app values
+		trustedConfig = {}
+		logger.debug('Assigning %s from %s' % ('trusted app name', 'gconfXML'))
+		trustedConfig['name'] = ds.xmlpath('.//settings/custom/trustedAppName', gconfXML)
+		logger.debug('Assigning %s from %s' % ('trusted app key', 'gconfXML'))
+		trustedConfig['key'] = ds.getDecrypted('.//settings/custom/trustedAppKey',gconfXML, './/settings/custom/protected')
 
 		logger.debug('Assigning %s from %s' % ('wPort', 'wconfXML'))
 		wPort = ds.xmlpath('.//server/port', wconfXML)
+
 		time2 = time.time()
 		logger.info('Assigning variables from XML complete')
 		logger.debug("Assigning variables took %0.3f ms" % ((time2 - time1) * 1000))
@@ -493,8 +524,9 @@ else:
 # TEST CODE / Definitions
 
 ds.datasyncBanner(dsappversion)
-
-# autoUpdateDsapp()
+print dbConfig
+print trustedConfig
+print ldapConfig
 
 ds.eContinue()
 sys.exit(0)
