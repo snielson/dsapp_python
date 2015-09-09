@@ -44,9 +44,6 @@ if not os.path.exists('/opt/novell/datasync/tools/dsapp/logs/'):
 	os.makedirs('/opt/novell/datasync/tools/dsapp/logs/')
 
 sys.path.append('./lib')
-# TODO : uncomment on mobility server
-# sys.path.append('/opt/novell/datasync/common/lib/')
-# sys.path.append('/root/Desktop/scripts/python/lib')
 import dsappDefinitions as ds
 import spin
 import psycopg2
@@ -80,17 +77,19 @@ dsappupload = dsappDirectory + "/upload"
 rootDownloads = "/root/Downloads"
 
 # Configuration Files
-mconf = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/mobility/connector.xml"
-gconf = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/groupwise/connector.xml"
-ceconf = "/etc/datasync/configengine/configengine.xml"
-econf = "/etc/datasync/configengine/engines/default/engine.xml"
-wconf = "/etc/datasync/webadmin/server.xml"
+config_files = {}
+config_files['mconf'] = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/mobility/connector.xml"
+config_files['gconf'] = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/groupwise/connector.xml"
+config_files['ceconf'] = "/etc/datasync/configengine/configengine.xml"
+config_files['econf'] = "/etc/datasync/configengine/engines/default/engine.xml"
+config_files['wconf'] = "/etc/datasync/webadmin/server.xml"
 
 # Test server paths
-# mconf = "/root/Desktop/confXML/mobility/connector.xml"
-# gconf = "/root/Desktop/confXML/groupwise/connector.xml"
-# ceconf = "/root/Desktop/confXML/configengine.xml"
-# wconf = "/root/Desktop/confXML/server.xml"
+# config_files['mconf'] = "/root/Desktop/confXML/mobility/connector.xml"
+# config_files['gconf'] = "/root/Desktop/confXML/groupwise/connector.xml"
+# config_files['ceconf'] = "/root/Desktop/confXML/configengine.xml"
+# config_files['econf'] = "/etc/datasync/configengine/engines/default/engine.xml"
+# config_files['wconf'] = "/root/Desktop/confXML/server.xml"
 
 # Misc variables
 serverinfo = "/etc/*release"
@@ -135,10 +134,6 @@ ghcLog = dsappConf + "/generalHealthCheck.log"
 #	Log Settings
 ##################################################################################################
 
-# if os.path.isfile(dsappLogSettings):
-# 	Config.read(dsappLogSettings)
-# print Config.get('logger___main__', 'level')
-
 # TODO: Change logger level via switch
 logging.config.fileConfig(dsappLogSettings)
 logger = logging.getLogger(__name__)
@@ -174,6 +169,7 @@ def exit_cleanup():
 	# Clear dsapp/tmp
 	ds.removeAllFiles("/opt/novell/datasync/tools/dsapp/tmp/")
 
+	# TODO : Remove .pgpass code when its no longer used (password used directly in script)
 	# Removes .pgpass if pgpass=true in dsapp.conf
 	if pgpass:
 		if sum(1 for line in open(dsappConf + '/dsapp.pid')) == 1:
@@ -221,7 +217,6 @@ def updateDsapp(publicVersion):
 	ds.logger.info('Updating dsapp to v%s' % (publicVersion))
 
 	# Download new version & extract
-	# TODO : Test if service exists
 	ds.dlfile('ftp://ftp.novell.com/outgoing/%s' % (dsapp_tar))
 	print
 	tar = tarfile.open(dsapp_tar, 'r:gz')
@@ -421,17 +416,17 @@ if len(sys.argv) == 0:
 		# XML tree of each XML file
 		logger.info('Building XML trees started')
 		time1 = time.time()
-		logger.debug('Building %s tree from: %s' % ('mconfXML', mconf))
-		mconfXML = ds.getXMLTree(mconf)
-		logger.debug('Building %s tree from: %s' % ('ceconfXML', ceconf))
-		ceconfXML = ds.getXMLTree(ceconf)
-		logger.debug('Building %s tree from: %s' % ('wconfXML', wconf))
-		wconfXML = ds.getXMLTree(wconf)
-		logger.debug('Building %s tree from: %s' % ('gconfXML', gconf))
-		gconfXML = ds.getXMLTree(gconf)
+		logger.debug('Building %s tree from: %s' % ('mconfXML', config_files['mconf']))
+		mconfXML = ds.getXMLTree(config_files['mconf'])
+		logger.debug('Building %s tree from: %s' % ('ceconfXML', config_files['ceconf']))
+		ceconfXML = ds.getXMLTree(config_files['ceconf'])
+		logger.debug('Building %s tree from: %s' % ('wconfXML', config_files['wconf']))
+		wconfXML = ds.getXMLTree(config_files['wconf'])
+		logger.debug('Building %s tree from: %s' % ('gconfXML', config_files['gconf']))
+		gconfXML = ds.getXMLTree(config_files['gconf'])
 		time2 = time.time()
 		logger.info('Building XML trees complete')
-		logger.debug("Building XML trees took %0.3f ms" % ((time2 - time1) * 1000))
+		logger.info("Building XML trees took %0.3f ms" % ((time2 - time1) * 1000))
 
 		time1 = time.time()
 		logger.info('Assigning variables from XML started')
@@ -440,6 +435,8 @@ if len(sys.argv) == 0:
 		provisioning = ds.xmlpath('.//configengine/source/provisioning', ceconfXML)
 		logger.debug('Assigning %s from %s' % ('authentication', 'ceconfXML'))
 		authentication = ds.xmlpath('.//configengine/source/authentication', ceconfXML)
+		logger.debug('Assigning %s from %s' % ('smtpPassword', 'ceconfXML'))
+		# smtpPassword = ds.getDecrypted('.//configengine/notification/smtpPassword', ceconfXML, './/configengine/notification/protected')
 		
 		# LDAP values
 		ldapConfig = {}
@@ -448,7 +445,7 @@ if len(sys.argv) == 0:
 		logger.debug('Assigning %s from %s' % ('login', 'ceconfXML'))
 		ldapConfig['login'] = ds.xmlpath('.//configengine/ldap/login/dn', ceconfXML)
 		logger.debug('Assigning %s from %s' % ('password', 'ceconfXML'))
-		ldapConfig['pass'] = ds.getDecrypted('.//configengine/ldap/login/password', ceconfXML, './/configengine/ldap/login/protected')
+		# ldapConfig['pass'] = ds.getDecrypted('.//configengine/ldap/login/password', ceconfXML, './/configengine/ldap/login/protected')
 		logger.debug('Assigning %s from %s' % ('ldap enabled', 'ceconfXML'))
 		ldapConfig['enabled'] = ds.xmlpath('.//configengine/ldap/enabled', ceconfXML)
 		logger.debug('Assigning %s from %s' % ('group container', 'ceconfXML'))
@@ -469,7 +466,7 @@ if len(sys.argv) == 0:
 		logger.debug('Assigning %s from %s' % ('Postgresql Database', 'ceconfXML'))
 		dbConfig['db'] = ds.xmlpath('.//configengine/database/db', ceconfXML)
 		logger.debug('Assigning %s from %s' % ('Postgresql Password', 'ceconfXML'))
-		dbConfig['pass'] = ds.getDecrypted('.//configengine/database/password', ceconfXML, './/configengine/database/protected')
+		# dbConfig['pass'] = ds.getDecrypted('.//configengine/database/password', ceconfXML, './/configengine/database/protected')
 
 		logger.debug('Assigning %s from %s' % ('ldapAddress', 'mconfXML'))
 		ldapAddress = ds.xmlpath('.//settings/custom/ldapAddress', mconfXML)
@@ -503,14 +500,14 @@ if len(sys.argv) == 0:
 		logger.debug('Assigning %s from %s' % ('trusted app name', 'gconfXML'))
 		trustedConfig['name'] = ds.xmlpath('.//settings/custom/trustedAppName', gconfXML)
 		logger.debug('Assigning %s from %s' % ('trusted app key', 'gconfXML'))
-		trustedConfig['key'] = ds.getDecrypted('.//settings/custom/trustedAppKey',gconfXML, './/settings/custom/protected')
+		# trustedConfig['key'] = ds.getDecrypted('.//settings/custom/trustedAppKey',gconfXML, './/settings/custom/protected')
 
 		logger.debug('Assigning %s from %s' % ('wPort', 'wconfXML'))
 		wPort = ds.xmlpath('.//server/port', wconfXML)
 
 		time2 = time.time()
 		logger.info('Assigning variables from XML complete')
-		logger.debug("Assigning variables took %0.3f ms" % ((time2 - time1) * 1000))
+		logger.info("Assigning variables took %0.3f ms" % ((time2 - time1) * 1000))
 		# Stop spinner
 		spinner.stop(); print '\n'
 
@@ -522,11 +519,6 @@ else:
 ##################################################################################################
 
 # TEST CODE / Definitions
-
-ds.datasyncBanner(dsappversion)
-print dbConfig
-print trustedConfig
-print ldapConfig
 
 ds.eContinue()
 sys.exit(0)

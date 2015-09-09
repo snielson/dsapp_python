@@ -1,32 +1,32 @@
 from __future__ import print_function
-import os,base64,sys,signal,getpass,shutil,fileinput,glob,atexit,time,itertools
-# import sys
-# import signal
-# import getpass
-# import shutil
-# import fileinput
-# import glob
-# import atexit
-# import time
-# import itertools
-import subprocess
-import socket
-import re
-import rpm
-import contextlib
+import os,base64,binascii,sys,signal,getpass,shutil,fileinput,glob,atexit,time,datetime,itertools
+import subprocess,socket,re,rpm,contextlib
 import tarfile, zipfile
 from pipes import quote
+from cStringIO import StringIO
 from urllib2 import urlopen, URLError, HTTPError
 import xml.etree.ElementTree as ET
 from xml.parsers.expat import ExpatError
-import logging
-import logging.config
+import logging, logging.config
 
 sys.path.append('./lib')
 import spin
 
+# NOTE : Get function Name
+# print (sys._getframe().f_code.co_name)
+
+# Folder variables
+dsappDirectory = "/opt/novell/datasync/tools/dsapp"
+dsappConf = dsappDirectory + "/conf"
+dsappLogs = dsappDirectory + "/logs"
+dsapplib = dsappDirectory + "/lib"
+dsappBackup = dsappDirectory + "/backup"
+dsapptmp = dsappDirectory + "/tmp"
+dsappupload = dsappDirectory + "/upload"
+rootDownloads = "/root/Downloads"
+
 # Log Settings
-logging.config.fileConfig('/opt/novell/datasync/tools/dsapp/conf/logging.cfg')
+logging.config.fileConfig('%s/logging.cfg' % (dsappConf))
 logger = logging.getLogger(__name__)
 
 def set_spinner():
@@ -358,13 +358,24 @@ def setupRPM(rpmName,flag='u'):
 
 #################### End of RPM definitions ###################
 
-def protect(msg, encode, key = None):
+def protect(msg, encode, path, key = None):
 # Code from GroupWise Mobility Service (GMS) datasync.util
-    if encode:
-        return base64.urlsafe_b64encode(os.popen('echo -n %s | openssl enc -aes-256-cbc -a -k `hostname -f`' % quote(msg)).read().rstrip())
-    else:
-        msg = base64.urlsafe_b64decode(msg)
-        return os.popen('echo %s | openssl enc -d -aes-256-cbc -a -k `hostname -f`' % quote(msg)).read().rstrip()
+	result = None
+	if encode:
+		result = base64.urlsafe_b64encode(os.popen('echo -n %s | openssl enc -aes-256-cbc -a -k `hostname -f`' % quote(msg)).read().rstrip())
+	else:
+		msg = base64.urlsafe_b64decode(msg)
+		result = os.popen('echo %s | openssl enc -d -aes-256-cbc -a -k `hostname -f` 2>%s/decode_error' % (quote(msg),dsapptmp)).read().rstrip()
+
+	if os.path.isfile(dsapptmp + '/decode_error'):
+		logger.error('bad decrypt - error decoding %s' % (path))
+		os.remove(dsapptmp + '/decode_error')
+
+		# TODO: Prompt user to attempt to fix files
+		print ('\ndsapp has encountered an error. See log for more details')
+		sys.exit(1)
+	elif result:
+		return result
 
 def getDecrypted(check_path, tree, pro_path):
 	try:
@@ -375,8 +386,35 @@ def getDecrypted(check_path, tree, pro_path):
 	if protected is None:
 		return xmlpath(check_path, tree)
 	elif int(protected) == 1:
-		return protect(xmlpath(check_path, tree), 0)
+		return protect(xmlpath(check_path, tree), 0, check_path)
 	elif int(protected) == 0:
 		return xmlpath(check_path,tree)
 
+def createPGPASS(config):
+	# TODO: May no longer be needed with psycopg2, or other methods to access the database
+	pgpass = '/root/.pgpass'
+	#Creating new .pgpass file
+	logger.debug('Creating new ~/.pgpass file')
+	with open(pgpass, 'w') as f:
+		f.write("*:*:*:*:%s" % (config['pass']))
+	os.chmod(pgpass, 0600)
 
+
+def backup_file(source, dest):
+	date_fmt = datetime.datetime.now().strftime('%X_%F')
+	folder_name = source.split('/')[-2]
+	dest = '%s/%s/%s' % (dest,date_fmt,folder_name)
+	if os.path.isfile(source):
+		if not os.path.exists(dest):
+			os.makedirs(dest)
+		logger.debug('Backing up %s to %s' % (source,dest))
+		shutil.copy(source, dest)
+
+def backup_config_files(list,fname=None):
+	folder_name = None
+	for path in list:
+		if os.path.isfile(list[path]):
+			if fname is not None:
+				backup_file(list[path],'%s/%s' % (dsappBackup,fname))
+			else:
+				backup_file(list[path],'%s' % (dsappBackup))
