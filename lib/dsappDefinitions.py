@@ -5,9 +5,11 @@ import tarfile, zipfile
 from pipes import quote
 from cStringIO import StringIO
 from urllib2 import urlopen, URLError, HTTPError
-import xml.etree.ElementTree as ET
+from lxml import etree
 from xml.parsers.expat import ExpatError
 import logging, logging.config
+import ConfigParser
+Config = ConfigParser.ConfigParser()
 
 sys.path.append('./lib')
 import spin
@@ -24,6 +26,7 @@ dsappBackup = dsappDirectory + "/backup"
 dsapptmp = dsappDirectory + "/tmp"
 dsappupload = dsappDirectory + "/upload"
 rootDownloads = "/root/Downloads"
+dsappSettings = dsappConf + "/setting.cfg"
 
 # Log Settings
 logging.config.fileConfig('%s/logging.cfg' % (dsappConf))
@@ -122,7 +125,7 @@ def pgrep(search, filePath, flag=0):
 
 def getXMLTree(filePath):
 	try:
-		return ET.ElementTree(file=filePath)
+		return etree.parse(filePath)
 		logger.debug(filePath + " loaded as XML tree")
 	except IOError:
 		print ('\ndsapp has encountered an error. See log for more details')
@@ -139,6 +142,18 @@ def xmlpath (elem, tree):
 		return (tree.find(elem).text)
 	except AttributeError:
 		logger.warning('Unable to find %s' % (elem))
+
+def setXML (elem, tree, value, filePath):
+	root = tree.getroot()
+	path = root.xpath(elem)
+	if value is not None:
+		path[0].text = value
+		try:
+			etree.ElementTree(root).write(filePath, pretty_print=True)
+			logger.debug("Set '%s' at %s in %s" % (value, elem, filePath))
+		except:
+			logger.warning('Unable to set %s at %s in %s' % (value, elem, filePath))
+
 
 def askYesOrNo(question, default=None):
 
@@ -358,16 +373,25 @@ def setupRPM(rpmName,flag='u'):
 
 #################### End of RPM definitions ###################
 
-def protect(msg, encode, path, key = None):
-# Code from GroupWise Mobility Service (GMS) datasync.util
+def protect(msg, encode, path, host = None, key = None):
+# Code from GroupWise Mobility Service (GMS) datasync.util.
+# Modified for dsapp
 	result = None
-	if encode:
-		result = base64.urlsafe_b64encode(os.popen('echo -n %s | openssl enc -aes-256-cbc -a -k `hostname -f`' % quote(msg)).read().rstrip())
+	if host is None:
+		if encode:
+			result = base64.urlsafe_b64encode(os.popen('echo -n %s | openssl enc -aes-256-cbc -a -k `hostname -f`' % quote(msg)).read().rstrip())
+		else:
+			msg = base64.urlsafe_b64decode(msg)
+			result = os.popen('echo %s | openssl enc -d -aes-256-cbc -a -k `hostname -f` 2>%s/decode_error' % (quote(msg),dsapptmp)).read().rstrip()
 	else:
-		msg = base64.urlsafe_b64decode(msg)
-		result = os.popen('echo %s | openssl enc -d -aes-256-cbc -a -k `hostname -f` 2>%s/decode_error' % (quote(msg),dsapptmp)).read().rstrip()
+		if encode:
+			result = base64.urlsafe_b64encode(os.popen('echo -n %s | openssl enc -aes-256-cbc -a -k %s' % (quote(msg),host)).read().rstrip())
+		else:
+			msg = base64.urlsafe_b64decode(msg)
+			result = os.popen('echo %s | openssl enc -d -aes-256-cbc -a -k %s 2>%s/decode_error' % (quote(msg),host,dsapptmp)).read().rstrip()
 
-	if os.path.isfile(dsapptmp + '/decode_error'):
+	# Check for errors
+	if os.path.isfile(dsapptmp + '/decode_error') and os.stat(dsapptmp + '/decode_error').st_size != 0 and path is not None:
 		logger.error('bad decrypt - error decoding %s' % (path))
 		os.remove(dsapptmp + '/decode_error')
 
@@ -377,7 +401,20 @@ def protect(msg, encode, path, key = None):
 	elif result:
 		return result
 
-def getDecrypted(check_path, tree, pro_path):
+def getEncrypted(msg, tree, pro_path, host = None):
+	try:
+		protected = xmlpath(pro_path, tree)
+	except:
+		pass
+
+	if protected is None:
+		return msg
+	elif int(protected) == 1:
+		return protect(msg, 1, None, host)
+	elif int(protected) == 0:
+		return msg
+
+def getDecrypted(check_path, tree, pro_path, host = None):
 	try:
 		protected = xmlpath(pro_path, tree)
 	except:
@@ -386,7 +423,7 @@ def getDecrypted(check_path, tree, pro_path):
 	if protected is None:
 		return xmlpath(check_path, tree)
 	elif int(protected) == 1:
-		return protect(xmlpath(check_path, tree), 0, check_path)
+		return protect(xmlpath(check_path, tree), 0, check_path, host)
 	elif int(protected) == 0:
 		return xmlpath(check_path,tree)
 
@@ -398,7 +435,6 @@ def createPGPASS(config):
 	with open(pgpass, 'w') as f:
 		f.write("*:*:*:*:%s" % (config['pass']))
 	os.chmod(pgpass, 0600)
-
 
 def backup_file(source, dest):
 	date_fmt = datetime.datetime.now().strftime('%X_%F')
@@ -418,3 +454,48 @@ def backup_config_files(list,fname=None):
 				backup_file(list[path],'%s/%s' % (dsappBackup,fname))
 			else:
 				backup_file(list[path],'%s' % (dsappBackup))
+
+def check_hostname(old_host, XMLconfig, config_files):
+	new_host = os.popen('echo `hostname -f`').read().rstrip()
+	if old_host != new_host:
+		print ("Hostname %s does not match configured %s" % (new_host, old_host))
+		logger.warning('Hostname %s does not match %s' % (new_host,old_host))
+		if askYesOrNo('Attempt to reconfigure XMLs:'):
+			update_xml_encrypt(XMLconfig, config_files, old_host, new_host)
+			Config.read(dsappSettings)
+			Config.set('Misc', 'hostname', new_host)
+			with open(dsappSettings, 'wb') as cfgfile:
+				Config.write(cfgfile)
+
+def find_old_hostname():
+	pass # TODO: Write the code to match old dsapp, or simply prompt for old hostname?
+
+def update_xml_encrypt(XMLconfig, config_files, old_host, new_host):
+	# Attempt to get all encrypted in clear text using old_host
+	before = {}
+	before['smtp'] = getDecrypted('.//configengine/notification/smtpPassword', XMLconfig['ceconf'], './/configengine/notification/protected', old_host)
+	before['ldap'] = getDecrypted('.//configengine/ldap/login/password', XMLconfig['ceconf'], './/configengine/ldap/login/protected', old_host)
+	before['key'] = getDecrypted('.//settings/custom/trustedAppKey', XMLconfig['gconf'], './/settings/custom/protected', old_host)
+	before['ceconf_db'] = getDecrypted('.//configengine/database/password', XMLconfig['ceconf'], './/configengine/database/protected', old_host)
+	before['mconf_db'] = getDecrypted('.//settings/custom/dbpass', XMLconfig['mconf'], './/settings/custom/protected', old_host)
+	before['econf_db'] = getDecrypted('.//settings/database/password', XMLconfig['econf'], './/settings/database/protected', old_host)
+	
+	after = {}
+	after['smtp'] = getEncrypted(before['smtp'], XMLconfig['ceconf'], './/configengine/notification/protected', new_host)
+	after['ldap'] = getEncrypted(before['ldap'], XMLconfig['ceconf'], './/configengine/ldap/login/protected', new_host)
+	after['key'] = getEncrypted(before['key'], XMLconfig['gconf'], './/settings/custom/protected', new_host)
+	after['ceconf_db'] = getEncrypted(before['ceconf_db'], XMLconfig['ceconf'], './/configengine/database/protected', new_host)
+	after['mconf_db'] = getEncrypted(before['mconf_db'], XMLconfig['mconf'], './/settings/custom/protected', new_host)
+	after['econf_db'] = getEncrypted(before['econf_db'], XMLconfig['econf'], './/settings/database/protected', new_host)
+	
+	# Backup XML files
+	backup_config_files(config_files)
+
+	# Update the XMLs
+	setXML('.//configengine/notification/smtpPassword', XMLconfig['ceconf'], after['smtp'], config_files['ceconf'])
+	setXML('.//configengine/ldap/login/password', XMLconfig['ceconf'], after['ldap'], config_files['ceconf'])
+	setXML('.//settings/custom/trustedAppKey', XMLconfig['gconf'], after['key'], config_files['gconf'])
+	setXML('.//configengine/database/password', XMLconfig['ceconf'], after['ceconf_db'], config_files['ceconf'])
+	setXML('.//settings/database/password', XMLconfig['econf'], after['econf_db'], config_files['econf'])
+	setXML('.//settings/custom/dbpass', XMLconfig['mconf'], after['mconf_db'], config_files['mconf'])
+	
