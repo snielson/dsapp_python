@@ -1,5 +1,5 @@
 from __future__ import print_function
-import os,base64,binascii,sys,signal,getpass,shutil,fileinput,glob,atexit,time,datetime,itertools
+import os,base64,binascii,sys,signal,select,getpass,shutil,fileinput,glob,atexit,time,datetime,itertools
 import subprocess,socket,re,rpm,contextlib
 import tarfile, zipfile
 from pipes import quote
@@ -32,10 +32,21 @@ dsappSettings = dsappConf + "/setting.cfg"
 logging.config.fileConfig('%s/logging.cfg' % (dsappConf))
 logger = logging.getLogger(__name__)
 
+# Read Config
+Config.read(dsappSettings)
+dsappversion = Config.get('Misc', 'dsapp.version')
+
 def set_spinner():
 	spinner = spin.progress_bar_loading()
 	spinner.setDaemon(True)
 	return spinner
+
+def print_disclaimer():
+	datasyncBanner(dsappversion)
+	prompt = 'Use at your own discretion. dsapp is not supported by Novell.\nSee [dsapp --bug] to report issues.'
+	print (prompt)
+	r,w,x = select.select([sys.stdin], [], [], 10)
+
 
 def clear():
 	tmp = os.system('clear')
@@ -489,7 +500,7 @@ def update_xml_encrypt(XMLconfig, config_files, old_host, new_host):
 	after['econf_db'] = getEncrypted(before['econf_db'], XMLconfig['econf'], './/settings/database/protected', new_host)
 	
 	# Backup XML files
-	backup_config_files(config_files)
+	backup_config_files(config_files, 'update_xml_encrypt')
 
 	# Update the XMLs
 	setXML('.//configengine/notification/smtpPassword', XMLconfig['ceconf'], after['smtp'], config_files['ceconf'])
@@ -498,4 +509,11 @@ def update_xml_encrypt(XMLconfig, config_files, old_host, new_host):
 	setXML('.//configengine/database/password', XMLconfig['ceconf'], after['ceconf_db'], config_files['ceconf'])
 	setXML('.//settings/database/password', XMLconfig['econf'], after['econf_db'], config_files['econf'])
 	setXML('.//settings/custom/dbpass', XMLconfig['mconf'], after['mconf_db'], config_files['mconf'])
+
+def promptVerifyPath(path):
+	if not os.path.exists(path):
+		if askYesOrNo("Path does not exist, would you like to create it now"):
+			logger.info('Creating folder: %s' % (path))
+			os.makedirs(path)
+
 	
