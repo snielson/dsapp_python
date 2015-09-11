@@ -45,6 +45,7 @@ if not os.path.exists('/opt/novell/datasync/tools/dsapp/logs/'):
 
 sys.path.append('./lib')
 import dsappDefinitions as ds
+import menus
 import spin
 import psycopg2
 
@@ -78,29 +79,29 @@ rootDownloads = "/root/Downloads"
 
 # Configuration Files
 config_files = {}
-# config_files['mconf'] = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/mobility/connector.xml"
-# config_files['gconf'] = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/groupwise/connector.xml"
-# config_files['ceconf'] = "/etc/datasync/configengine/configengine.xml"
-# config_files['econf'] = "/etc/datasync/configengine/engines/default/engine.xml"
-# config_files['wconf'] = "/etc/datasync/webadmin/server.xml"
+config_files['mconf'] = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/mobility/connector.xml"
+config_files['gconf'] = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/groupwise/connector.xml"
+config_files['ceconf'] = "/etc/datasync/configengine/configengine.xml"
+config_files['econf'] = "/etc/datasync/configengine/engines/default/engine.xml"
+config_files['wconf'] = "/etc/datasync/webadmin/server.xml"
 
 # Test server paths
-config_files['mconf'] = "/root/Desktop/confXML/mobility/connector.xml"
-config_files['gconf'] = "/root/Desktop/confXML/groupwise/connector.xml"
-config_files['ceconf'] = "/root/Desktop/confXML/configengine.xml"
-config_files['econf'] = "/root/Desktop/confXML/engine.xml"
-config_files['wconf'] = "/root/Desktop/confXML/server.xml"
+# config_files['mconf'] = "/root/Desktop/confXML/mobility/connector.xml"
+# config_files['gconf'] = "/root/Desktop/confXML/groupwise/connector.xml"
+# config_files['ceconf'] = "/root/Desktop/confXML/configengine.xml"
+# config_files['econf'] = "/root/Desktop/confXML/engine.xml"
+# config_files['wconf'] = "/root/Desktop/confXML/server.xml"
 
 # Misc variables
 serverinfo = "/etc/*release"
 rpminfo = "datasync"
 dsapp_tar = "dsapp.tgz"
 isNum = '^[0-9]+$'
-ds_20x = '2000'
-ds_21x = '2100'
-previousVersion = "20153"
-latestVersion = "210230"
-mobilityVersion = "0"
+ds_20x= 2000
+ds_21x = 2100
+previousVersion = 20153
+latestVersion = 210230
+mobilityVersion = 0
 version = "/opt/novell/datasync/version"
 
 # Mobility Directories
@@ -294,11 +295,22 @@ def checkPostgresql():
 	# cmd = subprocess.Popen(check, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
 	# result = cmd.wait()
 
+def setVariables():
+	# Depends on version 1.x or 2.x
+	if isInstalled:
+		if dsVersion > ds_20x:
+			declareVariables2()
+		else:
+			declareVariables1()
+
 
 
 ##################################################################################################
 #	Set up script
 ##################################################################################################
+
+# Disclaimer
+ds.print_disclaimer()
 
 # Register exit_cleanup with atexit
 atexit.register(exit_cleanup)
@@ -393,6 +405,9 @@ cPWD = os.getcwd()
 # Get mobility version
 dsVersion = getDSVersion()
 
+# Set up variables based on version
+setVariables()
+
 ##################################################################################################
 #	Initialization
 ##################################################################################################
@@ -424,6 +439,8 @@ if len(sys.argv) == 0:
 		# Check current hostname with stored hostname
 		logger.info('Checking hostname')
 		ds.check_hostname(dsHostname, XMLconfig, config_files)
+
+		# TODO: 
 
 		print "Loading settings... ",
 		# Start spinner
@@ -522,7 +539,17 @@ else:
 ##################################################################################################
 
 # TEST CODE / Definitions
-ds.datasyncBanner(dsappversion)
+# ds.datasyncBanner(dsappversion)
+
+menu = menus.show_menu('main_menu')
+while True:
+	choice = raw_input('Selection: ')
+	if choice in menu:
+		if menu[choice] == 'break':
+			break
+		else:
+			menu[choice]
+
 
 ds.eContinue()
 sys.exit(0)
