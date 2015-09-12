@@ -46,6 +46,7 @@ def print_disclaimer():
 	prompt = 'Use at your own discretion. dsapp is not supported by Novell.\nSee [dsapp --bug] to report issues.'
 	print (prompt)
 	r,w,x = select.select([sys.stdin], [], [], 10)
+	sys.stdout.flush()
 
 
 def clear():
@@ -515,5 +516,4 @@ def promptVerifyPath(path):
 		if askYesOrNo("Path does not exist, would you like to create it now"):
 			logger.info('Creating folder: %s' % (path))
 			os.makedirs(path)
-
 	
