@@ -45,9 +45,8 @@ if not os.path.exists('/opt/novell/datasync/tools/dsapp/logs/'):
 
 sys.path.append('./lib')
 import dsappDefinitions as ds
-import menus
 import spin
-import psycopg2
+# import setup
 
 ##################################################################################################
 #	Start up check
@@ -146,6 +145,8 @@ logger.info('------------- Starting dsapp -------------')
 
 # Define Variables for Eenou+ (2.x)
 def declareVariables2():
+	global ds_version
+	logger.debug('Setting version variables for 2.X')
 	mAlog = log + "/connectors/mobility-agent.log"
 	gAlog = log + "/connectors/groupwise-agent.log"
 	mlog = log + "/connectors/mobility.log"
@@ -154,6 +155,8 @@ def declareVariables2():
 
 # Define Variables for Pre-Eenou (1.x)
 def declareVariables1():
+	global ds_version
+	logger.debug('Setting version variables for 1.X')
 	mAlog = log + "/connectors/default.pipeline1.mobility-AppInterface.log"
 	gAlog = log + "/connectors/default.pipeline1.groupwise-AppInterface.log"
 	mlog = log + "/connectors/default.pipeline1.mobility.log"
@@ -266,34 +269,13 @@ def autoUpdateDsapp():
 				ds.logger.info('Updating dsapp v%s to v%s' % (dsappversion, publicVersion))
 				updateDsapp(publicVersion)
 			elif dsappversion >= publicVersion and publicVersion is not None:
-				ds.logger.info('dsapp is up-to-date at')
+				ds.logger.info('dsapp is up-to-date at v%s' % dsappversion)
 
 def getDSVersion():
 	if isInstalled:
 		with open(version) as f:
 			value = f.read().translate(None, '.')[0:4]
 		return value
-
-def checkPostgresql():
-	try:
-		conn = psycopg2.connect("dbname='postgres' user='%s' host='%s' password='%s'" % (dbConfig['user'],dbConfig['host'],dbConfig['pass']))
-		ds.logger.info('Successfully connected to postgresql [user=%s,pass=******]' % (dbConfig['user']))
-	except:
-		print "Unable to connect to the database"
-		logger.error('Unable to connect to postgresql [user=%s,pass=******]' % (dbConfig['user']))
-		return False
-	return True
-		# TODO: Add option for connection failure
-
-	# cur = conn.cursor()
-	# cur.execute("""SELECT dn from targets""")
-	# for row in rows:
-	# 	print "   ", row[0]
-
-	# var['command'] = '"SELECT dn from targets;"| tr -d \' \''
-	# check = 'PGPASSWORD=%(password)s psql -d %(db)s -U %(user)s -h %(host)s -p %(port)s -c %(command)s' % var
-	# cmd = subprocess.Popen(check, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
-	# result = cmd.wait()
 
 def setVariables():
 	# Depends on version 1.x or 2.x
@@ -304,13 +286,13 @@ def setVariables():
 			declareVariables1()
 
 
-
 ##################################################################################################
 #	Set up script
 ##################################################################################################
 
 # Disclaimer
-ds.print_disclaimer()
+# TODO: Always load on start? or work on placing at bottom of main menu
+# ds.print_disclaimer(dsappversion)
 
 # Register exit_cleanup with atexit
 atexit.register(exit_cleanup)
@@ -334,29 +316,6 @@ with open(dsappConf + '/dsapp.pid', 'r') as pidFile:
 		if not ds.check_pid(int(line)):
 			ds.removeLine(dsappConf + '/dsapp.pid', line)
 
-# Get Hostname of server, and store in setting.cfg
-if not os.path.isfile(dsappSettings):
-	dsHostname = os.popen('echo `hostname -f`').read().rstrip()
-
-# Create setting.cfg if not found
-if not os.path.isfile(dsappSettings):
-	with open(dsappSettings, 'w') as cfgfile:
-		Config.add_section('Misc')
-		Config.add_section('Settings')
-		Config.set('Settings', 'pgpass', True)
-		Config.set('Misc', 'hostname', dsHostname)
-		Config.set('Settings', 'new.feature', False)
-		Config.set('Misc', 'dsapp.version', dsappversion)
-		Config.set('Settings', 'auto.update', True)
-		Config.write(cfgfile)
-
-# Assign variables based on settings.cfg
-Config.read(dsappSettings)
-pgpass = Config.getboolean('Settings', 'pgpass')
-dsHostname = Config.get('Misc', 'hostname')
-newFeature = Config.getboolean('Settings', 'new.feature')
-autoUpdate = Config.getboolean('Settings', 'auto.update')
-
 # Get Console Size
 windowSize = rows, columns = os.popen('stty size', 'r').read().split()
 if int(windowSize[0]) < int(24) or int(windowSize[1]) < int(80):
@@ -374,7 +333,6 @@ for switch in switchCheck:
 	if switch not in switchArray:
 		print ("dsapp: %s is not a valid command. See '--help'." % (switch))
 		switchError = True
-
 # Exit script if invalid switch found
 if switchError:
 	sys.exit(1)
@@ -396,14 +354,48 @@ if forceMode:
 # Check if Mobility is installed on the server
 isInstalled = ds.checkInstall(forceMode, installedConnector)
 
+# Get mobility version
+dsVersion = getDSVersion()
+
+# Get Hostname of server, and store in setting.cfg
+if not os.path.isfile(dsappSettings):
+	dsHostname = os.popen('echo `hostname -f`').read().rstrip()
+
+# Create setting.cfg if not found
+if not os.path.isfile(dsappSettings):
+	with open(dsappSettings, 'w') as cfgfile:
+		Config.add_section('Misc')
+		Config.add_section('Settings')
+		Config.set('Settings', 'pgpass', True)
+		Config.set('Misc', 'hostname', dsHostname)
+		Config.set('Settings', 'new.feature', False)
+		Config.set('Misc', 'dsapp.version', dsappversion)
+		Config.set('Settings', 'auto.update', True)
+		Config.set('Misc', 'mobility.version', dsVersion)
+		Config.write(cfgfile)
+		
+# Update dsVersion in settings.cfg
+Config.read(dsappSettings)
+Config.set('Misc', 'mobility.version', dsVersion)
+with open(dsappSettings, 'wb') as cfgfile:
+	Config.write(cfgfile)
+
+# Assign variables based on settings.cfg
+Config.read(dsappSettings)
+pgpass = Config.getboolean('Settings', 'pgpass')
+dsHostname = Config.get('Misc', 'hostname')
+newFeature = Config.getboolean('Settings', 'new.feature')
+autoUpdate = Config.getboolean('Settings', 'auto.update')
+
 # Get Mobility Version
 mobilityVersion = ds.getVersion(isInstalled, version)
 
+# Only call autoUpdateDsapp() if filename is dsapp.pyc
+if __file__ == 'dsapp.pyc':
+	autoUpdateDsapp()
+
 # Get current working directory
 cPWD = os.getcwd()
-
-# Get mobility version
-dsVersion = getDSVersion()
 
 # Set up variables based on version
 setVariables()
@@ -439,8 +431,6 @@ if len(sys.argv) == 0:
 		# Check current hostname with stored hostname
 		logger.info('Checking hostname')
 		ds.check_hostname(dsHostname, XMLconfig, config_files)
-
-		# TODO: 
 
 		print "Loading settings... ",
 		# Start spinner
@@ -534,16 +524,23 @@ if len(sys.argv) == 0:
 else:
 	ds.clear()
 
+# Test database connection
+# TODO : TEST on server with dbs
+# if not ds.checkPostgresql(dbConfig):
+# 	sys.exit(1)
+
 ##################################################################################################
 #	Main
 ##################################################################################################
 
 # TEST CODE / Definitions
-# ds.datasyncBanner(dsappversion)
+ds.datasyncBanner(dsappversion)
 
 # Main menu
-menus.main_menu()
+import menus
 
+# menus.main_menu()
+# ds.dropDatabases(dbConfig)
 
-# ds.eContinue()
+ds.eContinue()
 sys.exit(0)

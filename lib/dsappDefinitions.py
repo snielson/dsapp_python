@@ -2,6 +2,7 @@ from __future__ import print_function
 import os,base64,binascii,sys,signal,select,getpass,shutil,fileinput,glob,atexit,time,datetime,itertools
 import subprocess,socket,re,rpm,contextlib
 import tarfile, zipfile
+import thread, threading
 from pipes import quote
 from cStringIO import StringIO
 from urllib2 import urlopen, URLError, HTTPError
@@ -13,6 +14,9 @@ Config = ConfigParser.ConfigParser()
 
 sys.path.append('./lib')
 import spin
+import psycopg2
+import getch
+getch = getch._Getch()
 
 # NOTE : Get function Name
 # print (sys._getframe().f_code.co_name)
@@ -28,26 +32,25 @@ dsappupload = dsappDirectory + "/upload"
 rootDownloads = "/root/Downloads"
 dsappSettings = dsappConf + "/setting.cfg"
 
+# Misc variables
+ds_20x= 2000
+ds_21x = 2100
+
 # Log Settings
 logging.config.fileConfig('%s/logging.cfg' % (dsappConf))
 logger = logging.getLogger(__name__)
-
-# Read Config
-Config.read(dsappSettings)
-dsappversion = Config.get('Misc', 'dsapp.version')
 
 def set_spinner():
 	spinner = spin.progress_bar_loading()
 	spinner.setDaemon(True)
 	return spinner
 
-def print_disclaimer():
+def print_disclaimer(dsappversion):
 	datasyncBanner(dsappversion)
 	prompt = 'Use at your own discretion. dsapp is not supported by Novell.\nSee [dsapp --bug] to report issues.'
 	print (prompt)
 	r,w,x = select.select([sys.stdin], [], [], 10)
 	sys.stdout.flush()
-
 
 def clear():
 	tmp = os.system('clear')
@@ -72,6 +75,16 @@ def check_pid(pid):
   else:
     return True
 
+def get_pid(name):
+	return os.popen('pgrep %s' % (name)).read().split()
+
+def kill_pid(pid, sig=1):
+	try:
+		os.kill(pid, sig)
+		logger.info('Killing process: %s' %(pid))
+	except OSError:
+		logger.warning('No such process: %s' %(pid))
+
 def removeLine(filePath, line):
 	try:
 		for fLine in fileinput.input(filePath, inplace=True):
@@ -84,14 +97,36 @@ def removeLine(filePath, line):
 def removeAllFiles(path):
 	filelist = glob.glob(path +"/*")
 	for f in filelist:
-		os.remove(f)
+		try:
+			os.remove(f)
+		except OSError:
+			logger.warning('No such file or directory: %s' % (f))
 
 def eContinue():
-   raw_input("Press Enter to continue: ")
+	print("Press Enter to continue ", end='')
+	while True:
+		enter = getch()
+		if ord(enter) == 13:
+			break
+	print()
 
-def eContinueTime():
-	# TODO:
-	pass
+def break_loop():
+	return True
+
+def eContinueTime(timeout=5):
+	signal.signal(signal.SIGALRM, break_loop)
+	print("Press Enter to continue ", end='')
+	signal.alarm(timeout)
+	loop = True
+	try:
+		while loop:
+			enter = getch()
+			if ord(enter) == 13:
+				loop = False
+	except:
+		loop = False
+	signal.alarm(0)
+	print()
 
 def checkInstall(forceMode, installedConnector):
 	if not forceMode:
@@ -517,3 +552,77 @@ def promptVerifyPath(path):
 			logger.info('Creating folder: %s' % (path))
 			os.makedirs(path)
 	
+def checkYaST():
+	# Check if YaST is running
+	yast_runnning = get_pid('yast')
+	for pid in yast_runnning:
+		pid = int(pid)
+		if check_pid(pid):
+			print ('YaST is running. Close YaST before proceeding')
+			if askYesOrNo('Attempt to close YaST now'):
+				logger.info('Attempting to kill YaST [%s]' % (pid))
+				kill_pid(pid)
+				time.sleep(1)
+				if check_pid(pid):
+					logger.warning('Failed to kill YaST [%s]' % (pid))
+					if askYesOrNo('Unable to close YaST. Force close YaST'):
+						logger.info('Attempting to force kill YaST [%s]' % (pid))
+						kill_pid(pid, 9)
+						time.sleep(1)
+						if not check_pid(pid):
+							print('Failed to force close YaST. Aborting')
+							logger.warning('Unable to force kill YaST. Aborting')
+							return False
+					else:
+						return False
+			else:
+				return False
+	return True
+
+
+
+#### Postgres Definitions #####
+
+def checkPostgresql(dbConfig):
+	try:
+		conn = psycopg2.connect("dbname='postgres' user='%s' host='%s' password='%s'" % (dbConfig['user'],dbConfig['host'],dbConfig['pass']))
+		ds.logger.info('Successfully connected to postgresql [user=%s,pass=******]' % (dbConfig['user']))
+		conn.close()
+	except:
+		print ('\ndsapp has encountered an error. See log for more details')
+		logger.error('Unable to connect to postgresql [user=%s,pass=******]' % (dbConfig['user']))
+		return False
+	return True
+		# TODO: Add option for connection failure
+
+	# cur = conn.cursor()
+	# cur.execute("""SELECT dn from targets""")
+	# for row in rows:
+	# 	print "   ", row[0]
+
+	# var['command'] = '"SELECT dn from targets;"| tr -d \' \''
+	# check = 'PGPASSWORD=%(password)s psql -d %(db)s -U %(user)s -h %(host)s -p %(port)s -c %(command)s' % var
+	# cmd = subprocess.Popen(check, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
+	# result = cmd.wait()
+
+def getConn(dbConfig):
+	try:
+		conn = psycopg2.connect("dbname='postgres' user='%s' host='%s' password='%s'" % (dbConfig['user'],dbConfig['host'],dbConfig['pass']))
+	except:
+		return None
+	return conn
+
+def dropDatabases(dbConfig):
+	conn = getConn(dbConfig)
+	Config.read(dsappSettings)
+	mobile_version = Config.get('Misc', 'mobility.version')
+	mobile_version = int(mobile_version)
+
+	#Dropping Tables
+	print ("Dropping datasync database")
+	# CODE HERE
+	print ("Dropping mobility database")
+	# CODE HERE
+	if mobile_version > ds_20x:
+		print ("Dropping dsmonitor database")
+	# 	# CODE HERE
