@@ -78,18 +78,18 @@ rootDownloads = "/root/Downloads"
 
 # Configuration Files
 config_files = {}
-# config_files['mconf'] = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/mobility/connector.xml"
-# config_files['gconf'] = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/groupwise/connector.xml"
-# config_files['ceconf'] = "/etc/datasync/configengine/configengine.xml"
-# config_files['econf'] = "/etc/datasync/configengine/engines/default/engine.xml"
-# config_files['wconf'] = "/etc/datasync/webadmin/server.xml"
+config_files['mconf'] = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/mobility/connector.xml"
+config_files['gconf'] = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/groupwise/connector.xml"
+config_files['ceconf'] = "/etc/datasync/configengine/configengine.xml"
+config_files['econf'] = "/etc/datasync/configengine/engines/default/engine.xml"
+config_files['wconf'] = "/etc/datasync/webadmin/server.xml"
 
 # Test server paths
-config_files['mconf'] = "/root/Desktop/confXML/mobility/connector.xml"
-config_files['gconf'] = "/root/Desktop/confXML/groupwise/connector.xml"
-config_files['ceconf'] = "/root/Desktop/confXML/configengine.xml"
-config_files['econf'] = "/root/Desktop/confXML/engine.xml"
-config_files['wconf'] = "/root/Desktop/confXML/server.xml"
+# config_files['mconf'] = "/root/Desktop/confXML/mobility/connector.xml"
+# config_files['gconf'] = "/root/Desktop/confXML/groupwise/connector.xml"
+# config_files['ceconf'] = "/root/Desktop/confXML/configengine.xml"
+# config_files['econf'] = "/root/Desktop/confXML/engine.xml"
+# config_files['wconf'] = "/root/Desktop/confXML/server.xml"
 
 # Misc variables
 serverinfo = "/etc/*release"
@@ -526,8 +526,8 @@ else:
 
 # Test database connection
 # TODO : TEST on server with dbs
-# if not ds.checkPostgresql(dbConfig):
-# 	sys.exit(1)
+if not ds.checkPostgresql(dbConfig):
+	sys.exit(1)
 
 ##################################################################################################
 #	Main
@@ -538,9 +538,7 @@ ds.datasyncBanner(dsappversion)
 
 # Main menu
 import menus
-
 # menus.main_menu()
-# ds.dropDatabases(dbConfig)
 
 ds.eContinue()
 sys.exit(0)
