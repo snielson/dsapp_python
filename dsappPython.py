@@ -621,8 +621,8 @@ ds.datasyncBanner(dsappversion)
 # ds.cuso(dbConfig)
 # ds.rcDS(rcScript, 'start')
 # ds.monitor_syncing_users(dbConfig)
-# menus.main_menu()
 
+# menus.main_menu()
 
 
 ds.eContinue()
