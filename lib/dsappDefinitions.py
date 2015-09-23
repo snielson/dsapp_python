@@ -1,10 +1,10 @@
 from __future__ import print_function
-import os,base64,binascii,sys,signal,select,getpass,shutil,fileinput,glob,atexit,time,datetime,itertools,pprint
+import os,base64,binascii,sys,signal,select,getpass,shutil,fileinput,glob,atexit,time,datetime,itertools,pprint,textwrap
 import subprocess,socket,re,rpm,contextlib
 import tarfile, zipfile
 import thread, threading
 from pipes import quote
-from cStringIO import StringIO
+import io
 from urllib2 import urlopen, URLError, HTTPError
 from lxml import etree
 from xml.parsers.expat import ExpatError
@@ -12,9 +12,10 @@ import logging, logging.config
 import ConfigParser
 Config = ConfigParser.ConfigParser()
 
-sys.path.append('./lib')
+sys.path.append('./lib') # TODO: Give absolute path when done.
 import spin
 import psycopg2
+import psycopg2.extras
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 import getch
 getch = getch._Getch()
@@ -46,10 +47,15 @@ version = "/opt/novell/datasync/version"
 # Misc variables
 ds_20x= 2000
 ds_21x = 2100
+dsappversion = None
 
 # Log Settings
 logging.config.fileConfig('%s/logging.cfg' % (dsappConf))
 logger = logging.getLogger(__name__)
+
+def set_dsappversion(version):
+	global dsappversion
+	dsappversion = version
 
 def set_spinner():
 	spinner = spin.progress_bar_loading()
@@ -64,7 +70,7 @@ def print_disclaimer(dsappversion):
 	sys.stdout.flush()
 
 def clear():
-	tmp = os.system('clear')
+	tmp = subprocess.call('clear',shell=True)
 
 def datasyncBanner(dsappversion):
 	banner="""
@@ -87,7 +93,7 @@ def check_pid(pid):
     return True
 
 def get_pid(name):
-	return os.popen('pgrep %s' % (name)).read().split()
+	return os.popen('pgrep -f %s' % (name)).read().split()
 
 def kill_pid(pid, sig=1):
 	try:
@@ -170,15 +176,6 @@ def getVersion(isInstalled,version):
 def findReplace(find, replace, filePath):
 	for line in fileinput.input(filePath, inplace=True):
 		print(line.replace(find,replace), end='')
-
-def pushConf(attribute, value, filePath):
-	# TODO : May not be needed with ConfigParser
-	find = str(attribute + "=.*")
-	replace = str(attribute + "=" + value)
-
-	logger.debug('Updating: ' + attribute + ' to: ' + value)
-	for line in fileinput.input(filePath, inplace=True):
-		print(re.sub(find, replace, line), end='')
 
 def pgrep(search, filePath, flag=0):
 	# Python equiv linux grep
@@ -423,9 +420,9 @@ def setupRPM(rpmName,flag='u'):
 	        logger.info("%s %s-%s-%s started" % (log, te.N(), te.V(), te.R()))
 
 		if flag == 'u':
-		    print ("\nUpdating... ", end='')
+		    print ("\nUpdating.. ", end='')
 		if flag == 'i':
-			print ("\nInstalling... ", end='')
+			print ("\nInstalling.. ", end='')
 
 	    spinner.start(); time.sleep(.000001)
 	    ts.run(runCallback, 1)
@@ -480,18 +477,18 @@ def protect(msg, encode, path, host = None, key = None):
 			result = base64.urlsafe_b64encode(os.popen('echo -n %s | openssl enc -aes-256-cbc -a -k `hostname -f`' % quote(msg)).read().rstrip())
 		else:
 			msg = base64.urlsafe_b64decode(msg)
-			result = os.popen('echo %s | openssl enc -d -aes-256-cbc -a -k `hostname -f` 2>%s/decode_error' % (quote(msg),dsapptmp)).read().rstrip()
+			result = os.popen('echo %s | openssl enc -d -aes-256-cbc -a -k `hostname -f` 2>%s/decode_error_check' % (quote(msg),dsapptmp)).read().rstrip()
 	else:
 		if encode:
 			result = base64.urlsafe_b64encode(os.popen('echo -n %s | openssl enc -aes-256-cbc -a -k %s' % (quote(msg),host)).read().rstrip())
 		else:
 			msg = base64.urlsafe_b64decode(msg)
-			result = os.popen('echo %s | openssl enc -d -aes-256-cbc -a -k %s 2>%s/decode_error' % (quote(msg),host,dsapptmp)).read().rstrip()
+			result = os.popen('echo %s | openssl enc -d -aes-256-cbc -a -k %s 2>%s/decode_error_check' % (quote(msg),host,dsapptmp)).read().rstrip()
 
 	# Check for errors
-	if os.path.isfile(dsapptmp + '/decode_error') and os.stat(dsapptmp + '/decode_error').st_size != 0 and path is not None:
+	if os.path.isfile(dsapptmp + '/decode_error_check') and os.stat(dsapptmp + '/decode_error_check').st_size != 0 and path is not None:
 		logger.error('bad decrypt - error decoding %s' % (path))
-		os.remove(dsapptmp + '/decode_error')
+		os.remove(dsapptmp + '/decode_error_check')
 
 		# TODO: Prompt user to attempt to fix files
 		print ('\ndsapp has encountered an error. See log for more details')
@@ -671,6 +668,7 @@ def dropDatabases(dbConfig):
 
 	#Dropping Tables
 	print ("Dropping datasync database")
+	logger.info("Dropping databases started")
 	time1 = time.time()
 	try:
 		cur.execute("DROP DATABASE datasync")
@@ -705,7 +703,8 @@ def dropDatabases(dbConfig):
 			conn.close()
 			return
 	time2 = time.time()
-	logger.info("Dropping databases took %0.3f ms" % ((time2 - time1) * 1000))
+	logger.info('Dropping databases complete')
+	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 	cur.close()
 	conn.close()
 
@@ -787,7 +786,7 @@ def createDatabases(dbConfig):
 	time2 = time.time()
 	print('\nDatabase creation done')
 	logger.info('Creating databases complete')
-	logger.info("Creating databases took %0.3f ms" % ((time2 - time1) * 1000))
+	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
 ###### End of Postgresql Definitions ########
 
@@ -860,4 +859,418 @@ def  cuso(dbConfig, op = 'everything'):
 	time2 = time.time()
 	print('CUSO complete')
 	logger.info('CUSO complete')
-	logger.info("CUSO took %0.3f ms" % ((time2 - time1) * 1000))
+	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
+def registerDS ():
+	#Obtain Registration/Activation Code and Email Address
+	try:
+		reg = raw_input("Registration Code: ")
+		email = raw_input("Email Address: ")
+		if reg == '' or email == '':
+			print("Invalid input")
+			raise
+	except:
+		print()
+	else:
+		time1 = time.time()
+		spinner = set_spinner()
+		print("Running registration.. ", end='')
+		logger.info('Starting mobility registration')
+		spinner.start(); time.sleep(.000001)
+
+		output,err = subprocess.Popen(['suse_register', '-a', 'regcode-mobility=%s' % reg, '-a', 'email=%s' % email, '-L', '/root/.suse_register.log', '-d', '3'], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
+		time2 = time.time()
+		spinner.stop(); print()
+		if err != '':
+		    print(textwrap.fill("\nThe code or email address you provided appear to be invalid or there is trouble contacting registration servers.").lstrip())
+		    logger.warning('Failed to register mobility')
+		else:
+			print("\nYour Mobility product has been successfully activated.")
+			logger.info('Mobility successfully registered')
+			logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
+	eContinue()
+
+def cleanLog():
+	print("Cleaning logs..")
+	removeAllFiles(log + '/connectors')
+	removeAllFiles(log + '/syncengine')
+	if askYesOrNo("To prevent future disk space hogging, set log maxage to 14"):
+		logger.info('Setting max log days to 14')
+		os.popen("sed -i 's|maxage.*|maxage 14|g' /etc/logrotate.d/datasync-*").read()
+		print('Completed setting log maxage to 14')
+
+def rcDS(rcScript, status, op = None):
+	spinner = set_spinner()
+
+	if status == "start" and op == None:
+		print('Starting Mobility.. ', end='')
+		spinner.start(); time.sleep(.000001)
+		d = subprocess.Popen(['%s' % rcScript, 'start'], stdout=subprocess.PIPE)
+		c = subprocess.Popen(['rccron', 'start'], stdout=subprocess.PIPE)
+		d.wait()
+		c.wait()
+		spinner.stop(); print()
+
+	elif status == "start" and op == "nocron":
+		print('Starting Mobility.. ', end='')
+		spinner.start(); time.sleep(.000001)
+		d = subprocess.Popen(['%s' % rcScript, 'start'], stdout=subprocess.PIPE)
+		d.wait()
+		spinner.stop(); print()
+
+	elif status == "stop" and op == None:
+		print('Stopping Mobility.. ', end='')
+		spinner.start(); time.sleep(.000001)
+		d = subprocess.Popen(['%s' % rcScript, 'stop'], stdout=subprocess.PIPE)
+		c = subprocess.Popen(['rccron', 'stop'], stdout=subprocess.PIPE)
+		d.wait()
+		c.wait()
+		pids = get_pid('/usr/bin/python')
+		cpids = get_pid('cron')
+		for pid in pids:
+			kill_pid(int(pid), 9)
+		for pid in cpids:
+			kill_pid(int(cpid))
+		spinner.stop(); print()
+
+	elif status == "stop" and op == "nocron":
+		print('Stopping Mobility.. ', end='')
+		spinner.start(); time.sleep(.000001)
+		d = subprocess.Popen(['%s' % rcScript, 'stop'], stdout=subprocess.PIPE)
+		d.wait()
+		pids = get_pid('/usr/bin/python')
+		for pid in pids:
+			kill_pid(int(pid), 9)
+		spinner.stop(); print()
+
+	elif status == "restart" and op == None:
+		print('Restarting Mobility.. ', end='')
+		spinner.start(); time.sleep(.000001)
+		d = subprocess.Popen(['%s' % rcScript, 'stop'], stdout=subprocess.PIPE)
+		c = subprocess.Popen(['rccron', 'stop'], stdout=subprocess.PIPE)
+		d.wait()
+		c.wait()
+		pids = get_pid('/usr/bin/python')
+		cpids = get_pid('cron')
+		for pid in pids:
+			kill_pid(int(pid), 9)
+		for pid in cpids:
+			kill_pid(int(cpid))
+		d = subprocess.Popen(['%s' % rcScript, 'start'], stdout=subprocess.PIPE)
+		c = subprocess.Popen(['rccron', 'start'], stdout=subprocess.PIPE)
+		d.wait()
+		c.wait()
+		spinner.stop(); print()
+
+def verifyUserMobilityDB(dbConfig, userConfig):
+	# Check if user exists in mobility database
+	logger.info('Checking for %s in mobility database' % userConfig['name'])
+	name = {'user': userConfig['name']}
+	conn = getConn(dbConfig, 'mobility')
+	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+	cur.execute("select distinct userid from users where userid ~* '(%(user)s[.|,].*)$' OR userid ilike '%(user)s' OR name ilike '%(user)s'" % name)
+	validUser = cur.fetchall()
+	cur.close()
+	conn.close()
+	for row in validUser:
+		if row['userid'] != "":
+			logger.debug("Found '%s' in mobility database" % row['userid'])
+			userConfig['mName'] = row['userid']
+			return True
+	logger.warning('User %s not found in mobility database' % userConfig['name'])
+	userConfig['mName'] = None
+	return False
+
+def verifyUserDataSyncDB(dbConfig, userConfig):
+	# Check if user exists in datasync database
+	logger.info('Checking for %s in datasync database' % userConfig['name'])
+	name = {'user': userConfig['name']}
+	conn = getConn(dbConfig, 'datasync')
+	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+	cur.execute("select distinct dn from targets where (\"dn\" ~* '(%(user)s[.|,].*)$' OR dn ilike '%(user)s' OR \"targetName\" ilike '%(user)s') AND disabled='0'" % name)
+	validUser = cur.fetchall()
+	cur.close()
+	conn.close()
+	for row in validUser:
+		if row['dn'] != "":
+			logger.debug("Found '%s' in datasync database" % row['dn'])
+			userConfig['dName'] = row['dn']
+			return True
+	logger.warning('User %s not found in datasync database' % userConfig['name'])
+	userConfig['dName'] = None
+	return False
+
+def get_username(userConfig):
+	with open(dsappConf + '/special_char.cfg', 'r') as f:
+		invalid = f.read().splitlines()
+	del invalid[0] # Removes comment from list
+	username = ""
+	# Prompt user for username
+	datasyncBanner(dsappversion)
+	print ("Enter 'q' to cancel")
+	while username == "":
+		username = raw_input("UserID: ")
+		if username == 'q' or username == 'Q':
+			userConfig['name'] = None
+			return False
+		elif username in invalid:
+			if not askYesOrNo("Invalid input. Try again"):
+				userConfig['name'] = None
+				return False
+			else:
+				username = ""
+		elif username == "":
+			if not askYesOrNo("No input. Try again"):
+				userConfig['name'] = None
+				return False
+	userConfig['name'] = username
+	return True
+
+def verifyUser(dbConfig):
+	userConfig = {}
+	# Return a number based on conditions 
+	get_username(userConfig)
+	if userConfig['name'] is None:
+		userConfig['mName'] = None
+		userConfig['dName'] = None
+		userConfig['verify'] = None
+		return userConfig
+	datasyncBanner(dsappversion)
+	# Calculate verifyCount based on where user was found
+	verifyCount = 0
+	# 0 = no user found ; 2 = datasync only ; 1 = mobility only ; 3 = both database
+
+	if verifyUserDataSyncDB(dbConfig, userConfig):
+		verifyCount += 2
+
+	if verifyUserMobilityDB(dbConfig, userConfig):
+		verifyCount += 1
+
+	if verifyCount == 0:
+		userConfig['verify'] = 0
+	elif verifyCount == 1:
+		userConfig['verify'] = 1
+	elif verifyCount == 2:
+		userConfig['verify'] = 2
+	elif verifyCount == 3:
+		userConfig['verify'] = 3
+
+	return userConfig
+
+def confirm_user(userConfig, database = None):
+	if userConfig['name'] == None:
+		return False
+	elif database == 1:
+		return True
+	elif database == None and userConfig['verify'] == 0:
+		print ("%s not found in Mobility" % userConfig['name'])
+		return False
+	elif database == 'mobility' and userConfig['verify'] == 2:
+		print ("%s not found in Mobility" % userConfig['name'])
+		return False
+	elif database == 'datasync' and userConfig['verify'] == 1:
+		print ("%s not found in Mobility" % userConfig['name'])
+		return False
+	return True
+
+def monitor_command(dbConfig, command, refresh):
+	clear()
+	conn = getConn(dbConfig, 'mobility')
+	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+
+	clearLine = "\033[1J" + "\033[H"
+	states = {'1': 'Initial Sync   ', '2': 'Synced         ', '3': 'Syncing-Days+  ', '5': 'Failed         ', '6':'Delete         ', '7': 'Re-Init        ', '9': 'Sync Validate  ', '11': 'Requesting Init', '12': 'Requesting More'}
+	logger.debug("Starting monitor with command: '%s'" % command)
+	try:
+		while True:
+			cur.execute(command)
+			monitor = cur.fetchall()
+			print ('  State              |   User ID                        [<Ctrl + c> to exit]')
+			print('---------------------+----------------------------')
+			for row in monitor:
+				print('  ' + states[row['state']] + '    |  ' + row['userid'])
+			time.sleep(refresh)
+			sys.stdout.write(clearLine)
+	except:
+		logger.debug('Ending monitor')
+
+	clear()
+	cur.close()
+	conn.close()
+
+def monitor_syncing_users(dbConfig, refresh = 1):
+	command = "SELECT state,userID FROM users WHERE state !='2'"
+	monitor_command(dbConfig, command, refresh)
+
+def monitorUser(dbConfig, userConfig = None, refresh = 1):
+	if userConfig is None:
+		userConfig = verifyUser(dbConfig)
+	if confirm_user(userConfig, 'mobility'):
+		command = "SELECT state,userID FROM users WHERE userid ilike '%%%s%%'" % userConfig['mName']
+		monitor_command(dbConfig, command, refresh)
+
+def setUserState(dbConfig, state):
+	# verifyUser sets vuid variable used in setUserState and removeAUser functions
+	userConfig = verifyUser(dbConfig)
+	if confirm_user(userConfig, 'mobility'):
+		conn = getConn(dbConfig, 'mobility')
+		cur = conn.cursor()
+		cur.execute("UPDATE users SET state = '%s' WHERE userid ilike '%%%s%%'" % (state, userConfig['mName']))
+		logger.info("Set '%s' to state %s" % (userConfig['mName'], state))
+
+		eContinue()
+		monitorUser(dbConfig, userConfig)
+
+def mCleanup(dbConfig, userConfig): # TODO Finish..
+	spinner = set_spinner()
+	uGuid = ""
+	
+	conn = getConn(dbConfig, 'mobility')
+	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+
+	# Get users mobility guid
+	cur.execute("select guid from users where userid ~* '(%(name)s[.|,].*)$' OR name ilike '%(name)s' OR userid ilike '%(name)s'" % userConfig)
+	data = cur.fetchall()
+	for row in data:
+		uGuid = row['guid']
+
+	logger.debug("uGuid assigned '%s'" % uGuid)
+
+	print ("Removing %s attachment maps from mobility.." % userConfig['name'])
+	logger.info("Removing '%s' attachmentmaps from mobility" % userConfig['name'])
+
+	# Delete attachmentmaps
+	cur.execute("delete from attachmentmaps where userid='%s'" % uGuid)
+	logger.debug("DELETE FROM attachmentmaps..")
+
+	# Get filestoreIDs that are safe to delete
+	print ("Obtaining list of file store IDs to remove..")
+	logger.info("Obtaining list of filestoreid to remove..")
+	cur.execute("SELECT filestoreid FROM attachments LEFT OUTER JOIN attachmentmaps ON attachments.attachmentid=attachmentmaps.attachmentid WHERE attachmentmaps.attachmentid IS NULL")
+	fileID = cur.fetchall()
+
+	print ("Removing %s from mobility database.. " % userConfig['name'], end='')
+	logger.info("Removing '%s' from mobility database started" % userConfig['name'])
+	spinner.start(); time.sleep(.000001)
+	time1 = time.time()
+
+	# clean tables with users guid
+	cur.execute("delete from foldermaps where deviceid IN (select deviceid from devices where userid='%s')" % uGuid)
+	logger.debug("DELETE FROM foldermaps..")
+	cur.execute("delete from deviceimages where userid='%s'" % uGuid)
+	logger.debug("DELETE FROM deviceimages..")
+	cur.execute("delete from syncevents where userid='%s'" % uGuid)
+	logger.debug("DELETE FROM syncevents..")
+	cur.execute("delete from deviceevents where userid='%s'" % uGuid)
+	logger.debug("DELETE FROM deviceevents..")
+	cur.execute("delete from devices where userid='%s'" % uGuid)
+	logger.debug("DELETE FROM devices..")
+	cur.execute("delete from users where guid='%s'" % uGuid)
+	logger.debug("DELETE FROM users..")
+	cur.execute("delete from attachments where attachmentid IN (select attachmentid from attachmentmaps where objectid in (select objectid from deviceimages where userid='%s'))" % uGuid)
+	logger.debug("DELETE FROM attachments where attachmentid..")
+	cur.execute("delete from attachments where filestoreid IN (SELECT filestoreid FROM attachments LEFT OUTER JOIN attachmentmaps ON attachments.attachmentid=attachmentmaps.attachmentid WHERE attachmentmaps.attachmentid IS NULL)")
+	logger.debug("DELETE FROM attachments where filestoreid..")
+
+	# TODO : Work on cleaning up filesystem files. Should be threaded.
+
+	# # Remove duplicate fileIDs
+	# echo -e "\nGenerating list of files..."
+	# echo "$fileID" >> $dsappLogs/fileIDs;
+	# cat $dsappLogs/fileIDs | sort -u --parallel $cpuCore > $dsappLogs/fileIDs.tmp; mv $dsappLogs/fileIDs.tmp $dsappLogs/fileIDs;
+	# sed -i '/^\s*$/d' $dsappLogs/fileIDs;
+	# fileID=`cat $dsappLogs/fileIDs`;
+
+	# # echo to output
+	# if [ -n "$fileID" ];then
+	# 	echo -e "Removing `echo $fileID|wc -w` attachments from file system."
+
+	# # While loop to delete all 'safe to delete' attachments from the file system (runs in background)
+	# if [ -n "$fileID" ];then
+	# 	echo -e "\n"`date`"\n------- Removing `echo $fileID|wc -w` attachments -------" >> $dsappLogs/mCleanup.log
+	# 	local attachmentCount=0;
+	# 	while IFS= read -r line
+	# 		if [ -f "$mAttach`python $dsapplib/filestoreIdToPath.pyc $line`" ];then
+	# 			rm -fv $mAttach`python $dsapplib/filestoreIdToPath.pyc $line` >> $dsappLogs/mCleanup.log
+	# 			attachmentCount=$(($attachmentCount + 1));
+	# 		else
+	# 			echo -e "Warning : FileID $line not found" >> $dsappLogs/mCleanup.log
+	# 		sed -i "/$line/d" $dsappLogs/fileIDs;
+	# 		fileID=`cat $dsappLogs/fileIDs`;
+	# 	done <<< "$fileID"
+	# 	echo -e "------- Complete : $attachmentCount files removed -------" >> $dsappLogs/mCleanup.log
+
+	time2 = time.time()
+	logger.info("Removing '%s' from mobility database complete" % userConfig['name'])
+	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+	spinner.stop(); print()
+
+def dCleanup(dbConfig, userConfig):
+	spinner = set_spinner()
+	uUser, psqlAppNameM, psqlAppNameG = "", "", ""
+
+	conn = getConn(dbConfig, 'datasync')
+	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+
+	# Get user dn from targets table;
+	cur.execute("select distinct dn from targets where (\"dn\" ~* '(%(name)s[.|,].*)$' OR dn ilike '%(name)s' OR \"targetName\" ilike '%(name)s') AND disabled='0'" % userConfig)
+	data = cur.fetchall()
+	for row in uUser:
+		uUser = row['dn']
+
+	# Get targetName from each connector
+	cur.execute("select \"targetName\" from targets where (dn ~* '(%(name)s[.|,].*)$' OR dn ilike '%(name)s' OR \"targetName\" ilike '%(name)s') AND \"connectorID\"='default.pipeline1.groupwise'" % userConfig)
+	data = cur.fetchall()
+	for row in data:
+		psqlAppNameG = row['targetName']
+
+	cur.execute("select \"targetName\" from targets where (dn ~* '(%(name)s[.|,].*)$' OR dn ilike '%(name)s' OR \"targetName\" ilike '%(name)s') AND \"connectorID\"='default.pipeline1.mobility'" % userConfig)
+	data = cur.fetchall()
+	for row in data:
+		psqlAppNameM = row['targetName']
+
+	logger.debug("uUser assigned '%s'" % uUser)
+	logger.debug("psqlAppNameG assigned '%s'" % psqlAppNameG)
+	logger.debug("psqlAppNameM assigned '%s'" % psqlAppNameM)
+
+	print ("Removing %s from datasync database.. " % userConfig['name'], end='')
+	logger.info("Removing '%s' from datasync database started" % userConfig['name'])
+
+	# Delete objectMappings, cache, membershipCache, folderMappings, and targets from datasync DB
+	spinner.start(); time.sleep(.000001)
+	time1 = time.time()
+	cur.execute("delete FROM \"objectMappings\" WHERE \"objectID\" IN (SELECT \"objectID\" FROM \"objectMappings\" WHERE \"objectID\" ilike '%%|%s' OR \"objectID\" ilike '%%|%s' OR \"objectID\" ilike '%%|%s')" % (psqlAppNameG, psqlAppNameM, userConfig['name']))
+	logger.debug('DELETE FROM objectMappings..')
+	cur.execute("delete FROM consumerevents WHERE edata ilike '%%<sourceName>%s</sourceName>%%' OR edata ilike '%%<sourceName>%s</sourceName>%%'" % (psqlAppNameG, psqlAppNameM))
+	logger.debug('DELETE FROM consumerevents..')
+	cur.execute("delete FROM \"folderMappings\" WHERE \"targetDN\" ilike '(%s[.|,].*)$' OR \"targetDN\" ilike '%s'" % (userConfig['name'],uUser))
+	logger.debug('DELETE FROM folderMappings..')
+	cur.execute("delete FROM cache WHERE \"sourceDN\" ilike '(%s[.|,].*)$' OR \"sourceDN\" ilike '%s'" % (userConfig['name'],uUser))
+	logger.debug('DELETE FROM cache..')
+	cur.execute("delete FROM \"membershipCache\" WHERE (groupdn ilike '(%s[.|,].*)$' OR memberdn ilike '(%s[.|,].*)$') OR (groupdn ilike '%s' OR memberdn ilike '%s')" % (userConfig['name'], userConfig['name'], uUser, uUser))
+	logger.debug('DELETE FROM membershipCache..')
+	cur.execute("delete FROM targets WHERE dn ~* '(%(name)s[.|,].*)$' OR dn ilike '%(name)s' OR \"targetName\" ilike '%(name)s'" % userConfig)
+	logger.debug('DELETE FROM targets..')
+	time2 = time.time()
+	logger.info("Removing '%s' from datasync database complete" % userConfig['name'])
+	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+	spinner.stop(); print()
+
+	cur.close()
+	conn.close()
+
+def remove_user(dbConfig, op = None):
+	# Pass in 1 for op to skip user database check in confirm_user()
+	userConfig = verifyUser(dbConfig)
+	datasyncBanner(dsappversion)
+	if op == 1:
+		logger.debug("Skipping user database check")
+		if confirm_user(userConfig, op):
+			dCleanup(dbConfig, userConfig)
+			mCleanup(dbConfig, userConfig)
+	elif op == None:
+		logger.debug("Checking user in database")
+		if confirm_user(userConfig):
+			dCleanup(dbConfig, userConfig)
+			mCleanup(dbConfig, userConfig)
