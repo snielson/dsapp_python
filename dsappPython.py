@@ -181,16 +181,10 @@ def exit_cleanup():
 
 
 def signal_handler_SIGINT(signal, frame):
-	monitorValue = False # TEMP
-
-	# Exit watch while staying in dsapp
-	if monitorValue:
-		monitorValue = False
-	else:
-		# Clean up dsapp
-		exit_cleanup
-		# Reset the terminal
-		sys.exit(1)
+	# Clean up dsapp
+	exit_cleanup
+	# Reset the terminal
+	sys.exit(1)
 
 def set_spinner():
 	spinner = spin.progress_bar_loading()
@@ -543,6 +537,10 @@ if len(sys.argv) == 0:
 		ldapConfig['user'] = ds.xmlpath('.//configengine/ldap/userContainer', XMLconfig['ceconf'])
 		logger.debug('Assigning %s from %s' % ('admins', 'ceconfXML'))
 		ldapConfig['admins'] = ds.xmlpath('.//configengine/ldap/admins/dn', XMLconfig['ceconf'])
+		logger.debug('Assigning %s from %s' % ('port', 'ceconfXML'))
+		ldapConfig['port'] = ds.xmlpath('.//configengine/ldap/port', XMLconfig['ceconf'])
+		logger.debug('Assigning %s from %s' % ('host', 'ceconfXML'))
+		ldapConfig['host'] = ds.xmlpath('.//configengine/ldap/hostname', XMLconfig['ceconf'])
 
 		# Postgresql values
 		dbConfig = {}
@@ -620,6 +618,9 @@ ds.datasyncBanner(dsappversion)
 # ds.rcDS(rcScript, 'stop')
 # ds.cuso(dbConfig)
 # ds.rcDS(rcScript, 'start')
+
+ds.addGroup(dbConfig, ldapConfig)
+
 # ds.monitor_syncing_users(dbConfig)
 
 # menus.main_menu()

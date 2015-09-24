@@ -9,11 +9,13 @@ from urllib2 import urlopen, URLError, HTTPError
 from lxml import etree
 from xml.parsers.expat import ExpatError
 import logging, logging.config
+from multiprocessing import Process
 import ConfigParser
 Config = ConfigParser.ConfigParser()
 
 sys.path.append('./lib') # TODO: Give absolute path when done.
 import spin
+import filestoreIdToPath
 import psycopg2
 import psycopg2.extras
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
@@ -41,7 +43,6 @@ dirVarMobility = "/var/lib/datasync"
 log = "/var/log/datasync"
 dirPGSQL = "/var/lib/pgsql"
 mAttach = dirVarMobility + "/mobility/attachments/"
-
 version = "/opt/novell/datasync/version"
 
 # Misc variables
@@ -1122,7 +1123,30 @@ def setUserState(dbConfig, state):
 		eContinue()
 		monitorUser(dbConfig, userConfig)
 
+def file_mCleanup(filePath, fileCount):
+	date = datetime.datetime.now().strftime("%H:%M:%S on %b %d, %Y")
+	count = 0
+	if os.path.isfile(filePath):
+		with open(filePath, 'r') as f:
+			lines = f.read().splitlines()
+		with open(dsappLogs + '/mCleanup.log', 'a') as f:
+			f.write("\n%s\n------- Removing %s attachments -------\n" % (date, fileCount))
+			for i in xrange(len(lines)):
+				removeF = mAttach + filestoreIdToPath.hashFileStoreID(lines[i])
+				try:
+					os.remove(removeF)
+					f.write("Removed '%s'\n" % removeF)
+					count += 1
+				except OSError:
+					f.write("Warning: file %s not found\n" % removeF)
+
+			f.write("------- Complete : %s files removed -------" % count)
+
+		os.remove(filePath)
+		os.remove(dsappConf + '/fileIDs.dsapp')
+
 def mCleanup(dbConfig, userConfig): # TODO Finish..
+	print ("Mobility database cleanup:")
 	spinner = set_spinner()
 	uGuid = ""
 	
@@ -1150,6 +1174,11 @@ def mCleanup(dbConfig, userConfig): # TODO Finish..
 	cur.execute("SELECT filestoreid FROM attachments LEFT OUTER JOIN attachmentmaps ON attachments.attachmentid=attachmentmaps.attachmentid WHERE attachmentmaps.attachmentid IS NULL")
 	fileID = cur.fetchall()
 
+	# Write fileIDs to a file
+	with open(dsappConf + '/fileIDs.dsapp', 'a') as f:
+		for line in fileID:
+			f.write(line['filestoreid']  + '\n')
+
 	print ("Removing %s from mobility database.. " % userConfig['name'], end='')
 	logger.info("Removing '%s' from mobility database started" % userConfig['name'])
 	spinner.start(); time.sleep(.000001)
@@ -1173,40 +1202,41 @@ def mCleanup(dbConfig, userConfig): # TODO Finish..
 	cur.execute("delete from attachments where filestoreid IN (SELECT filestoreid FROM attachments LEFT OUTER JOIN attachmentmaps ON attachments.attachmentid=attachmentmaps.attachmentid WHERE attachmentmaps.attachmentid IS NULL)")
 	logger.debug("DELETE FROM attachments where filestoreid..")
 
+	spinner.stop(); print()
+	cur.close()
+	conn.close()
 	# TODO : Work on cleaning up filesystem files. Should be threaded.
 
-	# # Remove duplicate fileIDs
-	# echo -e "\nGenerating list of files..."
-	# echo "$fileID" >> $dsappLogs/fileIDs;
-	# cat $dsappLogs/fileIDs | sort -u --parallel $cpuCore > $dsappLogs/fileIDs.tmp; mv $dsappLogs/fileIDs.tmp $dsappLogs/fileIDs;
-	# sed -i '/^\s*$/d' $dsappLogs/fileIDs;
-	# fileID=`cat $dsappLogs/fileIDs`;
+	# Remove duplicate fileIDs
+	count = 0
+	lines_seen = set()
+	outfile = open(dsappConf + '/uniq-fileIDs.dsapp', 'w')
+	if os.path.isfile(dsappConf + '/fileIDs.dsapp'):
+		spinner = set_spinner()
+		print ("Creating list of files to remove.. ", end='')
+		logger.debug("Remove any duplicates fileIDs")
+		spinner.start(); time.sleep(.000001)
+		for line in open(dsappConf + '/fileIDs.dsapp', 'r'):
+			if line not in lines_seen: # No duplicates
+				outfile.write(line)
+				lines_seen.add(line)
+				count += 1
+		outfile.close()
+		spinner.stop(); print()
 
-	# # echo to output
-	# if [ -n "$fileID" ];then
-	# 	echo -e "Removing `echo $fileID|wc -w` attachments from file system."
-
-	# # While loop to delete all 'safe to delete' attachments from the file system (runs in background)
-	# if [ -n "$fileID" ];then
-	# 	echo -e "\n"`date`"\n------- Removing `echo $fileID|wc -w` attachments -------" >> $dsappLogs/mCleanup.log
-	# 	local attachmentCount=0;
-	# 	while IFS= read -r line
-	# 		if [ -f "$mAttach`python $dsapplib/filestoreIdToPath.pyc $line`" ];then
-	# 			rm -fv $mAttach`python $dsapplib/filestoreIdToPath.pyc $line` >> $dsappLogs/mCleanup.log
-	# 			attachmentCount=$(($attachmentCount + 1));
-	# 		else
-	# 			echo -e "Warning : FileID $line not found" >> $dsappLogs/mCleanup.log
-	# 		sed -i "/$line/d" $dsappLogs/fileIDs;
-	# 		fileID=`cat $dsappLogs/fileIDs`;
-	# 	done <<< "$fileID"
-	# 	echo -e "------- Complete : $attachmentCount files removed -------" >> $dsappLogs/mCleanup.log
+	print ("Removing attachments..")
+	logger.info("Removing %s attachments in background process" % count)
+	# Clean up fileIDs in detached process
+	filePath = dsappConf + '/uniq-fileIDs.dsapp'
+	p = Process(target=file_mCleanup, args=(filePath, count,))
+	p.start()
 
 	time2 = time.time()
 	logger.info("Removing '%s' from mobility database complete" % userConfig['name'])
 	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
-	spinner.stop(); print()
 
 def dCleanup(dbConfig, userConfig):
+	print ("Datasync database cleanup:")
 	spinner = set_spinner()
 	uUser, psqlAppNameM, psqlAppNameG = "", "", ""
 
@@ -1268,9 +1298,64 @@ def remove_user(dbConfig, op = None):
 		logger.debug("Skipping user database check")
 		if confirm_user(userConfig, op):
 			dCleanup(dbConfig, userConfig)
+			print()
 			mCleanup(dbConfig, userConfig)
 	elif op == None:
 		logger.debug("Checking user in database")
 		if confirm_user(userConfig):
 			dCleanup(dbConfig, userConfig)
+			print()
 			mCleanup(dbConfig, userConfig)
+	print()
+	eContinue()
+
+def addGroup(dbConfig, ldapConfig):
+	conn = getConn(dbConfig, 'datasync')
+	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+
+	datasyncBanner(dsappversion)
+	ldapGroups = None
+	ldapGroupMembership = {}
+
+	logger.info("Obtaining all groups from Mobility")
+	cur.execute("select distinct dn from targets where \"targetType\"='group' AND dn ilike 'cn=%%'")
+	ldapGroups = cur.fetchall()
+
+	print ("\nMobility Group(s):")
+	for row in ldapGroups:
+		print (row['dn'])
+
+	print ("\nGroup Membership:")
+	for group in ldapGroups:
+		secure = "ldap"
+		if ldapConfig['port'] == "636":
+			secure = "ldaps"
+		cmd = "/usr/bin/ldapsearch -x -H %s://%s -D %s -w %s -b %s | perl -p00e 's/\r?\n //g' | grep member: | cut -d \":\" -f 2 | sed 's/^[ \t]*//' | sed 's/^/\"/' | sed 's/$/\",\"'%s'\"/'" % (secure, ldapConfig['host'], ldapConfig['login'], ldapConfig['pass'], group['dn'], group['dn'])
+		ldap = os.popen(cmd).read().strip()
+		print(ldap)
+		ldapGroupMembership[group['dn']] = ldap
+
+	print ()
+	if askYesOrNo("Does the above appear correct"):
+		copy_cmd = "copy \"membershipCache\"(memberdn,groupdn) from STDIN WITH DELIMITER ',' CSV HEADER"
+		cur.execute("delete from \"membershipCache\"")
+		logger.info('Removing old memberhipCache data')
+		with open(dsapptmp + '/ldapGroupMembership.dsapp' , 'a') as f:
+			f.write("memberdn,groupdn\n")
+			for group in ldapGroups:
+				f.write(ldapGroupMembership[group['dn']])
+
+		with open(dsapptmp + '/ldapGroupMembership.dsapp' ,'r') as f:
+			logger.info("Updating membershipCache with current data")
+			cur.copy_expert(sql=copy_cmd, file=f)
+			
+		os.remove (dsapptmp + '/ldapGroupMembership.dsapp')
+		print ("\nGroup Membership has been updated\n")
+		logger.info("Group membership has been updated")
+		
+	cur.close()
+	conn.close()
+
+	# TODO : Call function to fix reference cound / disabled
+
+
