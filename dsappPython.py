@@ -27,6 +27,7 @@ import re
 import tarfile, zipfile
 import rpm
 import urllib2
+import subprocess
 ts = rpm.TransactionSet()
 import ConfigParser
 Config = ConfigParser.ConfigParser()
@@ -43,11 +44,11 @@ Config = ConfigParser.ConfigParser()
 if not os.path.exists('/opt/novell/datasync/tools/dsapp/logs/'):
 	os.makedirs('/opt/novell/datasync/tools/dsapp/logs/')
 
-sys.path.append('./lib')
+sys.path.append('./lib') # TODO: Give absolute path when done.
 import dsappDefinitions as ds
-import menus
+ds.set_dsappversion(dsappversion)
+
 import spin
-import psycopg2
 
 ##################################################################################################
 #	Start up check
@@ -101,6 +102,7 @@ ds_20x= 2000
 ds_21x = 2100
 previousVersion = 20153
 latestVersion = 210230
+rcScript = None
 mobilityVersion = 0
 version = "/opt/novell/datasync/version"
 
@@ -146,19 +148,25 @@ logger.info('------------- Starting dsapp -------------')
 
 # Define Variables for Eenou+ (2.x)
 def declareVariables2():
+	global ds_version
+	global rcScript
+	logger.debug('Setting version variables for 2.X')
 	mAlog = log + "/connectors/mobility-agent.log"
 	gAlog = log + "/connectors/groupwise-agent.log"
 	mlog = log + "/connectors/mobility.log"
 	glog = log + "/connectors/groupwise.log"
-	# TODO: rcScript = "rcgms"
+	rcScript = "rcgms"
 
 # Define Variables for Pre-Eenou (1.x)
 def declareVariables1():
+	global ds_version
+	global rcScript
+	logger.debug('Setting version variables for 1.X')
 	mAlog = log + "/connectors/default.pipeline1.mobility-AppInterface.log"
 	gAlog = log + "/connectors/default.pipeline1.groupwise-AppInterface.log"
 	mlog = log + "/connectors/default.pipeline1.mobility.log"
 	glog = log + "/connectors/default.pipeline1.groupwise.log"
-	# TODO: rcScript="rcdatasync"
+	rcScript="rcdatasync"
 
 def exit_cleanup():
 	try:
@@ -169,31 +177,14 @@ def exit_cleanup():
 
 	# Clear dsapp/tmp
 	ds.removeAllFiles("/opt/novell/datasync/tools/dsapp/tmp/")
-
-	# TODO : Remove .pgpass code when its no longer used (password used directly in script)
-	# Removes .pgpass if pgpass=true in dsapp.conf
-	if pgpass:
-		if sum(1 for line in open(dsappConf + '/dsapp.pid')) == 1:
-			try:
-				os.remove('/root/.pgpass')
-			except OSError:
-				ds.logger.warning('No such file or directory: /root/.pgpass')
-
-	# Remove PID from dsapp.pid
 	ds.removeLine(dsappConf + '/dsapp.pid', str(os.getpid()))
 
 
 def signal_handler_SIGINT(signal, frame):
-	monitorValue = False # TEMP
-
-	# Exit watch while staying in dsapp
-	if monitorValue:
-		monitorValue = False
-	else:
-		# Clean up dsapp
-		exit_cleanup
-		# Reset the terminal
-		sys.exit(1)
+	# Clean up dsapp
+	exit_cleanup
+	# Reset the terminal
+	sys.exit(1)
 
 def set_spinner():
 	spinner = spin.progress_bar_loading()
@@ -266,34 +257,13 @@ def autoUpdateDsapp():
 				ds.logger.info('Updating dsapp v%s to v%s' % (dsappversion, publicVersion))
 				updateDsapp(publicVersion)
 			elif dsappversion >= publicVersion and publicVersion is not None:
-				ds.logger.info('dsapp is up-to-date at')
+				ds.logger.info('dsapp is up-to-date at v%s' % dsappversion)
 
 def getDSVersion():
 	if isInstalled:
 		with open(version) as f:
 			value = f.read().translate(None, '.')[0:4]
 		return value
-
-def checkPostgresql():
-	try:
-		conn = psycopg2.connect("dbname='postgres' user='%s' host='%s' password='%s'" % (dbConfig['user'],dbConfig['host'],dbConfig['pass']))
-		ds.logger.info('Successfully connected to postgresql [user=%s,pass=******]' % (dbConfig['user']))
-	except:
-		print "Unable to connect to the database"
-		logger.error('Unable to connect to postgresql [user=%s,pass=******]' % (dbConfig['user']))
-		return False
-	return True
-		# TODO: Add option for connection failure
-
-	# cur = conn.cursor()
-	# cur.execute("""SELECT dn from targets""")
-	# for row in rows:
-	# 	print "   ", row[0]
-
-	# var['command'] = '"SELECT dn from targets;"| tr -d \' \''
-	# check = 'PGPASSWORD=%(password)s psql -d %(db)s -U %(user)s -h %(host)s -p %(port)s -c %(command)s' % var
-	# cmd = subprocess.Popen(check, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
-	# result = cmd.wait()
 
 def setVariables():
 	# Depends on version 1.x or 2.x
@@ -303,6 +273,92 @@ def setVariables():
 		else:
 			declareVariables1()
 
+def dsUpdate(repo):
+	spinner = set_spinner()
+	if '%s/common/lib' % dirOptMobility not in sys.path:
+		sys.path.append(dirOptMobility + '/common/lib/')
+	import upgrade
+
+	ref = subprocess.Popen(['zypper', 'ref', '-f', repo], stdout=subprocess.PIPE)
+	ref.wait()
+	zLU = subprocess.Popen(['zypper', 'lu', '-r', repo], stdout=subprocess.PIPE).communicate()
+	if 'No updates found' in zLU[0]:
+		print "\nMobility is already this version, or newer"
+		ds.logger.info('Unable to update mobility. Same version or newer')
+		if ds.askYesOrNo('List %s packages' % repo):
+			pkg = subprocess.Popen(['zypper', 'pa', '-ir', '%s' % repo])
+			pkg.wait()
+			ds.logger.info('Listing %s packages' % repo)
+			print
+			if ds.askYesOrNo("Force install %s packages" % repo):
+				print "Force updating Mobility.. ",
+				ds.logger.info('Force updating Mobility..')
+				spinner.start(); time.sleep(.000001)
+				time1 = time.time()
+				install = subprocess.Popen(['zypper', '--non-interactive', 'install', '--force', '%s:' % repo], stdout=subprocess.PIPE)
+				install.wait()
+				spinner.stop(); print
+				time2 = time.time()
+				ds.logger.info("Foce update Mobility package complete")
+				ds.logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+				print "\nPlease run 'sh %s/update.sh' to complete the upgrade" % dirOptMobility
+	else:
+		print "Updating Mobility.. ",
+		ds.logger.info('Updating Mobility started')
+		spinner.start(); time.sleep(.000001)
+		time1 = time.time()
+		install = subprocess.Popen(['zypper', '--non-interactive', 'update', '--force', '-r', '%s' % repo], stdout=subprocess.PIPE)
+		install.wait()
+		spinner.stop(); print
+		time2 = time.time()
+		ds.logger.info("Updating Mobility package complete")
+		ds.logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
+		# Update config file
+		dsVersion = getDSVersion()
+		Config.read(dsappSettings)
+		Config.set('Misc', 'mobility.version', dsVersion)
+		with open(dsappSettings, 'wb') as cfgfile:
+			Config.write(cfgfile)
+		setVariables()
+		ds.logger.info('Updating Mobility schema started')
+		time1 = time.time()
+		ds.rcDS(rcScript,'stop')
+		os.environ["FEEDBACK"] = ""
+		os.environ["LOGGER"] = ""
+
+		pre = upgrade.Pre_Update()
+		if pre.get_it_done():
+			update = upgrade.connectorUpgrade(pre.version)
+			update.install_monitor()
+			update.service_upgrade()
+		time2 = time.time()
+		ds.logger.info("Updating Mobility schema complete")
+		ds.logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
+		p = subprocess.Popen(['rcpostgresql', 'stop'], stdout=subprocess.PIPE)
+		p.wait()
+		pids = ds.get_pid('/usr/bin/python')
+		for pid in pids:
+			ds.kill_pid(int(pid), 9)
+		
+		# Update config file
+		dsVersion = getDSVersion()
+		Config.read(dsappSettings)
+		Config.set('Misc', 'mobility.version', dsVersion)
+		with open(dsappSettings, 'wb') as cfgfile:
+			Config.write(cfgfile)
+		setVariables()
+
+		# getExactMobilityVersion
+		p = subprocess.Popen(['rcpostgresql', 'start'], stdout=subprocess.PIPE)
+		p.wait()
+		ds.rcDS(rcScript, 'start')
+
+		with open(dirOptMobility + '/version') as v:
+			version = v.read()
+		print "\nYour Mobility product has been successfully updated to %s" % version
+		ds.logger.info('Mobility product successfully updated to %s' % version)
 
 
 ##################################################################################################
@@ -310,7 +366,8 @@ def setVariables():
 ##################################################################################################
 
 # Disclaimer
-ds.print_disclaimer()
+# TODO: Always load on start? or work on placing at bottom of main menu
+# ds.print_disclaimer(dsappversion)
 
 # Register exit_cleanup with atexit
 atexit.register(exit_cleanup)
@@ -334,29 +391,6 @@ with open(dsappConf + '/dsapp.pid', 'r') as pidFile:
 		if not ds.check_pid(int(line)):
 			ds.removeLine(dsappConf + '/dsapp.pid', line)
 
-# Get Hostname of server, and store in setting.cfg
-if not os.path.isfile(dsappSettings):
-	dsHostname = os.popen('echo `hostname -f`').read().rstrip()
-
-# Create setting.cfg if not found
-if not os.path.isfile(dsappSettings):
-	with open(dsappSettings, 'w') as cfgfile:
-		Config.add_section('Misc')
-		Config.add_section('Settings')
-		Config.set('Settings', 'pgpass', True)
-		Config.set('Misc', 'hostname', dsHostname)
-		Config.set('Settings', 'new.feature', False)
-		Config.set('Misc', 'dsapp.version', dsappversion)
-		Config.set('Settings', 'auto.update', True)
-		Config.write(cfgfile)
-
-# Assign variables based on settings.cfg
-Config.read(dsappSettings)
-pgpass = Config.getboolean('Settings', 'pgpass')
-dsHostname = Config.get('Misc', 'hostname')
-newFeature = Config.getboolean('Settings', 'new.feature')
-autoUpdate = Config.getboolean('Settings', 'auto.update')
-
 # Get Console Size
 windowSize = rows, columns = os.popen('stty size', 'r').read().split()
 if int(windowSize[0]) < int(24) or int(windowSize[1]) < int(80):
@@ -374,7 +408,6 @@ for switch in switchCheck:
 	if switch not in switchArray:
 		print ("dsapp: %s is not a valid command. See '--help'." % (switch))
 		switchError = True
-
 # Exit script if invalid switch found
 if switchError:
 	sys.exit(1)
@@ -396,14 +429,46 @@ if forceMode:
 # Check if Mobility is installed on the server
 isInstalled = ds.checkInstall(forceMode, installedConnector)
 
+# Get mobility version
+dsVersion = getDSVersion()
+
+# Get Hostname of server, and store in setting.cfg
+if not os.path.isfile(dsappSettings):
+	dsHostname = os.popen('echo `hostname -f`').read().rstrip()
+
+# Create setting.cfg if not found
+if not os.path.isfile(dsappSettings):
+	with open(dsappSettings, 'w') as cfgfile:
+		Config.add_section('Misc')
+		Config.add_section('Settings')
+		Config.set('Misc', 'hostname', dsHostname)
+		Config.set('Settings', 'new.feature', False)
+		Config.set('Misc', 'dsapp.version', dsappversion)
+		Config.set('Settings', 'auto.update', True)
+		Config.set('Misc', 'mobility.version', dsVersion)
+		Config.write(cfgfile)
+		
+# Update dsVersion in settings.cfg
+Config.read(dsappSettings)
+Config.set('Misc', 'mobility.version', dsVersion)
+with open(dsappSettings, 'wb') as cfgfile:
+	Config.write(cfgfile)
+
+# Assign variables based on settings.cfg
+Config.read(dsappSettings)
+dsHostname = Config.get('Misc', 'hostname')
+newFeature = Config.getboolean('Settings', 'new.feature')
+autoUpdate = Config.getboolean('Settings', 'auto.update')
+
 # Get Mobility Version
 mobilityVersion = ds.getVersion(isInstalled, version)
 
+# Only call autoUpdateDsapp() if filename is dsapp.pyc
+if __file__ == 'dsapp.pyc':
+	autoUpdateDsapp()
+
 # Get current working directory
 cPWD = os.getcwd()
-
-# Get mobility version
-dsVersion = getDSVersion()
 
 # Set up variables based on version
 setVariables()
@@ -434,15 +499,13 @@ if len(sys.argv) == 0:
 		XMLconfig['gconf'] = ds.getXMLTree(config_files['gconf'])
 		time2 = time.time()
 		logger.info('Building XML trees complete')
-		logger.info("Building XML trees took %0.3f ms" % ((time2 - time1) * 1000))
+		logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
 		# Check current hostname with stored hostname
 		logger.info('Checking hostname')
 		ds.check_hostname(dsHostname, XMLconfig, config_files)
 
-		# TODO: 
-
-		print "Loading settings... ",
+		print "Loading settings.. ",
 		# Start spinner
 		spinner = set_spinner()
 		spinner.start(); time.sleep(.000001)
@@ -474,6 +537,10 @@ if len(sys.argv) == 0:
 		ldapConfig['user'] = ds.xmlpath('.//configengine/ldap/userContainer', XMLconfig['ceconf'])
 		logger.debug('Assigning %s from %s' % ('admins', 'ceconfXML'))
 		ldapConfig['admins'] = ds.xmlpath('.//configengine/ldap/admins/dn', XMLconfig['ceconf'])
+		logger.debug('Assigning %s from %s' % ('port', 'ceconfXML'))
+		ldapConfig['port'] = ds.xmlpath('.//configengine/ldap/port', XMLconfig['ceconf'])
+		logger.debug('Assigning %s from %s' % ('host', 'ceconfXML'))
+		ldapConfig['host'] = ds.xmlpath('.//configengine/ldap/hostname', XMLconfig['ceconf'])
 
 		# Postgresql values
 		dbConfig = {}
@@ -527,28 +594,36 @@ if len(sys.argv) == 0:
 
 		time2 = time.time()
 		logger.info('Assigning variables from XML complete')
-		logger.info("Assigning variables took %0.3f ms" % ((time2 - time1) * 1000))
+		logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 		# Stop spinner
 		spinner.stop(); print '\n'
 
 else:
 	ds.clear()
 
+# Test database connection
+# TODO : TEST on server with dbs
+if not ds.checkPostgresql(dbConfig):
+	sys.exit(1)
+
 ##################################################################################################
 #	Main
 ##################################################################################################
+import menus
 
 # TEST CODE / Definitions
-# ds.datasyncBanner(dsappversion)
+ds.datasyncBanner(dsappversion)
 
-menu = menus.show_menu('main_menu')
-while True:
-	choice = raw_input('Selection: ')
-	if choice in menu:
-		if menu[choice] == 'break':
-			break
-		else:
-			menu[choice]
+# ds.remove_user(dbConfig)
+# ds.rcDS(rcScript, 'stop')
+# ds.cuso(dbConfig)
+# ds.rcDS(rcScript, 'start')
+
+ds.addGroup(dbConfig, ldapConfig)
+
+# ds.monitor_syncing_users(dbConfig)
+
+# menus.main_menu()
 
 
 ds.eContinue()

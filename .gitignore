@@ -7,3 +7,9 @@
 *.o
 *.so
 *.pyc
+!filestoreIdToPath.pyc
+
+# Sublime #
+###################
+*.sublime-project
+*.sublime-workspace
