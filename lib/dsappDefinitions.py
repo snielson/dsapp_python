@@ -1,3 +1,5 @@
+# Written by Shane Nielson <snielson@projectuminfinitas.com>
+
 from __future__ import print_function
 import os,base64,binascii,sys,signal,select,getpass,shutil,fileinput,glob,atexit,time,datetime,itertools,pprint,textwrap
 import subprocess,socket,re,rpm,contextlib
@@ -13,7 +15,7 @@ from multiprocessing import Process
 import ConfigParser
 Config = ConfigParser.ConfigParser()
 
-sys.path.append('./lib') # TODO: Give absolute path when done.
+sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 import spin
 import filestoreIdToPath
 import psycopg2
@@ -21,9 +23,6 @@ import psycopg2.extras
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 import getch
 getch = getch._Getch()
-
-# NOTE : Get function Name
-# print (sys._getframe().f_code.co_name)
 
 # Folder variables
 dsappDirectory = "/opt/novell/datasync/tools/dsapp"
@@ -632,13 +631,6 @@ def checkYaST():
 
 #### Postgres Definitions #####
 
-# def show_query(title, qry):
-#     print('%s' % (title))
-#     cur.execute(qry)
-#     for row in cur.fetchall():
-#         print(row)
-#     print('')
-
 def checkPostgresql(dbConfig):
 	try:
 		conn = psycopg2.connect("dbname='postgres' user='%s' host='%s' password='%s'" % (dbConfig['user'],dbConfig['host'],dbConfig['pass']))
@@ -791,7 +783,7 @@ def createDatabases(dbConfig):
 
 ###### End of Postgresql Definitions ########
 
-def  cuso(dbConfig, op = 'everything'):
+def cuso(dbConfig, op = 'everything'):
 	print ('Running CUSO..\n')
 	logger.info('Starting CUSO')
 	time1 = time.time()
@@ -862,7 +854,7 @@ def  cuso(dbConfig, op = 'everything'):
 	logger.info('CUSO complete')
 	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
-def registerDS ():
+def registerDS():
 	#Obtain Registration/Activation Code and Email Address
 	try:
 		reg = raw_input("Registration Code: ")
@@ -1205,7 +1197,6 @@ def mCleanup(dbConfig, userConfig): # TODO Finish..
 	spinner.stop(); print()
 	cur.close()
 	conn.close()
-	# TODO : Work on cleaning up filesystem files. Should be threaded.
 
 	# Remove duplicate fileIDs
 	count = 0

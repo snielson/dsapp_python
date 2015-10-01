@@ -4,7 +4,7 @@
 #	dsapp was created to help customers and support engineers troubleshoot
 #	and solve common issues for the Novell GroupWise Mobility product.
 #
-#	Rewritten in python by: Shane Nielson <snielson@novell.com>
+#	Rewritten in python by: Shane Nielson <snielson@projectuminfinitas.com>
 #	Original dsapp by: Shane Nielson & Tyler Harris <tharris@novell.com>
 #
 ##################################################################################################
@@ -32,20 +32,13 @@ ts = rpm.TransactionSet()
 import ConfigParser
 Config = ConfigParser.ConfigParser()
 
-### Unused imports during dev --- Remove after ###
-# import getpass
-# import shutil
-# import fileinput
-# import glob
-# import subprocess
-# import itertools
-
 # Check for dsapp/logs folder (Needed for logs)
 if not os.path.exists('/opt/novell/datasync/tools/dsapp/logs/'):
 	os.makedirs('/opt/novell/datasync/tools/dsapp/logs/')
 
-sys.path.append('./lib') # TODO: Give absolute path when done.
+sys.path.append(os.path.dirname(os.path.realpath(__file__)) + '/lib')
 import dsappDefinitions as ds
+import dsappSoap as dsSOAP
 ds.set_dsappversion(dsappversion)
 
 import spin
@@ -531,15 +524,15 @@ if len(sys.argv) == 0:
 		
 		logger.debug('Assigning %s from %s' % ('ldap enabled', 'ceconfXML'))
 		ldapConfig['enabled'] = ds.xmlpath('.//configengine/ldap/enabled', XMLconfig['ceconf'])
-		logger.debug('Assigning %s from %s' % ('group container', 'ceconfXML'))
+		logger.debug('Assigning %s from %s' % ('LDAP group container', 'ceconfXML'))
 		ldapConfig['group'] = ds.xmlpath('.//configengine/ldap/groupContainer', XMLconfig['ceconf'])
-		logger.debug('Assigning %s from %s' % ('user container', 'ceconfXML'))
+		logger.debug('Assigning %s from %s' % ('LDAP user container', 'ceconfXML'))
 		ldapConfig['user'] = ds.xmlpath('.//configengine/ldap/userContainer', XMLconfig['ceconf'])
-		logger.debug('Assigning %s from %s' % ('admins', 'ceconfXML'))
+		logger.debug('Assigning %s from %s' % ('LDAP admins', 'ceconfXML'))
 		ldapConfig['admins'] = ds.xmlpath('.//configengine/ldap/admins/dn', XMLconfig['ceconf'])
-		logger.debug('Assigning %s from %s' % ('port', 'ceconfXML'))
+		logger.debug('Assigning %s from %s' % ('LDAP port', 'ceconfXML'))
 		ldapConfig['port'] = ds.xmlpath('.//configengine/ldap/port', XMLconfig['ceconf'])
-		logger.debug('Assigning %s from %s' % ('host', 'ceconfXML'))
+		logger.debug('Assigning %s from %s' % ('LDAP host', 'ceconfXML'))
 		ldapConfig['host'] = ds.xmlpath('.//configengine/ldap/hostname', XMLconfig['ceconf'])
 
 		# Postgresql values
@@ -555,10 +548,10 @@ if len(sys.argv) == 0:
 		logger.debug('Assigning %s from %s' % ('Postgresql Password', 'ceconfXML'))
 		dbConfig['pass'] = ds.getDecrypted('.//configengine/database/password', XMLconfig['ceconf'], './/configengine/database/protected')
 
-		logger.debug('Assigning %s from %s' % ('ldapAddress', 'mconfXML'))
-		ldapAddress = ds.xmlpath('.//settings/custom/ldapAddress', XMLconfig['mconf'])
-		logger.debug('Assigning %s from %s' % ('ldapPort', 'mconfXML'))
-		ldapPort = ds.xmlpath('.//settings/custom/ldapPort', XMLconfig['mconf'])
+		# logger.debug('Assigning %s from %s' % ('ldapAddress', 'mconfXML'))
+		# ldapAddress = ds.xmlpath('.//settings/custom/ldapAddress', XMLconfig['mconf'])
+		# logger.debug('Assigning %s from %s' % ('ldapPort', 'mconfXML'))
+		# ldapPort = ds.xmlpath('.//settings/custom/ldapPort', XMLconfig['mconf'])
 		logger.debug('Assigning %s from %s' % ('mPort', 'mconfXML'))
 		mPort = ds.xmlpath('.//settings/custom/listenPort', XMLconfig['mconf'])
 		logger.debug('Assigning %s from %s' % ('mSecure', 'mconfXML'))
@@ -570,18 +563,21 @@ if len(sys.argv) == 0:
 		logger.debug('Assigning %s from %s' % ('mAttachSize', 'mconfXML'))
 		mAttachSize = ds.xmlpath('.//settings/custom/attachmentMaxSize', XMLconfig['mconf'])
 
+		# GroupWise / SOAP values
+		gwConfig = {}
 		logger.debug('Assigning %s from %s' % ('sListenAddress', 'gconfXML'))
-		sListenAddress = ds.xmlpath('.//settings/custom/listeningLocation', XMLconfig['gconf'])
+		gwConfig['sListenAddress'] = ds.xmlpath('.//settings/custom/listeningLocation', XMLconfig['gconf'])
 		logger.debug('Assigning %s from %s' % ('gPort', 'gconfXML'))
-		gPort = ds.xmlpath('.//settings/custom/port', XMLconfig['gconf'])
+		gwConfig['gport'] = ds.xmlpath('.//settings/custom/port', XMLconfig['gconf'])
 		logger.debug('Assigning %s from %s' % ('gAttachSize', 'gconfXML'))
-		gAttachSize = ds.xmlpath('.//settings/custom/attachmentMaxSize', XMLconfig['gconf'])
+		gwConfig['gAttachSize'] = ds.xmlpath('.//settings/custom/attachmentMaxSize', XMLconfig['gconf'])
 		logger.debug('Assigning %s from %s' % ('gListenAddress', 'gconfXML'))
-		gListenAddress = ds.xmlpath('.//settings/custom/soapServer', XMLconfig['gconf']).split("://",1)[1].split(":",1)[0]
+		gwConfig['gListenAddress'] = ds.xmlpath('.//settings/custom/soapServer', XMLconfig['gconf']).split("://",1)[1].split(":",1)[0]
 		logger.debug('Assigning %s from %s' % ('sPort', 'gconfXML'))
-		sPort = ds.xmlpath('.//settings/custom/soapServer', XMLconfig['gconf']).split("://",1)[1].split(":",1)[1].split("/",1)[0]
+		gwConfig['sPort'] = ds.xmlpath('.//settings/custom/soapServer', XMLconfig['gconf']).split("://",1)[1].split(":",1)[1].split("/",1)[0]
 		logger.debug('Assigning %s from %s' % ('sSecure', 'gconfXML'))
-		sSecure = ds.xmlpath('.//settings/custom/soapServer', XMLconfig['gconf']).split("://",1)[0]
+		gwConfig['sSecure'] = ds.xmlpath('.//settings/custom/soapServer', XMLconfig['gconf']).split("://",1)[0]
+
 		# Trusted app values
 		trustedConfig = {}
 		logger.debug('Assigning %s from %s' % ('trusted app name', 'gconfXML'))
@@ -619,12 +615,17 @@ ds.datasyncBanner(dsappversion)
 # ds.cuso(dbConfig)
 # ds.rcDS(rcScript, 'start')
 
-ds.addGroup(dbConfig, ldapConfig)
-
+# ds.addGroup(dbConfig, ldapConfig)
 # ds.monitor_syncing_users(dbConfig)
 
 # menus.main_menu()
 
+# get_sessionID(trustedConfig)
+
+userConfig = ds.verifyUser(dbConfig)
+# soap_userConfig = dsSOAP.soap_getUserInfo(trustedConfig, gwConfig, userConfig)
+# print soap_userConfig
+dsSOAP.soap_checkFolderList(trustedConfig, gwConfig, userConfig)
 
 ds.eContinue()
 sys.exit(0)
