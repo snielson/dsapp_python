@@ -7,6 +7,9 @@ import tarfile, zipfile
 import thread, threading
 from pipes import quote
 import io
+import gzip
+import urllib2
+import readline
 from urllib2 import urlopen, URLError, HTTPError
 from lxml import etree
 from xml.parsers.expat import ExpatError
@@ -24,6 +27,13 @@ from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 import getch
 getch = getch._Getch()
 
+
+# Global variables
+forceMode = False
+installedConnector = "/etc/init.d/datasync-connectors"
+isInstalled = False
+problem = False
+
 # Folder variables
 dsappDirectory = "/opt/novell/datasync/tools/dsapp"
 dsappConf = dsappDirectory + "/conf"
@@ -33,7 +43,19 @@ dsappBackup = dsappDirectory + "/backup"
 dsapptmp = dsappDirectory + "/tmp"
 dsappupload = dsappDirectory + "/upload"
 rootDownloads = "/root/Downloads"
-dsappSettings = dsappConf + "/setting.cfg"
+
+# Misc variables
+serverinfo = "/etc/*release"
+rpminfo = "datasync"
+dsapp_tar = "dsapp.tgz"
+isNum = '^[0-9]+$'
+ds_20x= 2000
+ds_21x = 2100
+previousVersion = 20153
+latestVersion = 210230
+rcScript = None
+mobilityVersion = 0
+version = "/opt/novell/datasync/version"
 
 # Mobility Directories
 dirOptMobility = "/opt/novell/datasync"
@@ -42,20 +64,71 @@ dirVarMobility = "/var/lib/datasync"
 log = "/var/log/datasync"
 dirPGSQL = "/var/lib/pgsql"
 mAttach = dirVarMobility + "/mobility/attachments/"
-version = "/opt/novell/datasync/version"
 
-# Misc variables
-ds_20x= 2000
-ds_21x = 2100
-dsappversion = None
+# Mobility logs
+configenginelog = log + "/configengine/configengine.log"
+connectormanagerlog = log + "/syncengine/connectorManager.log"
+syncenginelog = log + "/syncengine/engine.log"
+monitorlog = log + "/monitorengine/monitor.log"
+systemagentlog = log + "/monitorengine/systemagent.log"
+updatelog = log + "/update.log"
+webadminlog = log + "/webadmin/server.log"
+mAlog = None
+gAlog = None
+mlog = None
+glog = None
+
+# System logs
+messages = "/var/log/messages"
+warn = "/var/log/warn"
+
+# dsapp Conf / Logs
+dsappSettings = dsappConf + "/setting.cfg"
+dsappLogSettings = dsappConf + "/logging.cfg"
+dsappLog = dsappConf + "/dsapp.log"
+ghcLog = dsappConf + "/generalHealthCheck.log"
 
 # Log Settings
 logging.config.fileConfig('%s/logging.cfg' % (dsappConf))
 logger = logging.getLogger(__name__)
 
+# Define Variables for Eenou+ (2.x)
+def declareVariables2():
+	global rcScript
+	global mAlog
+	global gAlog
+	global mlog
+	global glog
+
+	logger.debug('Setting version variables for 2.X')
+	mAlog = log + "/connectors/mobility-agent.log"
+	gAlog = log + "/connectors/groupwise-agent.log"
+	mlog = log + "/connectors/mobility.log"
+	glog = log + "/connectors/groupwise.log"
+	rcScript = "rcgms"
+
+# Define Variables for Pre-Eenou (1.x)
+def declareVariables1():
+	global rcScript
+	global mAlog
+	global gAlog
+	global mlog
+	global glog
+
+	logger.debug('Setting version variables for 1.X')
+	mAlog = log + "/connectors/default.pipeline1.mobility-AppInterface.log"
+	gAlog = log + "/connectors/default.pipeline1.groupwise-AppInterface.log"
+	mlog = log + "/connectors/default.pipeline1.mobility.log"
+	glog = log + "/connectors/default.pipeline1.groupwise.log"
+	rcScript="rcdatasync"
+
 def set_dsappversion(version):
 	global dsappversion
 	dsappversion = version
+
+def set_forcemode(force):
+	global forceMode
+	forceMode = force
 
 def set_spinner():
 	spinner = spin.progress_bar_loading()
@@ -83,6 +156,22 @@ def datasyncBanner(dsappversion):
 	"""
 	clear()
 	print (banner + "\t\t      v" + dsappversion + "\n")
+
+def announceNewFeature():
+	Config.read(dsappSettings)
+	newFeature = Config.getboolean('Settings', 'new.feature')
+
+	if newFeature:
+		datasyncBanner(dsappversion)
+		logger.debug('Prompt feature')
+		print ("General Health Check.\nLocated in the Checks & Queries menu.\n")
+		if askYesOrNo("Would you like to run it now?"):
+			pass
+			# TODO: generalHealthCheck()
+	Config.read(dsappSettings)
+	Config.set('Settings', 'new.feature', False)
+	with open(dsappSettings, 'wb') as cfgfile:
+		Config.write(cfgfile)
 
 def check_pid(pid):        
   try:
@@ -177,6 +266,16 @@ def findReplace(find, replace, filePath):
 	for line in fileinput.input(filePath, inplace=True):
 		print(line.replace(find,replace), end='')
 
+def complete(text, state):
+	return (glob.glob(text+'*')+[None])[state]
+
+def autoCompleteInput(text):
+	readline.set_completer_delims(' \t\n;')
+	readline.parse_and_bind("tab: complete")
+	readline.set_completer(complete)
+	user_input = raw_input('%s' % text)
+	return user_input
+
 def pgrep(search, filePath, flag=0):
 	# Python equiv linux grep
 	if flag == '-i':
@@ -247,7 +346,6 @@ def askYesOrNo(question, default=None):
         else:
             sys.stdout.write("Please respond with 'yes' or 'no' "
                              "(or 'y' or 'n').\n")
-
 def unzip_file(fileName):
 	with contextlib.closing(zipfile.ZipFile(fileName, 'r')) as z:
 	    z.extractall()
@@ -261,6 +359,18 @@ def uncompressIt(fileName):
 	options = {'.tar': untar_file,'.zip': unzip_file, '.tgz': untar_file}
 	options[extension](fileName)
 
+def zip_content(fileName):
+	with contextlib.closing(zipfile.ZipFile(fileName, 'r')) as z:
+		return z.namelist()
+
+def tar_content(fileName):
+	with contextlib.closing(tarfile.open(fileName, 'r:gz')) as tar:
+		return tar.getnames()
+
+def file_content(fileName):
+	extension = os.path.splitext(fileName)[1]
+	options = {'.tar': tar_content,'.zip': zip_content, '.tgz': tar_content}
+	return options[extension](fileName)
 
 def DoesServiceExist(host, port):
     captive_dns_addr = ""
@@ -289,31 +399,203 @@ def DoesServiceExist(host, port):
     logger.info('Successfully tested to %s:%s' %(host,port))
     return True
 
-def dlfile(url,print_url=True):
-    # Open the url
-    spinner = set_spinner()
-    try:
-        f = urlopen(url)
-        if print_url:
-	        print ("Downloading %s " % (url), end='')
-	        logger.info('Downloading %s' % (url))
-	        spinner.start(); time.sleep(.000001)
-        # Open our local file for writing
-        with open(os.path.basename(url), "wb") as local_file:
-            local_file.write(f.read())
+def dlfile(url,path=None, print_url=True):
+	# TODO : Check for bad filename or if size 0 report bad
+	# Open the url
+	spinner = set_spinner()
+	save_path = None
+	try:
+		f = urlopen(url)
+		if print_url:
+			print ("Downloading %s " % (url), end='')
+			spinner.start(); time.sleep(.000001)
+		logger.info('Downloading %s' % (url))
+		# Open our local file for writing
+		if path == None:
+			save_path = os.path.basename(url)
+		else:
+			save_path = path + '/' + os.path.basename(url)
+		with open(save_path, "wb") as local_file:
+				local_file.write(f.read())
 
-    #handle errors
-    except HTTPError, e:
-    	logger.warning("HTTP Error: %s %s" %(e.reason, url))
-    	return False
-    except URLError, e:
-    	logger.warning("URL Error: %s %s" %(e.reason, url))
-    	return False
-    else:
-    	return True
-    finally:
-    	if print_url:
-	    	spinner.stop(); print()
+	#handle errors
+	except HTTPError, e:
+		logger.warning("HTTP Error: %s %s" %(e.reason, url))
+		return False
+	except URLError, e:
+		print ("No such file or directory %s" % url)
+		logger.warning("URL Error: %s %s" %(e.reason, url))
+		return False
+	else:
+		return True
+	finally:
+		if print_url:
+			spinner.stop(); print()
+
+def updateDsapp(publicVersion):
+	print ('Updating dsapp to v%s' % (publicVersion))
+	logger.info('Updating dsapp to v%s' % (publicVersion))
+
+	# Download new version & extract
+	dlfile('ftp://ftp.novell.com/outgoing/%s' % (dsapp_tar))
+	print ()
+	tar = tarfile.open(dsapp_tar, 'r:gz')
+	rpmFile = re.search('.*.rpm' ,'%s' % (tar.getnames()[0])).group(0)
+	tar.close()
+	uncompressIt(dsapp_tar)
+	check_rpm = checkRPM(rpmFile)
+	if check_rpm:
+		setupRPM(rpmFile)
+	elif check_rpm == None:
+		setupRPM(rpmFile, 'i')
+	else:
+		print ('%s is older than installed version' % (rpmFile))
+		logger.warning('%s is older than installed version' % (rpmFile))
+
+	# Clean up files
+	try:
+		os.remove('dsapp.sh')
+	except OSError:
+		logger.warning('No such file: dsapp.sh')
+	try:
+		os.remove(rpmFile)
+	except OSError:
+		logger.warning('No such file: %s' % (rpmFile))
+	try:
+		os.remove(dsapp_tar)
+	except OSError:
+		logger.warning('No such file: %s' % (dsapp_tar))
+	# TODO: Close script, and relaunch
+
+def autoUpdateDsapp():
+	# Assign variables based on settings.cfg
+	Config.read(dsappSettings)
+	autoUpdate = Config.getboolean('Settings', 'auto.update')
+
+	# Variable declared above autoUpdate=true
+	if autoUpdate:
+		# Check FTP connectivity
+		if DoesServiceExist('ftp.novell.com', 21):
+			# Fetch online dsapp and store to memory, check version
+			spinner = set_spinner()
+			logger.info('Checking for a newer version of dsapp')
+			print ('Checking for a newer version of dsapp... ', end='')
+			spinner.start(); time.sleep(.000001)
+			for line in urllib2.urlopen('ftp://ftp.novell.com/outgoing/dsapp-version.info'):
+				publicVersion = line.split("'")[1]
+			spinner.stop(); print ()
+			clear()
+			
+			# Download if newer version is available
+			if dsappversion < publicVersion and publicVersion is not None:
+				print ('v%s (v%s available)' % (dsappversion, publicVersion))
+				logger.info('Updating dsapp v%s to v%s' % (dsappversion, publicVersion))
+				updateDsapp(publicVersion)
+			elif dsappversion >= publicVersion and publicVersion is not None:
+				logger.info('dsapp is up-to-date at v%s' % dsappversion)
+
+def getDSVersion():
+	if checkInstall(forceMode, installedConnector):
+		with open(version) as f:
+			value = f.read().translate(None, '.')[0:4]
+		return value
+
+def setVariables():
+	dsVersion = getDSVersion()
+	# Depends on version 1.x or 2.x
+	if checkInstall(forceMode, installedConnector):
+		if dsVersion > ds_20x:
+			declareVariables2()
+		else:
+			declareVariables1()
+
+def dsUpdate(repo):
+	spinner = set_spinner()
+	if '%s/common/lib' % dirOptMobility not in sys.path:
+		sys.path.append(dirOptMobility + '/common/lib/')
+	import upgrade
+
+	ref = subprocess.Popen(['zypper', 'ref', '-f', repo], stdout=subprocess.PIPE)
+	ref.wait()
+	zLU = subprocess.Popen(['zypper', 'lu', '-r', repo], stdout=subprocess.PIPE).communicate()
+	if 'No updates found' in zLU[0]:
+		print ("\nMobility is already this version, or newer")
+		logger.info('Unable to update mobility. Same version or newer')
+		if askYesOrNo('List %s packages' % repo):
+			pkg = subprocess.Popen(['zypper', 'pa', '-ir', '%s' % repo])
+			pkg.wait()
+			logger.info('Listing %s packages' % repo)
+			print ()
+			if askYesOrNo("Force install %s packages" % repo):
+				print ("Force updating Mobility.. ", end='')
+				logger.info('Force updating Mobility..')
+				spinner.start(); time.sleep(.000001)
+				time1 = time.time()
+				install = subprocess.Popen(['zypper', '--non-interactive', 'install', '--force', '%s:' % repo], stdout=subprocess.PIPE)
+				install.wait()
+				spinner.stop(); print ()
+				time2 = time.time()
+				logger.info("Foce update Mobility package complete")
+				logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+				print ("\nPlease run 'sh %s/update.sh' to complete the upgrade" % dirOptMobility)
+	else:
+		print ("Updating Mobility.. ", end='')
+		logger.info('Updating Mobility started')
+		spinner.start(); time.sleep(.000001)
+		time1 = time.time()
+		install = subprocess.Popen(['zypper', '--non-interactive', 'update', '--force', '-r', '%s' % repo], stdout=subprocess.PIPE)
+		install.wait()
+		spinner.stop(); print ()
+		time2 = time.time()
+		logger.info("Updating Mobility package complete")
+		logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
+		# Update config file
+		dsVersion = getDSVersion()
+		Config.read(dsappSettings)
+		Config.set('Misc', 'mobility.version', dsVersion)
+		with open(dsappSettings, 'wb') as cfgfile:
+			Config.write(cfgfile)
+		# setVariables()
+
+		logger.info('Updating Mobility schema started')
+		time1 = time.time()
+		rcDS('stop')
+		os.environ["FEEDBACK"] = ""
+		os.environ["LOGGER"] = ""
+
+		pre = upgrade.Pre_Update()
+		if pre.get_it_done():
+			update = upgrade.connectorUpgrade(pre.version)
+			update.install_monitor()
+			update.service_upgrade()
+		time2 = time.time()
+		logger.info("Updating Mobility schema complete")
+		logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
+		p = subprocess.Popen(['rcpostgresql', 'stop'], stdout=subprocess.PIPE)
+		p.wait()
+		pids = get_pid('/usr/bin/python')
+		for pid in pids:
+			kill_pid(int(pid), 9)
+		
+		# Update config file
+		dsVersion = getDSVersion()
+		Config.read(dsappSettings)
+		Config.set('Misc', 'mobility.version', dsVersion)
+		with open(dsappSettings, 'wb') as cfgfile:
+			Config.write(cfgfile)
+		# setVariables()
+
+		# getExactMobilityVersion
+		p = subprocess.Popen(['rcpostgresql', 'start'], stdout=subprocess.PIPE)
+		p.wait()
+		rcDS('start')
+
+		with open(dirOptMobility + '/version') as v:
+			version = v.read()
+		print ("\nYour Mobility product has been successfully updated to %s" % version)
+		logger.info('Mobility product successfully updated to %s' % version)
 
 
 #################### RPM definitions ###################
@@ -406,35 +688,36 @@ def setupRPM(rpmName,flag='u'):
 	unresolved_dependencies = ts.check(checkCallback)
 
 	if not unresolved_dependencies:
-	    ts.order()
+		ts.order()
 
-	    spinner = set_spinner()
-	    if flag == 'u':
-	    	print ("This will update:")
-	    	log = 'Updating'
-	    elif flag == 'i':
-	    	print ("This will install:")
-	    	log = 'Installing'
-	    for te in ts:
-	        print ("%s-%s-%s" % (te.N(), te.V(), te.R()))
-	        logger.info("%s %s-%s-%s started" % (log, te.N(), te.V(), te.R()))
+		spinner = set_spinner()
+		if flag == 'u':
+			print ("This will update to:")
+			log = 'Updating'
+		elif flag == 'i':
+			print ("This will install:")
+			log = 'Installing'
+		for te in ts:
+			print ("%s-%s-%s" % (te.N(), te.V(), te.R()))
+			logger.info("%s %s-%s-%s started" % (log, te.N(), te.V(), te.R()))
+			break
 
 		if flag == 'u':
-		    print ("\nUpdating.. ", end='')
+			print ("\nUpdating.. ", end='')
 		if flag == 'i':
 			print ("\nInstalling.. ", end='')
 
-	    spinner.start(); time.sleep(.000001)
-	    ts.run(runCallback, 1)
-	    spinner.stop(); print ()
-	    if flag == 'u':
-	    	print ("Update complete\n")
-	    elif flag == 'i':
-	    	print ("Install complete\n")
-	    logger.info("%s %s-%s-%s complete" % (log, te.N(), te.V(), te.R()))
+		spinner.start(); time.sleep(.000001)
+		ts.run(runCallback, 1)
+		spinner.stop(); print ()
+		if flag == 'u':
+			print ("Update complete\n")
+		elif flag == 'i':
+			print ("Install complete\n")
+		logger.info("%s %s-%s-%s complete" % (log, te.N(), te.V(), te.R()))
 	else:
-	    print ("Error: Unresolved dependencies, transaction failed.")
-	    print (unresolved_dependencies)
+		print ("Error: Unresolved dependencies, transaction failed.")
+		print (unresolved_dependencies)
 
 def removeRPM(rpmName):
 	ts = rpm.TransactionSet()
@@ -495,6 +778,9 @@ def protect(msg, encode, path, host = None, key = None):
 		sys.exit(1)
 	elif result:
 		return result
+def encryptMSG(msg):
+	result = base64.urlsafe_b64encode(os.popen('echo -n %s | openssl enc -aes-256-cbc -a -k `hostname -f`' % quote(msg)).read().rstrip())
+	return result
 
 def getEncrypted(msg, tree, pro_path, host = None):
 	try:
@@ -522,6 +808,16 @@ def getDecrypted(check_path, tree, pro_path, host = None):
 	elif int(protected) == 0:
 		return xmlpath(check_path,tree)
 
+def isProtected(tree, pro_path):
+	protected = xmlpath(pro_path, tree)
+	if protected is None:
+		return False
+	elif int(protected) == 1:
+		return True
+	elif int(protected) == 0:
+		return False
+
+
 def createPGPASS(config):
 	# TODO: May no longer be needed with psycopg2, or other methods to access the database
 	pgpass = '/root/.pgpass'
@@ -541,7 +837,7 @@ def backup_file(source, dest):
 		logger.debug('Backing up %s to %s' % (source,dest))
 		shutil.copy(source, dest)
 
-def backup_config_files(list,fname=None):
+def backup_config_files(list, fname=None):
 	folder_name = None
 	for path in list:
 		if os.path.isfile(list[path]):
@@ -599,6 +895,9 @@ def promptVerifyPath(path):
 		if askYesOrNo("Path does not exist, would you like to create it now"):
 			logger.info('Creating folder: %s' % (path))
 			os.makedirs(path)
+		else:
+			return False
+	return True
 	
 def checkYaST():
 	# Check if YaST is running
@@ -634,11 +933,11 @@ def checkYaST():
 def checkPostgresql(dbConfig):
 	try:
 		conn = psycopg2.connect("dbname='postgres' user='%s' host='%s' password='%s'" % (dbConfig['user'],dbConfig['host'],dbConfig['pass']))
-		logger.info('Successfully connected to postgresql [user=%s,pass=******]' % (dbConfig['user']))
+		logger.info('Successfully connected to postgresql [user=%s,pass=%s]' % (dbConfig['user'],"*" * len(dbConfig['pass'])))
 		conn.close()
 	except:
 		print ('\ndsapp has encountered an error. See log for more details')
-		logger.error('Unable to connect to postgresql [user=%s,pass=******]' % (dbConfig['user']))
+		logger.error('Unable to connect to postgresql [user=%s,pass=%s]' % (dbConfig['user'],"*" * len(dbConfig['pass'])))
 		return False
 	return True
 
@@ -817,7 +1116,7 @@ def cuso(dbConfig, op = 'everything'):
 			rpms = findRPM('datasync-*')
 			for rpm in rpms:
 				removeRPM(rpm)
-			removeRPM(ds.findRPM('postgresql')[0])
+			removeRPM(findRPM('postgresql')[0])
 			if dsappversion > 194:
 				removeRPM('dsapp')
 
@@ -893,7 +1192,8 @@ def cleanLog():
 		os.popen("sed -i 's|maxage.*|maxage 14|g' /etc/logrotate.d/datasync-*").read()
 		print('Completed setting log maxage to 14')
 
-def rcDS(rcScript, status, op = None):
+def rcDS(status, op = None):
+	setVariables()
 	spinner = set_spinner()
 
 	if status == "start" and op == None:
@@ -1054,15 +1354,15 @@ def verifyUser(dbConfig):
 def confirm_user(userConfig, database = None):
 	if userConfig['name'] == None:
 		return False
-	elif database == 1:
+	if database == 1:
 		return True
-	elif database == None and userConfig['verify'] == 0:
-		print ("%s not found in Mobility" % userConfig['name'])
-		return False
 	elif database == 'mobility' and userConfig['verify'] == 2:
 		print ("%s not found in Mobility" % userConfig['name'])
 		return False
 	elif database == 'datasync' and userConfig['verify'] == 1:
+		print ("%s not found in Mobility" % userConfig['name'])
+		return False
+	if userConfig['verify'] == 0:
 		print ("%s not found in Mobility" % userConfig['name'])
 		return False
 	return True
@@ -1079,7 +1379,7 @@ def monitor_command(dbConfig, command, refresh):
 		while True:
 			cur.execute(command)
 			monitor = cur.fetchall()
-			print ('  State              |   User ID                        [<Ctrl + c> to exit]')
+			print ('  State              |  User ID                        [<Ctrl + c> to exit]')
 			print('---------------------+----------------------------')
 			for row in monitor:
 				print('  ' + states[row['state']] + '    |  ' + row['userid'])
@@ -1111,6 +1411,8 @@ def setUserState(dbConfig, state):
 		cur = conn.cursor()
 		cur.execute("UPDATE users SET state = '%s' WHERE userid ilike '%%%s%%'" % (state, userConfig['mName']))
 		logger.info("Set '%s' to state %s" % (userConfig['mName'], state))
+		cur.close()
+		conn.close()
 
 		eContinue()
 		monitorUser(dbConfig, userConfig)
@@ -1349,4 +1651,354 @@ def addGroup(dbConfig, ldapConfig):
 
 	# TODO : Call function to fix reference cound / disabled
 
+def updateMobilityFTP():
+	datasyncBanner(dsappversion)
+	if DoesServiceExist('ftp.novell.com', 21):
+		print ("Mobility will restart during the upgrade")
+		if askYesOrNo("Continue"):
+			# Check FTP connectivity
+			ds = raw_input("FTP Filename: ")
+			dbuild = ds.split('.')[0]
+			os.chdir('/root/Downloads')
+			if dlfile('ftp://ftp.novell.com/outgoing/%s' % ds):
 
+				# Get ISO name
+				dsISO = file_content(ds)
+				# Decompress file
+				uncompressIt(ds)
+
+				zypper = subprocess.Popen(["zypper", "rr", "mobility"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+				zypper.wait()
+				zypper = subprocess.Popen(["zypper", "addrepo", "iso:///?iso=%s&url=file:///root/Downloads" % dsISO[0], "mobility"], stdout=subprocess.PIPE)
+				zypper.wait()
+
+				dsUpdate('mobility')
+	else:
+		print ("Unable to connect to ftp.novell.com 21")
+
+def checkNightlyMaintenance(config_files, mobilityConfig):
+	global problem
+	setVariables()
+	problem = False
+
+	print("Scanning logs for maintenance.. ")
+	logger.info("Scannning logs for maintenance..")
+	time1 = time.time()
+
+	# Open files, and get content to print later
+	dbSetting = []
+	logReport = []
+	with open(config_files['mconf'], 'r') as f:
+		for line in f:
+			if 'database' in line: dbSetting.append(line.strip())
+	with open(mAlog, 'r') as f:
+		for line in f:
+			if 'Nightly maintenance' in line: logReport.append(line.strip())
+	
+	# If logReport is empty, check next 5 gziped logs
+	if len(logReport) == 0:
+		files = sorted(glob.glob(log +'/connectors/mobility-agent.*'), key=os.path.getctime)
+		try:
+			files.remove(log + '/connectors/mobility-agent.log')
+		except:
+			pass
+
+		for file in files[-5:]:
+			with contextlib.closing(gzip.open('%s' % file, 'r')) as f:
+				for line in f:
+					if 'Nightly maintenance' in line: logReport.append(line.strip())
+			if len(logReport) != 0:
+				break
+
+	time2 = time.time()
+	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
+	print ("\nNightly Maintenance Settings:")
+	for line in dbSetting:
+		print (line)
+
+	if mobilityConfig['dbMaintenance'] != '1':
+		problem = True
+		print ("\nNightly Maintenance disabled\n")
+	elif mobilityConfig['dbMaintenance'] == '1' and len(logReport) != 0:
+		print ("\nNightly Maintenance History:")
+		logger.info('Found maintenance history in: %s' % file)
+		print (file)
+		for line in logReport[-5:]:
+			print (line)
+	else:
+		print ("Unable to find nightly maintenance in past logs")
+		logger.info("Unable to find nightly maintenance in past logs")
+		problem = True
+
+def showStatus(dbConfig):
+	# Pending sync items - Monitor
+	data_found = False
+	logger.info("Checking for pending events")
+	conn = getConn(dbConfig, 'datasync')
+	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+	cur.execute("select state,count(*) from consumerevents where state!='1000' group by state")
+	data = cur.fetchall()
+	cur.close()
+	conn.close()
+	if len(data) != 0:
+		print ("\nGroupWise-connector:")
+		data_found = True
+		logger.info("Found pending consumerevents")
+		print (" state | count\n-------+-------")
+		for row1 in data:
+			print (" %s | %s " % (row['state'], row['count']))
+
+	conn = getConn(dbConfig, 'mobility')
+	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+	cur.execute("select state,count(*) from syncevents where state!='1000' group by state")
+	data = cur.fetchall()
+	cur.close()
+	conn.close()
+	if len(data) != 0:
+		print ("\nMobility-connector:")
+		data_found = True
+		logger.info("Found pending syncevents")
+		print (" state | count\n-------+-------")
+		for row1 in data:
+			print (" %s | %s " % (row['state'], row['count']))
+
+	if not data_found:
+		print ("No pending events")
+		logger.info("No pending events")
+
+def indexDB(dbConfig):
+	cmd = "PGPASSWORD=%(pass)s psql -U %(user)s datasync -c \"reindex database datasync\"" % dbConfig
+	logger.info("Indexing datasync database..")
+	time1 = time.time()
+	i = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	i.wait()
+	time2 = time.time()
+	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
+	cmd = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"reindex database mobility\"" % dbConfig
+	logger.info("Indexing mobility database..")
+	time1 = time.time()
+	i = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	i.wait()
+	time2 = time.time()
+	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
+def vacuumDB(dbConfig):
+	cmd = "PGPASSWORD=%(pass)s vacuumdb -U %(user)s datasync --full -v" % dbConfig
+	logger.info("Vacuuming datasync database..")
+	time1 = time.time()
+	v = subprocess.Popen(cmd, shell=True)
+	v.wait()
+	time2 = time.time()
+	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
+	cmd = "PGPASSWORD=%(pass)s vacuumdb -U %(user)s mobility --full -v" % dbConfig
+	logger.info("Vacuuming mobility database..")
+	time1 = time.time()
+	v = subprocess.Popen(cmd, shell=True)
+	v.wait()
+	time2 = time.time()
+	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
+def changeDBPass(dbConfig, config_files, XMLconfig):
+	datasyncBanner(dsappversion)
+	if askYesOrNo("Change psql datasync_user password?"):
+		p_input = getpass.getpass("Enter new password: ")
+		if len(p_input) == 0:
+			print ("Invalid input")
+			sys.exit(1)
+
+		vinput = getpass.getpass("Re-enter new password: ")
+		if p_input != vinput:
+			print ("\nPasswords do not match")
+			sys.exit(1)
+
+		print()
+
+		#Get Encrypted password from user input
+		inputEncrpt = encryptMSG(p_input)
+
+		print ("Changing database password..")
+		conn = getConn(dbConfig, 'postgres')
+		cur = conn.cursor()
+		logger.info("Changeing datasync_user database password")
+		try:
+			cur.execute("ALTER USER datasync_user WITH password \'%s\'" % p_input)
+		except:
+			print ("Failed to change database password")
+			logger.error("Failed to change datasync_user database password")
+			sys.exit(1)
+
+		cur.close()
+		conn.close()
+		# Backup conf files
+		backup_config_files(config_files, 'changeDBPass')
+
+		# Update XML files with new password
+		if isProtected(XMLconfig['ceconf'], './/configengine/database/protected'):
+			setXML('.//configengine/database/password', XMLconfig['ceconf'], inputEncrpt, config_files['ceconf'])
+		else:
+			setXML('.//configengine/database/password', XMLconfig['ceconf'], p_input, config_files['ceconf'])
+		logger.info("Updated database password in %s" % config_files['ceconf'])
+
+		if isProtected(XMLconfig['econf'], './/settings/database/protected'):
+			setXML('.//settings/database/password', XMLconfig['econf'], inputEncrpt, config_files['econf'])
+		else:
+			setXML('.//settings/database/password', XMLconfig['econf'], p_input, config_files['econf'])
+		logger.info("Updated database password in %s" % config_files['econf'])
+
+		if isProtected(XMLconfig['mconf'], './/settings/custom/protected'):
+			setXML('.//settings/custom/dbpass', XMLconfig['mconf'], inputEncrpt, config_files['mconf'])
+		else:
+			setXML('.//settings/custom/dbpass', XMLconfig['mconf'], p_input, config_files['mconf'])
+		logger.info("Updated database password in %s" % config_files['mconf'])
+
+		print ("\nDatabase password updated. Please restart mobility.")
+
+def changeAppName(dbConfig):
+	datasyncBanner(dsappversion)
+	userConfig = verifyUser(dbConfig)
+	if confirm_user(userConfig, 'datasync'):
+		conn = getConn(dbConfig, 'datasync')
+		cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+
+		# Assign application names from database to default variables
+		cur.execute("select \"targetName\" from targets where dn ilike '%%%s%%' AND \"connectorID\"='default.pipeline1.mobility'" % userConfig['name'])
+		defaultMAppName = cur.fetchall()[0]['targetName']
+
+		cur.execute("select \"targetName\" from targets where dn ilike '%%%s%%' AND \"connectorID\"='default.pipeline1.groupwise'" % userConfig['name'])
+		defaultGAppName = cur.fetchall()[0]['targetName']
+
+		if defaultMAppName and defaultGAppName:
+
+			mAppName = defaultMAppName
+			gAppName = defaultGAppName
+			print ()
+
+			# Prompt user for new device app name and display default
+			mAppName = raw_input("Enter user device application name [%s] " % mAppName)
+			if not mAppName:
+				mAppName = defaultMAppName
+
+			# Prompt user for new groupwise app name and display default
+			gAppName = raw_input("Enter user groupwise application name [%s] " % gAppName)
+			if not gAppName:
+				gAppName = defaultGAppName
+
+			print ("\nDevice application name: %s" % mAppName)
+			print ("Groupwise application name: %s " % gAppName)
+
+			if askYesOrNo("Update %s application names" % userConfig['name']):
+				logger.info("Updating %s application names" % userConfig['name'])
+				
+				# pdates users application names with variable entries
+				cur.execute("UPDATE targets set \"targetName\"='%s' where dn ilike '%%%s%%' AND \"connectorID\"='default.pipeline1.mobility'" % (mAppName, userConfig['name']))
+				logger.info("Set mobility application name to: %s" % mAppName)
+				cur.execute("UPDATE targets set \"targetName\"='%s' where dn ilike '%%%s%%' AND \"connectorID\"='default.pipeline1.groupwise'" % (gAppName, userConfig['name']))
+				logger.info("Set groupwise application name to: %s" % gAppName)
+
+				print ("\nRestart mobility to pick up changes.")
+		else:
+			print ("Unable to find application names")
+			logger.warning("Unalbe to find all application names")
+
+		cur.close()
+		conn.close()
+
+def reinitAllUsers(dbConfig):
+	print ("Note: During the re-initialize, users will not be able to log in. This may take some time.")
+	if askYesOrNo("Are you sure you want to re-initialize all the users"):
+		conn = getConn(dbConfig, 'mobility')
+		cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+		cur.execute("update users set state = '7'")
+
+		cur.close()
+		conn.close()
+		print ("\nAll users have been set to re-initialize")
+
+
+####### Certificate functions #######
+
+def certPath():
+	certPath = autoCompleteInput("Enter path to store certificate files: ")
+	if promptVerifyPath(certPath):
+		return certPath
+	return ""
+
+
+def newCertPass():
+	keyPass = getpass.getpass("Enter password for private key: ")
+	confirmPass = getpass.getpass("Confirm password: ")
+	if keyPass != confirmPass:
+		print ("\nPasswords do not match")
+		logger.warning("Passwords do not match")
+		return
+	logger.info("Private key password created")
+	return keyPass
+
+def getCommonName(csrFile):
+	cmd = "openssl req -in %s -text -noout" % csrFile
+	out = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+	out.wait()
+	pout = p = out.communicate()[0]
+	search = re.search('CN=.*', pout)
+	return search.group().split('=')[1]
+
+def signCert(path, csr, key, keyPass, commonName):
+	print ("\nSigning certificate")
+	logger.info("Signing certificate..")
+	if os.path.isfile(path + '/' + csr) and os.path.isfile(path + '/' + key):
+		certDays = raw_input("Certificate Validity Period (Days): ")
+		if certDays:
+			certDays = '730'
+
+		crt = "%s.crt" % commonName
+		cmd = "openssl x509 -req -days %s -in %s/%s -signkey %s/%s -out %s/%s -passin pass:%s" % (certDays, path, csr, path, key, path, crt, keyPass)
+		logger.debug("Signing %s" % csr)
+		signed = subprocess.call(cmd, shell=True)
+
+		print ("Signed Server Certificate: %s/%s" % (path, crt))
+		logger.info("Signed server certificate at %s" % path)
+	else:
+		print ("Unable to locate certificate files")
+
+def createCSRKey(sign = False):
+	#Start of Generate CSR and Key script.
+	path = certPath()
+	if path:
+		# Remove '/' from end of path
+		path = path.rstrip('/')
+
+		print ("\nGenerating a key and CSR")
+		logger.info("Generating a private key and CSR")
+		keyPass = newCertPass()
+		print ()
+
+		cmd = "openssl genrsa -passout pass:%s -des3 -out %s/server.key 2048" % (keyPass, path)
+		key = subprocess.call(cmd, shell=True)
+		logger.debug("Creating private key..")
+		cmd = "openssl req -sha256 -new -key %s/server.key -out %s/server.csr -passin pass:%s" % (path, path, keyPass)
+		csr = subprocess.call(cmd, shell=True)
+		logger.debug("Creating certificate signing request..")
+		
+		csr = '%s/server.csr' % path
+		commonName = getCommonName(csr)
+
+		# Rename CSR and Key to common an used
+		if os.path.isfile(path + '/%s.csr' % commonName):
+			os.remove(path + '/%s.csr' % commonName)
+		if os.path.isfile(path + '/%s.key' % commonName):
+			os.remove(path + '/%s.key' % commonName)
+		os.rename(path + '/server.csr', path + '/%s.csr' % commonName)
+		os.rename(path + '/server.key', path + '/%s.key' % commonName)
+
+		key = '%s.key' % commonName
+		csr = '%s.csr' % commonName
+
+		print ("\nPrivate Key: %s/%s.key" % (path,csr))
+		print ("Certificate Signing Request (CSR): %s/%s.csr" % (path,key))
+		logger.info("Certificates created at %s" % path)
+
+		if sign:
+			signCert(path, csr, key, keyPass, commonName)

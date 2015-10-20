@@ -139,28 +139,6 @@ logger.info('------------- Starting dsapp -------------')
 #	Setup local definitions
 ##################################################################################################
 
-# Define Variables for Eenou+ (2.x)
-def declareVariables2():
-	global ds_version
-	global rcScript
-	logger.debug('Setting version variables for 2.X')
-	mAlog = log + "/connectors/mobility-agent.log"
-	gAlog = log + "/connectors/groupwise-agent.log"
-	mlog = log + "/connectors/mobility.log"
-	glog = log + "/connectors/groupwise.log"
-	rcScript = "rcgms"
-
-# Define Variables for Pre-Eenou (1.x)
-def declareVariables1():
-	global ds_version
-	global rcScript
-	logger.debug('Setting version variables for 1.X')
-	mAlog = log + "/connectors/default.pipeline1.mobility-AppInterface.log"
-	gAlog = log + "/connectors/default.pipeline1.groupwise-AppInterface.log"
-	mlog = log + "/connectors/default.pipeline1.mobility.log"
-	glog = log + "/connectors/default.pipeline1.groupwise.log"
-	rcScript="rcdatasync"
-
 def exit_cleanup():
 	try:
 		if spinner.isAlive():
@@ -172,7 +150,6 @@ def exit_cleanup():
 	ds.removeAllFiles("/opt/novell/datasync/tools/dsapp/tmp/")
 	ds.removeLine(dsappConf + '/dsapp.pid', str(os.getpid()))
 
-
 def signal_handler_SIGINT(signal, frame):
 	# Clean up dsapp
 	exit_cleanup
@@ -183,176 +160,6 @@ def set_spinner():
 	spinner = spin.progress_bar_loading()
 	spinner.setDaemon(True)
 	return spinner
-
-def announceNewFeature():
-	if newFeature:
-		ds.datasyncBanner(dsappversion)
-		ds.logger.debug('Prompt feature')
-		print "General Health Check.\nLocated in the Checks & Queries menu.\n"
-		if ds.askYesOrNo("Would you like to run it now?"):
-			pass
-			# TODO: generalHealthCheck()
-	Config.read(dsappSettings)
-	Config.set('Misc', 'new.feature', False)
-	with open(dsappSettings, 'wb') as cfgfile:
-		Config.write(cfgfile)
-
-def updateDsapp(publicVersion):
-	print 'Updating dsapp to v%s' % (publicVersion)
-	ds.logger.info('Updating dsapp to v%s' % (publicVersion))
-
-	# Download new version & extract
-	ds.dlfile('ftp://ftp.novell.com/outgoing/%s' % (dsapp_tar))
-	print
-	tar = tarfile.open(dsapp_tar, 'r:gz')
-	rpmFile = re.search('.*.rpm' ,'%s' % (tar.getnames()[0])).group(0)
-	tar.close()
-	ds.uncompressIt(dsapp_tar)
-	if ds.checkRPM(rpmFile):
-		ds.setupRPM(rpmFile)
-	else:
-		print ('%s is older than installed version' % (rpmFile))
-		ds.logger.warning('%s is older than installed version' % (rpmFile))
-
-	# Clean up files
-	try:
-		os.remove('dsapp.sh')
-	except OSError:
-		ds.logger.warning('No such file: dsapp.sh')
-	try:
-		os.remove(rpmFile)
-	except OSError:
-		ds.logger.warning('No such file: %s' % (rpmFile))
-	try:
-		os.remove(dsapp_tar)
-	except OSError:
-		ds.logger.warning('No such file: %s' % (dsapp_tar))
-	# TODO: Close script, and relaunch
-
-def autoUpdateDsapp():
-	# Variable declared above autoUpdate=true
-	if autoUpdate:
-		# Check FTP connectivity
-		if ds.DoesServiceExist('ftp.novell.com', 21):
-			# Fetch online dsapp and store to memory, check version
-			spinner = set_spinner()
-			ds.logger.info('Checking for a newer version of dsapp')
-			print 'Checking for a newer version of dsapp... ',
-			spinner.start(); time.sleep(.000001)
-			for line in urllib2.urlopen('ftp://ftp.novell.com/outgoing/dsapp-version.info'):
-				publicVersion = line.split("'")[1]
-			spinner.stop(); print
-			ds.clear()
-			
-			# Download if newer version is available
-			if dsappversion < publicVersion and publicVersion is not None:
-				print 'v%s (v%s available)' % (dsappversion, publicVersion)
-				ds.logger.info('Updating dsapp v%s to v%s' % (dsappversion, publicVersion))
-				updateDsapp(publicVersion)
-			elif dsappversion >= publicVersion and publicVersion is not None:
-				ds.logger.info('dsapp is up-to-date at v%s' % dsappversion)
-
-def getDSVersion():
-	if isInstalled:
-		with open(version) as f:
-			value = f.read().translate(None, '.')[0:4]
-		return value
-
-def setVariables():
-	# Depends on version 1.x or 2.x
-	if isInstalled:
-		if dsVersion > ds_20x:
-			declareVariables2()
-		else:
-			declareVariables1()
-
-def dsUpdate(repo):
-	spinner = set_spinner()
-	if '%s/common/lib' % dirOptMobility not in sys.path:
-		sys.path.append(dirOptMobility + '/common/lib/')
-	import upgrade
-
-	ref = subprocess.Popen(['zypper', 'ref', '-f', repo], stdout=subprocess.PIPE)
-	ref.wait()
-	zLU = subprocess.Popen(['zypper', 'lu', '-r', repo], stdout=subprocess.PIPE).communicate()
-	if 'No updates found' in zLU[0]:
-		print "\nMobility is already this version, or newer"
-		ds.logger.info('Unable to update mobility. Same version or newer')
-		if ds.askYesOrNo('List %s packages' % repo):
-			pkg = subprocess.Popen(['zypper', 'pa', '-ir', '%s' % repo])
-			pkg.wait()
-			ds.logger.info('Listing %s packages' % repo)
-			print
-			if ds.askYesOrNo("Force install %s packages" % repo):
-				print "Force updating Mobility.. ",
-				ds.logger.info('Force updating Mobility..')
-				spinner.start(); time.sleep(.000001)
-				time1 = time.time()
-				install = subprocess.Popen(['zypper', '--non-interactive', 'install', '--force', '%s:' % repo], stdout=subprocess.PIPE)
-				install.wait()
-				spinner.stop(); print
-				time2 = time.time()
-				ds.logger.info("Foce update Mobility package complete")
-				ds.logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
-				print "\nPlease run 'sh %s/update.sh' to complete the upgrade" % dirOptMobility
-	else:
-		print "Updating Mobility.. ",
-		ds.logger.info('Updating Mobility started')
-		spinner.start(); time.sleep(.000001)
-		time1 = time.time()
-		install = subprocess.Popen(['zypper', '--non-interactive', 'update', '--force', '-r', '%s' % repo], stdout=subprocess.PIPE)
-		install.wait()
-		spinner.stop(); print
-		time2 = time.time()
-		ds.logger.info("Updating Mobility package complete")
-		ds.logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
-
-		# Update config file
-		dsVersion = getDSVersion()
-		Config.read(dsappSettings)
-		Config.set('Misc', 'mobility.version', dsVersion)
-		with open(dsappSettings, 'wb') as cfgfile:
-			Config.write(cfgfile)
-		setVariables()
-		ds.logger.info('Updating Mobility schema started')
-		time1 = time.time()
-		ds.rcDS(rcScript,'stop')
-		os.environ["FEEDBACK"] = ""
-		os.environ["LOGGER"] = ""
-
-		pre = upgrade.Pre_Update()
-		if pre.get_it_done():
-			update = upgrade.connectorUpgrade(pre.version)
-			update.install_monitor()
-			update.service_upgrade()
-		time2 = time.time()
-		ds.logger.info("Updating Mobility schema complete")
-		ds.logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
-
-		p = subprocess.Popen(['rcpostgresql', 'stop'], stdout=subprocess.PIPE)
-		p.wait()
-		pids = ds.get_pid('/usr/bin/python')
-		for pid in pids:
-			ds.kill_pid(int(pid), 9)
-		
-		# Update config file
-		dsVersion = getDSVersion()
-		Config.read(dsappSettings)
-		Config.set('Misc', 'mobility.version', dsVersion)
-		with open(dsappSettings, 'wb') as cfgfile:
-			Config.write(cfgfile)
-		setVariables()
-
-		# getExactMobilityVersion
-		p = subprocess.Popen(['rcpostgresql', 'start'], stdout=subprocess.PIPE)
-		p.wait()
-		ds.rcDS(rcScript, 'start')
-
-		with open(dirOptMobility + '/version') as v:
-			version = v.read()
-		print "\nYour Mobility product has been successfully updated to %s" % version
-		ds.logger.info('Mobility product successfully updated to %s' % version)
-
 
 ##################################################################################################
 #	Set up script
@@ -410,6 +217,7 @@ forceArray = ('--force', '-f', '?', '-h', '--help', '-db', '--database', '-re', 
 for switch in switchCheck:
 	if switch in forceArray:
 		forceMode = True
+		ds.set_forcemode(forceMode)
 
 # Give force mode warning
 if forceMode:
@@ -419,11 +227,8 @@ if forceMode:
 		logger.warning('Running in force mode')
 		ds.eContinue()
 
-# Check if Mobility is installed on the server
-isInstalled = ds.checkInstall(forceMode, installedConnector)
-
 # Get mobility version
-dsVersion = getDSVersion()
+dsVersion = ds.getDSVersion()
 
 # Get Hostname of server, and store in setting.cfg
 if not os.path.isfile(dsappSettings):
@@ -450,21 +255,16 @@ with open(dsappSettings, 'wb') as cfgfile:
 # Assign variables based on settings.cfg
 Config.read(dsappSettings)
 dsHostname = Config.get('Misc', 'hostname')
-newFeature = Config.getboolean('Settings', 'new.feature')
-autoUpdate = Config.getboolean('Settings', 'auto.update')
 
 # Get Mobility Version
-mobilityVersion = ds.getVersion(isInstalled, version)
+mobilityVersion = ds.getVersion(ds.checkInstall(forceMode, installedConnector), version)
 
 # Only call autoUpdateDsapp() if filename is dsapp.pyc
 if __file__ == 'dsapp.pyc':
-	autoUpdateDsapp()
+	ds.autoUpdateDsapp()
 
 # Get current working directory
 cPWD = os.getcwd()
-
-# Set up variables based on version
-setVariables()
 
 ##################################################################################################
 #	Initialization
@@ -475,7 +275,7 @@ if len(sys.argv) == 0:
 	ds.datasyncBanner(dsappversion)
 
 	# Read values from XML config
-	if isInstalled:
+	if ds.checkInstall(forceMode, installedConnector):
 		# XML tree of each XML file
 		logger.info('Building XML trees started')
 		time1 = time.time()
@@ -548,41 +348,40 @@ if len(sys.argv) == 0:
 		logger.debug('Assigning %s from %s' % ('Postgresql Password', 'ceconfXML'))
 		dbConfig['pass'] = ds.getDecrypted('.//configengine/database/password', XMLconfig['ceconf'], './/configengine/database/protected')
 
-		# logger.debug('Assigning %s from %s' % ('ldapAddress', 'mconfXML'))
-		# ldapAddress = ds.xmlpath('.//settings/custom/ldapAddress', XMLconfig['mconf'])
-		# logger.debug('Assigning %s from %s' % ('ldapPort', 'mconfXML'))
-		# ldapPort = ds.xmlpath('.//settings/custom/ldapPort', XMLconfig['mconf'])
-		logger.debug('Assigning %s from %s' % ('mPort', 'mconfXML'))
-		mPort = ds.xmlpath('.//settings/custom/listenPort', XMLconfig['mconf'])
-		logger.debug('Assigning %s from %s' % ('mSecure', 'mconfXML'))
-		mSecure = ds.xmlpath('.//settings/custom/ssl', XMLconfig['mconf'])
-		logger.debug('Assigning %s from %s' % ('mlistenAddress', 'mconfXML'))
-		mlistenAddress = ds.xmlpath('.//settings/custom/listenAddress', XMLconfig['mconf'])
-		logger.debug('Assigning %s from %s' % ('galUserName', 'mconfXML'))
-		galUserName = ds.xmlpath('.//settings/custom/galUserName', XMLconfig['mconf'])
-		logger.debug('Assigning %s from %s' % ('mAttachSize', 'mconfXML'))
-		mAttachSize = ds.xmlpath('.//settings/custom/attachmentMaxSize', XMLconfig['mconf'])
+		mobilityConfig = {}
+		logger.debug('Assigning %s from %s' % ('Mobility connector mPort', 'mconfXML'))
+		mobilityConfig['mPort'] = ds.xmlpath('.//settings/custom/listenPort', XMLconfig['mconf'])
+		logger.debug('Assigning %s from %s' % ('Mobility connector mSecure', 'mconfXML'))
+		mobilityConfig['mSecure'] = ds.xmlpath('.//settings/custom/ssl', XMLconfig['mconf'])
+		logger.debug('Assigning %s from %s' % ('Mobility connector mlistenAddress', 'mconfXML'))
+		mobilityConfig['mlistenAddress'] = ds.xmlpath('.//settings/custom/listenAddress', XMLconfig['mconf'])
+		logger.debug('Assigning %s from %s' % ('Mobility connector galUserName', 'mconfXML'))
+		mobilityConfig['galUserName'] = ds.xmlpath('.//settings/custom/galUserName', XMLconfig['mconf'])
+		logger.debug('Assigning %s from %s' % ('Mobility connector mAttachSize', 'mconfXML'))
+		mobilityConfig['mAttachSize'] = ds.xmlpath('.//settings/custom/attachmentMaxSize', XMLconfig['mconf'])
+		logger.debug('Assigning %s from %s' % ('Mobility connector dbMaintenance', 'mconfXML'))
+		mobilityConfig['dbMaintenance'] = ds.xmlpath('.//settings/custom/databaseMaintenance', XMLconfig['mconf'])
 
 		# GroupWise / SOAP values
 		gwConfig = {}
-		logger.debug('Assigning %s from %s' % ('sListenAddress', 'gconfXML'))
+		logger.debug('Assigning %s from %s' % ('GroupWise connector sListenAddress', 'gconfXML'))
 		gwConfig['sListenAddress'] = ds.xmlpath('.//settings/custom/listeningLocation', XMLconfig['gconf'])
-		logger.debug('Assigning %s from %s' % ('gPort', 'gconfXML'))
+		logger.debug('Assigning %s from %s' % ('GroupWise connector gPort', 'gconfXML'))
 		gwConfig['gport'] = ds.xmlpath('.//settings/custom/port', XMLconfig['gconf'])
-		logger.debug('Assigning %s from %s' % ('gAttachSize', 'gconfXML'))
+		logger.debug('Assigning %s from %s' % ('GroupWise connector gAttachSize', 'gconfXML'))
 		gwConfig['gAttachSize'] = ds.xmlpath('.//settings/custom/attachmentMaxSize', XMLconfig['gconf'])
-		logger.debug('Assigning %s from %s' % ('gListenAddress', 'gconfXML'))
+		logger.debug('Assigning %s from %s' % ('GroupWise connector gListenAddress', 'gconfXML'))
 		gwConfig['gListenAddress'] = ds.xmlpath('.//settings/custom/soapServer', XMLconfig['gconf']).split("://",1)[1].split(":",1)[0]
-		logger.debug('Assigning %s from %s' % ('sPort', 'gconfXML'))
+		logger.debug('Assigning %s from %s' % ('GroupWise connector sPort', 'gconfXML'))
 		gwConfig['sPort'] = ds.xmlpath('.//settings/custom/soapServer', XMLconfig['gconf']).split("://",1)[1].split(":",1)[1].split("/",1)[0]
-		logger.debug('Assigning %s from %s' % ('sSecure', 'gconfXML'))
+		logger.debug('Assigning %s from %s' % ('GroupWise connector sSecure', 'gconfXML'))
 		gwConfig['sSecure'] = ds.xmlpath('.//settings/custom/soapServer', XMLconfig['gconf']).split("://",1)[0]
 
 		# Trusted app values
 		trustedConfig = {}
-		logger.debug('Assigning %s from %s' % ('trusted app name', 'gconfXML'))
+		logger.debug('Assigning %s from %s' % ('Trusted app name', 'gconfXML'))
 		trustedConfig['name'] = ds.xmlpath('.//settings/custom/trustedAppName', XMLconfig['gconf'])
-		logger.debug('Assigning %s from %s' % ('trusted app key', 'gconfXML'))
+		logger.debug('Assigning %s from %s' % ('Trusted app key', 'gconfXML'))
 		trustedConfig['key'] = ds.getDecrypted('.//settings/custom/trustedAppKey',XMLconfig['gconf'], './/settings/custom/protected')
 
 		logger.debug('Assigning %s from %s' % ('wPort', 'wconfXML'))
@@ -611,21 +410,40 @@ import menus
 ds.datasyncBanner(dsappversion)
 
 # ds.remove_user(dbConfig)
-# ds.rcDS(rcScript, 'stop')
+
+# # Test rcDS function
+# ds.rcDS('stop')
 # ds.cuso(dbConfig)
-# ds.rcDS(rcScript, 'start')
+# ds.rcDS('start')
 
 # ds.addGroup(dbConfig, ldapConfig)
+# ds.setUserState(dbConfig, '7')
 # ds.monitor_syncing_users(dbConfig)
+# ds.checkNightlyMaintenance(config_files, mobilityConfig)
 
 # menus.main_menu()
 
 # get_sessionID(trustedConfig)
 
-userConfig = ds.verifyUser(dbConfig)
-# soap_userConfig = dsSOAP.soap_getUserInfo(trustedConfig, gwConfig, userConfig)
-# print soap_userConfig
-dsSOAP.soap_checkFolderList(trustedConfig, gwConfig, userConfig)
+# # Test SOAP:
+# userConfig = ds.verifyUser(dbConfig)
+# if userConfig['name'] != None:
+	# soap_userConfig = dsSOAP.soap_getUserInfo(trustedConfig, gwConfig, ds.verifyUser(dbConfig))
+	# dsSOAP.soap_printUser(trustedConfig, gwConfig, userConfig)
+	# dsSOAP.soap_checkFolderList(trustedConfig, gwConfig, ds.verifyUser(dbConfig))
+
+# ds.updateMobilityFTP()
+
+# ds.showStatus(dbConfig)
+
+# ds.vacuumDB(dbConfig)
+
+# ds.changeDBPass(dbConfig, config_files, XMLconfig)
+
+# ds.changeAppName(dbConfig)
+
+# ds.certPath()
+# ds.createCSRKey(True)
 
 ds.eContinue()
 sys.exit(0)

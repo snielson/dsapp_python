@@ -189,3 +189,19 @@ def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
 		print "No problems found with GroupWise folder structure"
 		logger.info("No problems found with GroupWise folder structure")
 
+
+def soap_printUser(trustedConfig, gwConfig, userConfig):
+	soap_userConfig = soap_getUserInfo(trustedConfig, gwConfig, userConfig)
+	if soap_userConfig == None:
+		return
+
+	results = """Host : %(soapAddr)s
+Domain : %(domain)s
+POA version : %(gwVersion)s-%(build)s 
+
+User Name : %(name)s 
+User Email : %(email)s 
+User GroupWise ID : %(userid)s 
+User File ID : %(fid)s """ % soap_userConfig
+
+	print results
