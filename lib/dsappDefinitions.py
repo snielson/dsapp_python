@@ -42,6 +42,7 @@ dsapplib = dsappDirectory + "/lib"
 dsappBackup = dsappDirectory + "/backup"
 dsapptmp = dsappDirectory + "/tmp"
 dsappupload = dsappDirectory + "/upload"
+dsappdata = dsappDirectory + "/data"
 rootDownloads = "/root/Downloads"
 
 # Misc variables
@@ -151,7 +152,7 @@ def datasyncBanner(dsappversion):
       __| |___  __ _ _ __  _ __
      / _' / __|/ _' | '_ \\| '_ \\
     | (_| \__ | (_| | |_) | |_) |
-     \__,_|___/\__,_| .__/| .__/
+     \__,_|___/\__,_| .__/| .__/ 
                     |_|   |_|
 	"""
 	clear()
@@ -307,6 +308,15 @@ def xmlpath (elem, tree):
 	except AttributeError:
 		logger.warning('Unable to find %s' % (elem))
 
+def xmlpath_findall(elem, tree): # TODO : Fix to find all children with same tag
+	xml_list = []
+	try:
+		for node in tree.findall(elem):
+			xml_list.append(node.text)
+		return (xml_list)
+	except AttributeError:
+		logger.warning('Unable to find %s' % (elem))
+
 def setXML (elem, tree, value, filePath):
 	root = tree.getroot()
 	path = root.xpath(elem)
@@ -335,8 +345,7 @@ def askYesOrNo(question, default=None):
         raise ValueError("invalid default answer: '%s'" % default)
 
     while True:
-        sys.stdout.write(question + prompt)
-        choice = raw_input().lower()
+        choice = raw_input(question + prompt).lower()
         if default is not None and choice == '':
         	logger.debug('%s: %s' % (question, valid[default]))
         	return valid[default]
@@ -400,7 +409,6 @@ def DoesServiceExist(host, port):
     return True
 
 def dlfile(url,path=None, print_url=True):
-	# TODO : Check for bad filename or if size 0 report bad
 	# Open the url
 	spinner = set_spinner()
 	save_path = None
@@ -926,8 +934,6 @@ def checkYaST():
 				return False
 	return True
 
-
-
 #### Postgres Definitions #####
 
 def checkPostgresql(dbConfig):
@@ -949,6 +955,18 @@ def getConn(dbConfig, database):
 		return None
 	conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
 	return conn
+
+def dumpTable(dbConfig, database, tableName, targetSave):
+	filePath = "%s/%s.sql" %(targetSave, tableName)
+	if os.path.isfile(filePath):
+		print ("%s already exists.\nCreated : %s" % (filePath, time.ctime(os.path.getctime(filePath))))
+		logger.info("%s already exists. Created : %s" % (filePath, time.ctime(os.path.getctime(filePath))))
+		print ()
+		if not askYesOrNo("Overwrite SQL dump"):
+			return
+	logger.info("Dumping %s table from %s database to %s" % (tableName, database, filePath))
+	cmd = "PGPASSWORD=%s pg_dump -U %s %s -D -a -t '\"%s\"' > %s" % (dbConfig['pass'], dbConfig['user'], database, tableName, filePath)
+	dump = subprocess.call(cmd, shell=True)
 
 def dropDatabases(dbConfig):
 	conn = getConn(dbConfig, 'postgres')
@@ -1087,7 +1105,9 @@ def cuso(dbConfig, op = 'everything'):
 	logger.info('Starting CUSO')
 	time1 = time.time()
 	continue_cleanup = False
-	# TODO : Backup targets and membershipCache if op == 'user'
+	if op == 'user':
+		dumpTable(dbConfig, 'datasync', 'membershipCache', dsappdata)
+		dumpTable(dbConfig, 'datasync', 'targets', dsappdata)
 
 	# Dropping Tables
 	dropDatabases(dbConfig)
@@ -1102,9 +1122,9 @@ def cuso(dbConfig, op = 'everything'):
 				# Repopulating targets and membershipCache
 				conn = getConn(dbConfig, 'datasync')
 				cur = conn.cursor()
-				cur.execute(open(dsappConf +'/targets.sql').read())
+				cur.execute(open(dsappdata +'/targets.sql').read())
 				logger.info('Imported targets.sql into datasync database')
-				cur.execute(open(dsappConf +'membershipCache.sql').read())
+				cur.execute(open(dsappdata +'/membershipCache.sql').read())
 				logger.info('Imported membershipCache.sql into datasync database')
 				cur.close()
 				conn.close()
@@ -1122,8 +1142,8 @@ def cuso(dbConfig, op = 'everything'):
 
 			# Copy logs to /tmp before removing /opt/novell/datasync/
 			if os.path.isfile(dsappLogs) and os.path.exists('/tmp/'):
-				shutil.copy(dsappLogs, '/tmp/')
 				logger.info('Copying %s to /tmp/' % (dsappLogs))
+				shutil.copy(dsappLogs, '/tmp/')
 
 			folders = [dirPGSQL, dirEtcMobility, dirVarMobility, log, dirOptMobility]
 			for folder in folders:
@@ -1349,6 +1369,8 @@ def verifyUser(dbConfig):
 	elif verifyCount == 3:
 		userConfig['verify'] = 3
 
+	userConfig = getApplicationNames(userConfig, dbConfig)
+
 	return userConfig
 
 def confirm_user(userConfig, database = None):
@@ -1414,7 +1436,6 @@ def setUserState(dbConfig, state):
 		cur.close()
 		conn.close()
 
-		eContinue()
 		monitorUser(dbConfig, userConfig)
 
 def file_mCleanup(filePath, fileCount):
@@ -1439,7 +1460,7 @@ def file_mCleanup(filePath, fileCount):
 		os.remove(filePath)
 		os.remove(dsappConf + '/fileIDs.dsapp')
 
-def mCleanup(dbConfig, userConfig): # TODO Finish..
+def mCleanup(dbConfig, userConfig):
 	print ("Mobility database cleanup:")
 	spinner = set_spinner()
 	uGuid = ""
@@ -1590,17 +1611,51 @@ def remove_user(dbConfig, op = None):
 	if op == 1:
 		logger.debug("Skipping user database check")
 		if confirm_user(userConfig, op):
-			dCleanup(dbConfig, userConfig)
+			if askYesOrNo("Remove %s from datasync database" % userConfig['name']):
+				dCleanup(dbConfig, userConfig)
 			print()
-			mCleanup(dbConfig, userConfig)
+			if askYesOrNo("Remove %s from mobility database" % userConfig['name']):
+				mCleanup(dbConfig, userConfig)
 	elif op == None:
 		logger.debug("Checking user in database")
 		if confirm_user(userConfig):
+
+			# Set user to delete
+			conn = getConn(dbConfig, 'datasync')
+			cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+			cur.execute("update targets set disabled='3' where dn='%s'" % userConfig['dName'])
+			logger.debug("Set %s state to 3" % userConfig['dName'])
+			cur.close()
+			conn.close()
+
+			# Restart configengine
+			print ("Restarting configengine..")
+			logger.info("Restarting the configengine")
+			cmd = 'rcdatasync-configengine restart'
+			r = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+			r.wait()
+
+			# Monitor mobility database for user to delete
+			conn = getConn(dbConfig, 'mobility')
+			cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+
+			print ("Cleaning up databases..")
+			logger.info("Cleaning up database..")
+			loop = True
+			while loop:
+				cur.execute("select state from users where userid='%s'" % userConfig['mName'])
+				data = cur.fetchall()
+				for row in data:
+					if len(row) != '1':
+						loop = False
+				time.sleep(2)
+			cur.close()
+			conn.close()
+			logger.info("Cleanup complete. Running force cleanup")
+
 			dCleanup(dbConfig, userConfig)
 			print()
 			mCleanup(dbConfig, userConfig)
-	print()
-	eContinue()
 
 def addGroup(dbConfig, ldapConfig):
 	conn = getConn(dbConfig, 'datasync')
@@ -1771,7 +1826,7 @@ def indexDB(dbConfig):
 	cmd = "PGPASSWORD=%(pass)s psql -U %(user)s datasync -c \"reindex database datasync\"" % dbConfig
 	logger.info("Indexing datasync database..")
 	time1 = time.time()
-	i = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	i = subprocess.Popen(cmd, shell=True)
 	i.wait()
 	time2 = time.time()
 	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
@@ -1779,7 +1834,7 @@ def indexDB(dbConfig):
 	cmd = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"reindex database mobility\"" % dbConfig
 	logger.info("Indexing mobility database..")
 	time1 = time.time()
-	i = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	i = subprocess.Popen(cmd, shell=True)
 	i.wait()
 	time2 = time.time()
 	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
@@ -1907,7 +1962,8 @@ def changeAppName(dbConfig):
 		conn.close()
 
 def reinitAllUsers(dbConfig):
-	print ("Note: During the re-initialize, users will not be able to log in. This may take some time.")
+	datasyncBanner(dsappversion)
+	print (textwrap.fill("Note: During the re-initialize, users will not be able to log in. This may take some time.", 80))
 	if askYesOrNo("Are you sure you want to re-initialize all the users"):
 		conn = getConn(dbConfig, 'mobility')
 		cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
@@ -1945,7 +2001,7 @@ def getCommonName(csrFile):
 	search = re.search('CN=.*', pout)
 	return search.group().split('=')[1]
 
-def signCert(path, csr, key, keyPass, commonName):
+def signCert(path, csr, key, keyPass, commonName, sign = False):
 	print ("\nSigning certificate")
 	logger.info("Signing certificate..")
 	if os.path.isfile(path + '/' + csr) and os.path.isfile(path + '/' + key):
@@ -1954,7 +2010,7 @@ def signCert(path, csr, key, keyPass, commonName):
 			certDays = '730'
 
 		crt = "%s.crt" % commonName
-		cmd = "openssl x509 -req -days %s -in %s/%s -signkey %s/%s -out %s/%s -passin pass:%s" % (certDays, path, csr, path, key, path, crt, keyPass)
+		cmd = "openssl x509 -req -days %s -in %s/%s -signkey %s/%s -out %s/%s -passin pass:%s &>/dev/null" % (certDays, path, csr, path, key, path, crt, keyPass)
 		logger.debug("Signing %s" % csr)
 		signed = subprocess.call(cmd, shell=True)
 
@@ -1963,27 +2019,33 @@ def signCert(path, csr, key, keyPass, commonName):
 	else:
 		print ("Unable to locate certificate files")
 
+	if sign:
+		eContinue()
+		createPEM(sign, commonName, keyPass, key, crt, path)
+
 def createCSRKey(sign = False):
+	datasyncBanner(dsappversion)
 	#Start of Generate CSR and Key script.
 	path = certPath()
 	if path:
 		# Remove '/' from end of path
 		path = path.rstrip('/')
 
-		print ("\nGenerating a key and CSR")
+		print ("\nGenerating a private key and certificate signing request (CSR)")
 		logger.info("Generating a private key and CSR")
 		keyPass = newCertPass()
 		print ()
 
 		cmd = "openssl genrsa -passout pass:%s -des3 -out %s/server.key 2048" % (keyPass, path)
-		key = subprocess.call(cmd, shell=True)
 		logger.debug("Creating private key..")
+		key = subprocess.call(cmd, shell=True)
 		cmd = "openssl req -sha256 -new -key %s/server.key -out %s/server.csr -passin pass:%s" % (path, path, keyPass)
-		csr = subprocess.call(cmd, shell=True)
 		logger.debug("Creating certificate signing request..")
+		csr = subprocess.call(cmd, shell=True)
 		
 		csr = '%s/server.csr' % path
 		commonName = getCommonName(csr)
+		print ("CommonName is : %s" % commonName)
 
 		# Rename CSR and Key to common an used
 		if os.path.isfile(path + '/%s.csr' % commonName):
@@ -1996,9 +2058,448 @@ def createCSRKey(sign = False):
 		key = '%s.key' % commonName
 		csr = '%s.csr' % commonName
 
-		print ("\nPrivate Key: %s/%s.key" % (path,csr))
-		print ("Certificate Signing Request (CSR): %s/%s.csr" % (path,key))
+		print ("\nPrivate Key: %s/%s" % (path, key))
+		print ("Certificate Signing Request (CSR): %s/%s" % (path, csr))
 		logger.info("Certificates created at %s" % path)
 
 		if sign:
-			signCert(path, csr, key, keyPass, commonName)
+			eContinue()
+			signCert(path, csr, key, keyPass, commonName, sign)
+
+def createPEM(sign = None, commonName = None, keyPass = None, key = None, crt = None, path = None):
+	datasyncBanner(dsappversion)
+	print ("Creating PEM..")
+
+	# Ask for files/path if not self-signed
+	if not sign:
+		print ("Please provide the private key, the public certificate, and any intermediate certificate or bundles.\n")
+		path = autoCompleteInput("Enter directory path for certificate files (ie. /root/certificates): ")
+		path = path.rstrip('/')
+		if os.path.isdir(path):
+			os.chdir(path)
+			cmd = "ls --format=single-column | column"
+			if askYesOrNo("List files"):
+				subprocess.call(cmd, shell=True)
+				print ()
+
+			# Enter loops to get private key and public certificate
+			logger.info("Getting private key..")
+			while True:
+				key = autoCompleteInput("Private key: ")
+				if not os.path.isfile(key):
+					print ("No such file: %s\n" % key)
+					logger.warning("No such file: %s" % key)
+					if not askYesOrNo("Try again"):
+						return
+				else:
+					logger.info("Using private key: %s" % key)
+					break
+			logger.info("Getting public certificate..")
+			while True:
+				crt = autoCompleteInput("Public certificate: ")
+				if not os.path.isfile(crt):
+					print ("No such file: %s\n" % crt)
+					logger.warning("No such file: %s" % crt)
+					if not askYesOrNo("Try again"):
+						return
+				else:
+					logger.info("Using public certificate: %s" % crt)
+					break
+		else:
+			print ("No such directory: %s" % path)
+			logger.warning("No such directory: %s" % path)
+			return
+
+		# Check if private key is passwordless
+		cmd = "openssl rsa -in %s/%s -check -noout -passin pass:" % (path,key)
+		chk = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		valid, error = chk.communicate()
+		if error:
+			# Check the private key password
+			keyPass = getpass.getpass("Private key passphrase: ")
+			cmd = "openssl rsa -in %s/%s -check -noout -passin pass:%s" % (path,key,keyPass)
+			chk = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+			out, err = chk.communicate()
+			if err:
+				print ("Incorrect passphrase on %s/%s" % (path,key))
+				logger.warning("Incorrect passphrase on %s" % key)
+				return
+			logger.info("Valid passphrase for private key %s" % key)
+		else:
+			logger.debug("Private key %s has no password" % key)
+			keyPass=""
+
+	# Check if public certifiate and private key match
+	if not verifyCertifiateMatch(key, keyPass, crt, path):
+		return
+
+	# Get any intermediate certificates
+	intermediateCAList = []
+	if askYesOrNo("Any intermediate certificate files or bundles"):
+		intermedFile = autoCompleteInput("Intermediate certificate: ")
+		intermediateCAList.append(intermedFile)
+		logger.debug("Adding intermediate file: %s" % intermedFile)
+		while True:
+			if askYesOrNo("Any additional intermediate certificate files or bundles"):
+				intermedFile = autoCompleteInput("Intermediate certificate: ")
+				intermediateCAList.append(intermedFile)
+				logger.debug("Adding intermediate file: %s" % intermedFile)
+			else:
+				break
+
+	# dos2unix all intermediate files
+	for caFile in intermediateCAList:
+		cmd = "dos2unix %s/%s &>/dev/null" % (path,caFile)
+		tmp = subprocess.call(cmd, shell=True)
+
+	# dos2unix the public certificate and private key
+	cmd = "dos2unix %s/%s %s/%s &>/dev/null" % (path,key,path,crt)
+	tmp = subprocess.call(cmd, shell=True)
+
+	# Removing password from Private Key, if it contains one
+	cmd = "openssl rsa -in %s/%s -out %s/nopassword.key -passin pass:%s &>/dev/null" % (path,key,path,keyPass)
+	tmp = subprocess.call(cmd, shell=True)
+	logger.debug("Creating %s/nopassword.key for mobility.pem" % path)
+
+	# Remove any pervious mobility.pem files
+	if os.path.isfile('%s/mobility.pem' % path):
+		os.remove('%s/mobility.pem' % path)
+		logger.debug("Removing previous %s/mobility.pem" % path)
+
+	# Create mobility.pem from public certificate, and private
+	with open('%s/mobility.pem' % path, 'a') as openPem:
+		with open('%s/nopassword.key' % path, 'r') as openKey:
+			k = openKey.read().strip()
+		with open('%s/%s' % (path,crt), 'r') as openCRT:
+			cert = openCRT.read().strip()
+		openPem.write(k + '\n')
+		openPem.write(cert + '\n')
+
+		# Add all intermediate files
+		for caFile in intermediateCAList:
+			with open('%s/%s' % (path,caFile), 'r') as openInter:
+				interCert = openInter.read().strip()
+			openPem.write(interCert + '\n')
+	os.remove('%s/nopassword.key' % path)
+
+	print ("\nPEM created at: %s/mobility.pem" % path)
+	logger.info("PEM created at: %s/mobility.pem" % path)
+
+	if askYesOrNo("Install PEM"):
+		logger.debug("Running certificate install..")
+		configureMobilityCerts(path)
+
+def configureMobilityCerts(path):
+	certInstall = False
+	datasyncBanner(dsappversion)
+
+	if askYesOrNo("Implement pem certificate with Mobility devices"):
+		shutil.copy(path + '/mobility.pem', dirVarMobility + '/device/mobility.pem')
+		print ("Copied mobility.pem to %s/device/mobility.pem" % dirVarMobility)
+		logger.info("Copied %s/mobility.pem to %s/device/mobility.pem" % (path, dirVarMobility))
+		certInstall = True
+
+	if askYesOrNo("\nImplement pem certificate with Mobility web admin"):
+		shutil.copy(path + '/mobility.pem', dirVarMobility + '/webadmin/server.pem')
+		print ("Copied mobility.pem to %s/webadmin/server.pem" % dirVarMobility)
+		logger.info("Copied %s/mobility.pem to %s/webadmin/server.pem" % (path, dirVarMobility))
+		certInstall = True
+
+	if certInstall:
+		if askYesOrNo("\nDo you want to restart Mobility services now"):
+			rcDS('restart')
+		else:
+			print ("Note: Mobility services will need to be restarted for the PEM to become active")
+
+def verifyCertifiateMatch(key = None, keyPass = None, crt = None, path = None):
+	if key == None and crt == None and path == None:
+		datasyncBanner(dsappversion)
+		print ("Please provide the private key, the public certificate to verify match\n")
+		path = autoCompleteInput("Enter directory path for certificate files (ie. /root/certificates): ")
+		path = path.rstrip('/')
+		if os.path.isdir(path):
+			os.chdir(path)
+			cmd = "ls --format=single-column | column"
+			if askYesOrNo("List files"):
+				subprocess.call(cmd, shell=True)
+				print ()
+
+			# Enter loops to get private key and public certificate
+			logger.info("Getting private key..")
+			while True:
+				key = autoCompleteInput("Private key: ")
+				if not os.path.isfile(key):
+					print ("No such file: %s\n" % key)
+					logger.warning("No such file: %s" % key)
+					if not askYesOrNo("Try again"):
+						return False
+				else:
+					logger.info("Using private key: %s" % key)
+					break
+			logger.info("Getting public certificate..")
+			while True:
+				crt = autoCompleteInput("Public certificate: ")
+				if not os.path.isfile(crt):
+					print ("No such file: %s\n" % crt)
+					logger.warning("No such file: %s" % crt)
+					if not askYesOrNo("Try again"):
+						return False
+				else:
+					logger.info("Using public certificate: %s" % crt)
+					break
+		else:
+			print ("No such directory: %s" % path)
+			logger.warning("No such directory: %s" % path)
+			return False
+
+	# MD5 of public certificate
+	cmd = "openssl x509 -noout -modulus -in %s/%s | openssl md5" % (path, crt)
+	tmp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	crtMD5_good, crtMD5_err = tmp.communicate()
+	if crtMD5_err:
+		print ("Unable to load certificate")
+		logger.warning("Unable to load certificate")
+		return False
+
+	# MD5 of private key
+	if keyPass != None:
+		cmd = "openssl rsa -noout -modulus -in %s/%s -passin pass:%s | openssl md5" % (path, key, keyPass)
+	else:
+		cmd = "openssl rsa -noout -modulus -in %s/%s | openssl md5" % (path, key)
+	tmp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	keyMD5_good, keyMD5_err = tmp.communicate()
+	if keyMD5_err:
+		print ("Unable to load private key")
+		logger.warning("Unable to load private key")
+		return False
+
+	if keyMD5_good == crtMD5_good:
+		print ("\nValid: Public certificate and private key match")
+		logger.info("Public certificate and private key match")
+		return True
+	else:
+		print ("\nInvalid: Public certificate and private key mismatch")
+		logger.warning("Public certificate and private key mismatch")
+		return False
+
+
+def checkLDAP(XMLconfig ,ldapConfig):
+	if not (ldapConfig['port'] or ldapConfig['login'] or ldapConfig['host'] or ldapConfig['pass']) or (ldapConfig['port'] == None or ldapConfig['login'] == None or ldapConfig['host'] == None or ldapConfig['pass'] == None):
+		print ("Unable to determine ldap variables")
+		logger.warning("Unable to determine ldap variables")
+		return False
+
+	if ldapConfig['secure'] == 'false':
+		cmd = "/usr/bin/ldapsearch -x -H ldap://%(host)s -D %(login)s -w %(pass)s %(login)s" % ldapConfig
+	elif ldapConfig['secure'] == 'true':
+		cmd = "/usr/bin/ldapsearch -x -H ldaps://%(host)s -D %(login)s -w %(pass)s %(login)s" % ldapConfig
+
+	logger.info("Testing LDAP connection")
+	log_cmd = cmd.replace("-w " + ldapConfig['pass'],"-w *******")
+	logger.debug("LDAP test command: %s" % log_cmd)
+	ldapCheck = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	ldapCheck.wait()
+	out, err = ldapCheck.communicate()
+	if out:
+		logger.info("LDAP tested successfully")
+		return True
+	elif err:
+		logger.warning("Unable to test LDAP connection")
+		return False
+
+def userLdapOrGw(userConfig, pro_type):
+	result = None
+	logger.info("Checking for %s provisioning for user: %s" % (pro_type, userConfig['name']))
+
+	if pro_type == 'ldap':
+		if 'cn=' in userConfig['dName']:
+			logger.info("LDAP provioned user: %s" % userConfig['name'])
+			result = True
+		else:
+			logger.warning("Failed to find LDAP provisioning for user: %s" % userConfig['name'])
+			result = False
+
+	if pro_type == 'groupwise':
+		if 'cn=' not in userConfig['dName'] and userConfig['dName'] != None:
+			logger.info("GroupWise provioned user: %s" % userConfig['name'])
+			result = True
+		else:
+			logger.warning("Failed to find GroupWise Provisioning for user: %s" % userConfig['name'])
+			result = False
+
+	if  userConfig['dName'] == userConfig['mName']:
+		logger.debug("Provisioning for user '%s' matches in both databases" % userConfig['name'])
+	else:
+		logger.warning("Provisioning or name for user '%s' does not match in both databases" % userConfig['name'])
+		logger.debug("Datasync database: %s" % userConfig['dName'])
+		logger.debug("Mobility database: %s" % userConfig['mName'])
+
+	return result
+
+def updateFDN(dbConfig, XMLconfig, ldapConfig):
+	datasyncBanner(dsappversion)
+	if checkLDAP(XMLconfig, ldapConfig):
+		userConfig = verifyUser(dbConfig)
+		if userConfig['verify'] != 0:
+			if userLdapOrGw(userConfig, 'ldap'):
+				multiple = False
+				print ("Searching LDAP...")
+				userDN = []
+
+				if ldapConfig['secure'] == 'false':
+					cmd = "/usr/bin/ldapsearch -x -H ldap://%s -D %s -w %s -b %s" % (ldapConfig['host'], ldapConfig['login'], ldapConfig['pass'], userConfig['dName'])
+				elif ldapConfig['secure'] == 'true':
+					cmd = "/usr/bin/ldapsearch -x -H ldaps://%s -D %s -w %s -b %s" % (ldapConfig['host'], ldapConfig['login'], ldapConfig['pass'], userConfig['dName'])
+
+				tmp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+				out, err = tmp.communicate()
+				search = re.search('dn:.*', out)
+				if search:
+					userDN.append((search.group().split(' ')[1]))
+				if len(userDN) != 0:
+					print (list(set(userDN))[0])
+				else:
+					print ("Unable to find LDAP user '%(name)s' at: %(dName)s" % userConfig)
+					logger.warning("Unable to find LDAP user '%(name)s' at: %(dName)s" % userConfig)
+					if askYesOrNo("Expand search"):
+						print ("\nSearching LDAP...")
+						userDN = []
+						for container in ldapConfig['user']:
+							if ldapConfig['secure'] == 'false':
+								cmd = "/usr/bin/ldapsearch -x -H ldap://%s -D %s -w %s -b %s cn=%s" % (ldapConfig['host'], ldapConfig['login'], ldapConfig['pass'], container, userConfig['name'])
+							elif ldapConfig['secure'] == 'true':
+								cmd = "/usr/bin/ldapsearch -x -H ldaps://%s -D %s -w %s -b %s cn=%s" % (ldapConfig['host'], ldapConfig['login'], ldapConfig['pass'], container, userConfig['name'])
+							tmp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+							out, err = tmp.communicate()
+							search = re.findall('dn:.*', out)
+							for dn in search:
+								userDN.append(dn.split(' ')[1])
+						userDN = list(set(userDN))
+
+						if len(userDN) > 1:
+							print ("Multiple user contexts found:")
+							logger.info("Multiple user contexts found")
+							for elem in userDN:
+								print (elem)
+							multiple = True
+						elif len(userDN) == 1:
+							print (list(set(userDN))[0])
+						else:
+							print ("Unable to find LDAP user '%(name)s' with: cn=%(name)s" % userConfig)
+							logger.warning("Unable to find LDAP user '%(name)s' with: cn=%(name)s" % userConfig)
+							return
+
+				# Prompt for new FDN
+				if not multiple:
+					defaultuserDN = userDN[0]
+					print ("\nPress [Enter] to take LDAP defaults")
+					userNewDN = raw_input ("Enter users new full FDN [%s]: " % defaultuserDN)
+					if userNewDN == "":
+						userNewDN = defaultuserDN
+				else:
+					userNewDN = raw_input("\nEnter users new full FDN: ")
+					print (userNewDN)
+					if not ('cn=' in userNewDN or 'CN=' in userNewDN) and not (',o=' in userNewDN or ',O=' in userNewDN):
+						print ("Invalid FDN: %s" % userNewDN)
+						logger.warning("Invalid FDN: %s" % userNewDN)
+						return
+
+				if userNewDN == userConfig['dName'] and userNewDN == userConfig['mName']:
+					print ("\nUser FDN matches database [%s]. No changes made" % userConfig['dName'])
+					logger.info("User FDN matches database [%s]. No changes made" % userConfig['dName'])
+					if not askYesOrNo("Force update anyways"):
+						return
+
+				if askYesOrNo("\nUpdate [%s] to [%s]" % (userConfig['dName'], userNewDN)):
+					logger.info("Updating '%s' to '%s'" % (userConfig['dName'], userNewDN))
+
+					# Connect to datasync database to change FDN
+					conn = getConn(dbConfig, 'datasync')
+					cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+					cur.execute("update targets set dn='%s' where dn='%s' or dn='%s'" % (userNewDN, userConfig['dName'], userConfig['mName']))
+					cur.execute("update cache set \"sourceDN\"='%s' where \"sourceDN\"='%s' or \"sourceDN\"='%s'" % (userNewDN, userConfig['dName'], userConfig['mName']))
+					cur.execute("update \"folderMappings\" set \"targetDN\"='%s' where \"targetDN\"='%s' or \"targetDN\"='%s'" % (userNewDN, userConfig['dName'], userConfig['mName']))
+					cur.execute("update \"membershipCache\" set memberdn='%s' where memberdn='%s' or memberdn='%s'" % (userNewDN, userConfig['dName'], userConfig['mName']))
+					cur.close()
+					conn.close()
+					# Connect to mobility database to change FDN
+					conn = getConn(dbConfig, 'mobility')
+					cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+					cur.execute("update users set userid='%s' where userid='%s' or userid='%s'" % (userNewDN, userConfig['dName'], userConfig['mName']))
+					cur.close()
+					conn.close()
+
+					print ("User FDN update complete\n\nRestart mobility for changes to take effect")
+					logger.info("FND update complete")
+
+			else:
+				print ("Unable to get FDN. User '%s' is not LDAP provisioned" % userConfig['name'])
+				logger.warning("Unable to get FDN. User '%s' is not LDAP provisioned" % userConfig['name'])
+		else:
+			print ("No such user '%s'" % userConfig['name'])
+			logger.warning("User '%s' not found in databases" % userConfig['name'])
+
+def getApplicationNames(userConfig, dbConfig):
+	conn = getConn(dbConfig, 'datasync')
+	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+
+	cur.execute("select \"targetName\" from targets where dn='%s' and \"connectorID\"='default.pipeline1.mobility'" % userConfig['dName'])
+	data = cur.fetchall()
+	for row in data:
+		userConfig['mAppName'] = row['targetName']
+
+	cur.execute("select \"targetName\" from targets where dn='%s' and \"connectorID\"='default.pipeline1.groupwise'" % userConfig['dName'])
+	data = cur.fetchall()
+	for row in data:
+		userConfig['gAppName'] = row['targetName']
+
+	cur.close()
+	conn.close()
+	return userConfig
+
+##################################################################################################
+#	Patch / FTF Fixes
+##################################################################################################
+
+def getExactMobilityVersion():
+	with open(version, 'r') as f:
+		mVersion = f.read().translate(None, '.')
+	return mVersion.rstrip()
+
+def ftfPatchlevel(ftpFile, files):
+	patchFile = dsappConf + '/patch-file.conf'
+
+	if not os.path.isfile(patchFile):
+		open(patchFile, 'a').close()
+
+	with open(patchFile, 'r') as openPatchFile:
+		dsPatchLevel = openPatchFile.read()
+
+	DATE = datetime.datetime.now().strftime("%X %F")
+	if 'Applied fix %s to Mobility' % ftpFile not in dsPatchLevel:
+		with open(patchFile, 'a') as f:
+			f.write("Applied fix %s to Mobility version %s at %s:\n" % (ftpFile, getExactMobilityVersion(), DATE))
+			for item in files:
+				f.write(item + '\n')
+			f.write('\n')
+
+def ftfPatchlevelCheck(ftpFile):
+	patchFile = dsappConf + '/patch-file.conf'
+	if not os.path.isfile(patchFile):
+		return False
+	else:
+		with open(patchFile, 'r') as f:
+			patchFileContent = f.read()
+		print (patchFileContent)
+		if ftpFile in patchFileContent:
+			datasyncBanner(dsappversion)
+			print ("Patch %s has already been applied" % ftpFile)
+			return True
+
+# def checkVersion():
+# 	if [ "$1" == "$daVersion" ]; then
+# 		info "\nVersion check ${bGREEN}passed${NC}.\n"
+# 		return 0;
+# 	else
+# 		error "This patch is intended for version $1, the server is running version $daVersion\n"
+# 		return 1;

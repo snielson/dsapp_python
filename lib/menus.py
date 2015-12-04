@@ -6,6 +6,9 @@ import ConfigParser
 Config = ConfigParser.ConfigParser()
 import getch
 getch = getch._Getch()
+import textwrap
+
+import dsappSoap as dsSOAP
 
 # Folder variables
 dsappDirectory = "/opt/novell/datasync/tools/dsapp"
@@ -15,6 +18,7 @@ dsapplib = dsappDirectory + "/lib"
 dsappBackup = dsappDirectory + "/backup"
 dsapptmp = dsappDirectory + "/tmp"
 dsappupload = dsappDirectory + "/upload"
+dsappdata = dsappDirectory + "/data"
 rootDownloads = "/root/Downloads"
 dsappSettings = dsappConf + "/setting.cfg"
 
@@ -26,6 +30,26 @@ logger = logging.getLogger('__main__')
 Config.read(dsappSettings)
 dsappversion = Config.get('Misc', 'dsapp.version')
 
+# Configs from main script
+dbConfig = None
+ldapConfig = None
+mobilityConfig = None
+gwConfig = None
+trustedConfig = None
+XMLconfig = None
+def getConfigs(db, ldap, mobility, gw, trustedapp, xml):
+	global dbConfig
+	global ldapConfig
+	global gwConfig
+	global trustedConfig
+	global XMLconfig
+
+	dbConfig = db
+	ldapConfig = ldap
+	mobilityConfig = mobility
+	gwConfig = gw
+	trustedConfig = trustedapp
+	XMLconfig = xml
 
 def show_menu(menu_call):
 	ds.datasyncBanner(dsappversion)
@@ -63,7 +87,7 @@ def build_avaialbe(menu):
 ##################################################################################################
 
 def main_menu():
-	menu = ['1. Logs', '2. Register & Update', '3. Database', '4. Certificates', '5. User Issues', '6. User Info', '7. Checks & Queries', '0. Quit']
+	menu = ['1. Logs', '2. Register & Update', '3. Database', '4. Certificates', '\n     5. User Issues', '6. User Info', '7. Checks & Queries', '\n     0. Quit']
 	sub_menus = {'1': log_menu,'2': registerUpdate_menu, '3': database_menu, '4': certificate_menu, '5': userIssue_menu, '6': userInfo_menu, '7': checksQueries_menu}
 	
 	available = build_avaialbe(menu)
@@ -79,7 +103,7 @@ def main_menu():
 ## Sub menus  ##
 
 def log_menu():
-	menu = ['1. Upload logs', '2. Set logs to defaults', '3. Set logs to diagnostics/debug', '4. Log Capture', '5. Remove log archives', '0. Back']
+	menu = ['1. Upload logs', '2. Set logs to defaults', '3. Set logs to diagnostics/debug', '4. Log Capture', '\n     5. Remove log archives', '\n     0. Back']
 	
 	available = build_avaialbe(menu)
 	loop = True
@@ -101,7 +125,7 @@ def log_menu():
 			main_menu()
 
 def registerUpdate_menu():
-	menu = ['1. Register Mobility', '2. Update Mobility', '3. Apply FTF / Patch Files', '0. Back']
+	menu = ['1. Register Mobility', '2. Update Mobility', '3. Apply FTF / Patch Files', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -118,8 +142,57 @@ def registerUpdate_menu():
 			loop = False
 			main_menu()
 
-def certificate_menu():
-	menu = ['1. Generate self-signed certificate', '2. Create CSR & Private key', '3. Install certificate from 3rd party', '4. Verify certificate / key pair', '0. Back']
+def database_menu():
+	ds.datasyncBanner(dsappversion)
+	print "The database menu will require Mobility to be stopped"
+	if ds.askYesOrNo("Stop Mobility now"):
+		ds.datasyncBanner(dsappversion)
+		ds.rcDS('stop')
+		menu = ['1. Vacuum Databases', '2. Re-Index Databases', '\n     3. Back up Databases', '4. Restore Databases', '\n     5. Recreate Global Address Book (GAL)', '6. Fix targets/membershipCache', '\n     7. CUSO Clean-Up Start-Over', '\n     0. Back -- Start Mobility']
+
+		available = build_avaialbe(menu)
+		loop = True
+		while loop:
+			show_menu(menu)
+			choice = get_choice(available)
+			if choice == '1':
+				ds.datasyncBanner(dsappversion)
+				print textwrap.fill("The amount of time this takes can vary depending on the last time it was completed. It is recommended that this be run every 6 months.", 80)
+				print
+				if ds.askYesOrNo("Do you want to continue"):
+					ds.vacuumDB(dbConfig)
+					print
+					ds.eContinue()
+			elif choice == '2':
+				ds.datasyncBanner(dsappversion)
+				print textwrap.fill("The amount of time this takes can vary depending on the last time it was completed. It is recommended that this be run after a database vacuum.", 80)
+				print
+				if ds.askYesOrNo("Do you want to continue"):
+					ds.indexDB(dbConfig)
+					print
+					ds.eContinue()
+			elif choice == '3':
+				pass
+			elif choice == '4':
+				pass
+			elif choice == '5':
+				pass
+			elif choice == '6':
+				pass
+			elif choice == '7':
+				cuso_menu()
+			elif choice == '0':
+				loop = False
+				ds.datasyncBanner(dsappversion)
+				ds.rcDS('start')
+				main_menu()
+	else:
+		main_menu()
+
+### Start ### Sub menu for database_menu ###
+
+def cuso_menu():
+	menu = ['1. Clean up and start over (Except Users)', '2. Clean up and start over (Everything)', '\n     3. Uninstall Mobility', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -127,19 +200,52 @@ def certificate_menu():
 		show_menu(menu)
 		choice = get_choice(available)
 		if choice == '1':
-			pass
+			ds.datasyncBanner(dsappversion)
+			if ds.askYesOrNo("Clean up and start over (Except Users)"):
+				ds.cuso(dbConfig, 'user')
+				print; ds.eContinue()
 		elif choice == '2':
-			pass
+			ds.dsappversion(dsappversion)
+			if ds.askYesOrNo("Clean up and start over (Everything)"):
+				ds.cuso(dbConfig, 'everything')
+				print; ds.eContinue()
 		elif choice == '3':
-			pass
+			ds.datasyncBanner(dsappversion)
+			print "Please run 'sh /opt/novell/datasync/uninstall.sh' first"
+			if ds.askYesOrNo("Uninstall Mobility"):
+				ds.cuso(dbConfig, 'uninstall')
+		elif choice == '0':
+			loop = False
+			return
+
+### End ### Sub menu for database_menu ###
+
+def certificate_menu():
+	menu = ['1. Generate self-signed certificate', '\n     2. Create CSR & Private key', '3. Install certificate from 3rd party', '\n     4. Verify certificate / key pair', '\n     0. Back']
+
+	available = build_avaialbe(menu)
+	loop = True
+	while loop:
+		show_menu(menu)
+		choice = get_choice(available)
+		if choice == '1':
+			ds.createCSRKey(True)
+			print; ds.eContinue()
+		elif choice == '2':
+			ds.createCSRKey()
+			print; ds.eContinue()
+		elif choice == '3':
+			ds.createPEM()
+			print; ds.eContinue()
 		elif choice == '4':
-			pass
+			ds.verifyCertifiateMatch()
+			print; ds.eContinue()
 		elif choice == '0':
 			loop = False
 			main_menu()
 
 def userIssue_menu():
-	menu = ['1. Monitor user sync options...', '2. GroupWise checks options...', '3. Remove & reinitialize users options...', '4. User authentication issues', '5. Change user application name', '6. Change user FDN', '7. What deleted this (contact, email, folder, calendar)?', '8. List subjects of deleted items from device', '0. Back']
+	menu = ['1. Monitor user sync options...', '2. GroupWise checks options...', '3. Remove & reinitialize users options...', '\n     4. User authentication issues', '5. Change user application name', '6. Change user FDN', '7. What deleted this (contact, email, folder, calendar)?', '8. List subjects of deleted items from device', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -147,17 +253,17 @@ def userIssue_menu():
 		show_menu(menu)
 		choice = get_choice(available)
 		if choice == '1':
-			pass
+			monitorUser_menu()
 		elif choice == '2':
-			pass
+			groupwiseChecks_menu()
 		elif choice == '3':
-			pass
+			removeUser_menu()
 		elif choice == '4':
 			pass
 		elif choice == '5':
 			pass
 		elif choice == '6':
-			pass
+			ds.updateFDN(dbConfig, XMLconfig, ldapConfig)
 		elif choice == '7':
 			pass
 		elif choice == '8':
@@ -166,8 +272,81 @@ def userIssue_menu():
 			loop = False
 			main_menu()
 
+### Start ### Sub menus userIssue_menu ###
+
+def monitorUser_menu():
+	menu = ['1. Monitor user sync state (Mobility)', '2. Monitor user sync GW/MC count (Sync-Validate)', '3. Monitor active users sync state', '\n     0. Back']
+
+	available = build_avaialbe(menu)
+	loop = True
+	while loop:
+		show_menu(menu)
+		choice = get_choice(available)
+		if choice == '1':
+			ds.monitorUser(dbConfig)
+		elif choice == '2':
+			pass
+		elif choice == '3':
+			ds.monitor_syncing_users(dbConfig)
+		elif choice == '0':
+			loop = False
+			return
+
+def groupwiseChecks_menu():
+	menu = ['1. Check user over SOAP', '2. Check GroupWise folder structure', '3. Remote GWcheck DELDUPFOLDERS (beta)', '\n     0. Back']
+
+	available = build_avaialbe(menu)
+	loop = True
+	while loop:
+		show_menu(menu)
+		choice = get_choice(available)
+		if choice == '1':
+			userConfig = ds.verifyUser(dbConfig)
+			if userConfig['name'] != None:
+				dsSOAP.soap_printUser(trustedConfig, gwConfig, userConfig)
+				print
+				ds.eContinue()
+		elif choice == '2':
+			dsSOAP.soap_checkFolderList(trustedConfig, gwConfig, ds.verifyUser(dbConfig))
+			print
+			ds.eContinue()
+		elif choice == '3':
+			pass
+		elif choice == '0':
+			loop = False
+			return
+
+def removeUser_menu():
+	menu = ['1. Force remove user/group db references', '2. Remove user/group (restarts configengine)', '3. Remove disabled users & fix referenceCount', '\n     4. Reinitialize user (WebAdmin is recommended)', '5. Reinitialize all users (CAUTION - down time)', '\n     0. Back']
+
+	available = build_avaialbe(menu)
+	loop = True
+	while loop:
+		show_menu(menu)
+		choice = get_choice(available)
+		if choice == '1':
+			ds.remove_user(dbConfig, 1)
+			print
+			ds.eContinue()
+		elif choice == '2':
+			ds.remove_user(dbConfig)
+			print
+			ds.eContinue()
+		elif choice == '3':
+			pass
+		elif choice == '4':
+			ds.setUserState(dbConfig, '7')
+		elif choice == '5':
+			ds.reinitAllUsers(dbConfig)
+			ds.eContinue()
+		elif choice == '0':
+			loop = False
+			return
+
+### End ### Sub menus userIssue_menu ###
+
 def userInfo_menu():
-	menu = ['1. List all devices from db', '2. List of GMS users & emails', '0. Back']
+	menu = ['1. List all devices from db', '2. List of GMS users & emails', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -183,7 +362,7 @@ def userInfo_menu():
 			main_menu()
 
 def checksQueries_menu():
-	menu = ['1. General Health Check (beta)', '2. Nightly Maintenance Check', '3. Show Sync Status', '4. GW pending events by User (consumerevents)', '5. Mobility pending events by User (syncevents)', '6. Attachments...', '7. Watch psql command (CAUTION)', '0. Back']
+	menu = ['1. General Health Check (beta)', '2. Nightly Maintenance Check', '\n     3. Show Sync Status', '4. GW pending events by User (consumerevents)', '5. Mobility pending events by User (syncevents)', '\n     6. Attachments...', '7. Watch psql command (CAUTION)', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -201,15 +380,17 @@ def checksQueries_menu():
 		elif choice == '5':
 			pass
 		elif choice == '6':
-			pass
+			viewAttachments_menu()
 		elif choice == '7':
 			pass
 		elif choice == '0':
 			loop = False
 			main_menu()
 
-def database_menu():
-	menu = ['1. Vacuum Databases', '2. Re-Index Databases', '3. Back up Databases', '4. Restore Databases', '5. Recreate Global Address Book (GAL)', '6. Fix targets/membershipCache', '7. CUSO Clean-Up Start-Over', '0. Back -- Start Mobility']
+### Start ### Sub menus checkQueries_menu ###
+
+def viewAttachments_menu():
+	menu = ['1. View attachments by user', '2. Check Mobility attachments', '3. Check Mobility attachments count (beta)', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -222,14 +403,8 @@ def database_menu():
 			pass
 		elif choice == '3':
 			pass
-		elif choice == '4':
-			pass
-		elif choice == '5':
-			pass
-		elif choice == '6':
-			pass
-		elif choice == '7':
-			pass
 		elif choice == '0':
 			loop = False
-			main_menu()
+			return
+
+### End ### Sub menus checkQueries_menu ###

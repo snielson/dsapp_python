@@ -49,7 +49,7 @@ import spin
 
 # Make sure user is root
 if (os.getuid() != 0):
-	print ("Please login as root to run this script")
+	print ("Root user required to run this script")
 	sys.exit(1)
 
 ##################################################################################################
@@ -69,6 +69,7 @@ dsapplib = dsappDirectory + "/lib"
 dsappBackup = dsappDirectory + "/backup"
 dsapptmp = dsappDirectory + "/tmp"
 dsappupload = dsappDirectory + "/upload"
+dsappdata = dsappDirectory + "/data"
 rootDownloads = "/root/Downloads"
 
 # Configuration Files
@@ -140,6 +141,7 @@ logger.info('------------- Starting dsapp -------------')
 ##################################################################################################
 
 def exit_cleanup():
+	logger.debug("Running exit cleanup..")
 	try:
 		if spinner.isAlive():
 			spinner.stop()
@@ -149,11 +151,12 @@ def exit_cleanup():
 	# Clear dsapp/tmp
 	ds.removeAllFiles("/opt/novell/datasync/tools/dsapp/tmp/")
 	ds.removeLine(dsappConf + '/dsapp.pid', str(os.getpid()))
+	ds.clear()
+	logger.info('------------- Successfully shutdown dsapp -------------')
 
 def signal_handler_SIGINT(signal, frame):
 	# Clean up dsapp
 	exit_cleanup
-	# Reset the terminal
 	sys.exit(1)
 
 def set_spinner():
@@ -176,7 +179,7 @@ atexit.register(exit_cleanup)
 signal.signal(signal.SIGINT, signal_handler_SIGINT)
 
 # Create dsapp folder stucture
-dsapp_folders = [dsappDirectory, dsappConf, dsappLogs, dsappBackup, dsapptmp, dsappupload, rootDownloads, dsapplib]
+dsapp_folders = [dsappDirectory, dsappConf, dsappLogs, dsappBackup, dsapptmp, dsappupload, rootDownloads, dsapplib, dsappdata]
 for folder in dsapp_folders:
 	if not os.path.exists(folder):
 		os.makedirs(folder)
@@ -325,11 +328,11 @@ if len(sys.argv) == 0:
 		logger.debug('Assigning %s from %s' % ('ldap enabled', 'ceconfXML'))
 		ldapConfig['enabled'] = ds.xmlpath('.//configengine/ldap/enabled', XMLconfig['ceconf'])
 		logger.debug('Assigning %s from %s' % ('LDAP group container', 'ceconfXML'))
-		ldapConfig['group'] = ds.xmlpath('.//configengine/ldap/groupContainer', XMLconfig['ceconf'])
+		ldapConfig['group'] = ds.xmlpath_findall('.//configengine/ldap/groupContainer', XMLconfig['ceconf'])
 		logger.debug('Assigning %s from %s' % ('LDAP user container', 'ceconfXML'))
-		ldapConfig['user'] = ds.xmlpath('.//configengine/ldap/userContainer', XMLconfig['ceconf'])
+		ldapConfig['user'] = ds.xmlpath_findall('.//configengine/ldap/userContainer', XMLconfig['ceconf'])
 		logger.debug('Assigning %s from %s' % ('LDAP admins', 'ceconfXML'))
-		ldapConfig['admins'] = ds.xmlpath('.//configengine/ldap/admins/dn', XMLconfig['ceconf'])
+		ldapConfig['admins'] = ds.xmlpath_findall('.//configengine/ldap/admins/dn', XMLconfig['ceconf'])
 		logger.debug('Assigning %s from %s' % ('LDAP port', 'ceconfXML'))
 		ldapConfig['port'] = ds.xmlpath('.//configengine/ldap/port', XMLconfig['ceconf'])
 		logger.debug('Assigning %s from %s' % ('LDAP host', 'ceconfXML'))
@@ -406,44 +409,31 @@ if not ds.checkPostgresql(dbConfig):
 ##################################################################################################
 import menus
 
+menus.getConfigs(dbConfig, ldapConfig, mobilityConfig, gwConfig, trustedConfig, XMLconfig)
+menus.main_menu()
+
 # TEST CODE / Definitions
-ds.datasyncBanner(dsappversion)
+# ds.datasyncBanner(dsappversion)
+
+# myFile = ['/opt/novell/datasync/configengine/lib/configengine/__init__.pyc']
+# ds.ftfPatchlevel('918660.zip', myFile)
+
+# ds.ftfPatchlevelCheck('918660.zip')
+
+# userConfig = ds.verifyUser(dbConfig)
+# print userConfig
+
 
 # ds.remove_user(dbConfig)
 
-# # Test rcDS function
-# ds.rcDS('stop')
-# ds.cuso(dbConfig)
-# ds.rcDS('start')
-
 # ds.addGroup(dbConfig, ldapConfig)
-# ds.setUserState(dbConfig, '7')
-# ds.monitor_syncing_users(dbConfig)
 # ds.checkNightlyMaintenance(config_files, mobilityConfig)
 
-# menus.main_menu()
-
-# get_sessionID(trustedConfig)
-
-# # Test SOAP:
-# userConfig = ds.verifyUser(dbConfig)
-# if userConfig['name'] != None:
-	# soap_userConfig = dsSOAP.soap_getUserInfo(trustedConfig, gwConfig, ds.verifyUser(dbConfig))
-	# dsSOAP.soap_printUser(trustedConfig, gwConfig, userConfig)
-	# dsSOAP.soap_checkFolderList(trustedConfig, gwConfig, ds.verifyUser(dbConfig))
-
 # ds.updateMobilityFTP()
-
-# ds.showStatus(dbConfig)
-
-# ds.vacuumDB(dbConfig)
 
 # ds.changeDBPass(dbConfig, config_files, XMLconfig)
 
 # ds.changeAppName(dbConfig)
-
-# ds.certPath()
-# ds.createCSRKey(True)
 
 ds.eContinue()
 sys.exit(0)
