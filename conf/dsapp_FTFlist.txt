@@ -1,0 +1,29 @@
+# Format line 1 : File name
+# Format line 2 : GMS version
+# Format line 3 : Patch Description
+# Format line 4 : Patch install location. Seperate by spaces
+
+918694.zip
+210230
+Fix update.sh to work with clear-text passwords - TID 7016214
+/opt/novell/datasync/common/lib/upgrade.pyc
+
+918660.zip
+210230
+Fix interface for synced admin user - 7016212
+/opt/novell/datasync/configengine/lib/configengine/__init__.pyc
+
+935282.zip
+210230
+Fix sync.pyc for iOS device - 7016617
+/opt/novell/datasync/syncengine/connectors/mobility/lib/device/sync.py
+
+912117.tar
+210230
+Fix 'None Folder' in dashboard
+/opt/novell/datasync/syncengine/connectors/mobility/lib/device/sync.pyc /opt/novell/datasync/syncengine/connectors/mobility/lib/device/ping.pyc
+
+912117.tar
+1420228
+Fix me
+/path/some

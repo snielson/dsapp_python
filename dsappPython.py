@@ -9,7 +9,7 @@
 #
 ##################################################################################################
 
-dsappversion='223'
+dsappversion='226'
 
 ##################################################################################################
 #	Imports
@@ -39,8 +39,6 @@ if not os.path.exists('/opt/novell/datasync/tools/dsapp/logs/'):
 sys.path.append(os.path.dirname(os.path.realpath(__file__)) + '/lib')
 import dsappDefinitions as ds
 import dsappSoap as dsSOAP
-ds.set_dsappversion(dsappversion)
-
 import spin
 
 ##################################################################################################
@@ -80,22 +78,14 @@ config_files['ceconf'] = "/etc/datasync/configengine/configengine.xml"
 config_files['econf'] = "/etc/datasync/configengine/engines/default/engine.xml"
 config_files['wconf'] = "/etc/datasync/webadmin/server.xml"
 
-# Test server paths
-# config_files['mconf'] = "/root/Desktop/confXML/mobility/connector.xml"
-# config_files['gconf'] = "/root/Desktop/confXML/groupwise/connector.xml"
-# config_files['ceconf'] = "/root/Desktop/confXML/configengine.xml"
-# config_files['econf'] = "/root/Desktop/confXML/engine.xml"
-# config_files['wconf'] = "/root/Desktop/confXML/server.xml"
-
 # Misc variables
 serverinfo = "/etc/*release"
 rpminfo = "datasync"
 dsapp_tar = "dsapp.tgz"
 isNum = '^[0-9]+$'
-ds_20x= 2000
-ds_21x = 2100
-previousVersion = 20153
-latestVersion = 210230
+ds_1x= 1
+ds_2x = 2
+ds_14x = 14
 rcScript = None
 mobilityVersion = 0
 version = "/opt/novell/datasync/version"
@@ -233,6 +223,14 @@ if forceMode:
 # Get mobility version
 dsVersion = ds.getDSVersion()
 
+# Debug logging: dsVersion
+if dsVersion >= ds_14x:
+	logger.debug('Version : Mobility 14x')
+elif dsVersion >= ds_2x:
+	logger.debug('Version : Mobility 2x')
+elif dsVersion >= ds_1x:
+	logger.debug('Version : Mobility 1x')
+
 # Get Hostname of server, and store in setting.cfg
 if not os.path.isfile(dsappSettings):
 	dsHostname = os.popen('echo `hostname -f`').read().rstrip()
@@ -249,9 +247,10 @@ if not os.path.isfile(dsappSettings):
 		Config.set('Misc', 'mobility.version', dsVersion)
 		Config.write(cfgfile)
 		
-# Update dsVersion in settings.cfg
+# Update values in settings.cfg
 Config.read(dsappSettings)
 Config.set('Misc', 'mobility.version', dsVersion)
+Config.set('Misc', 'dsapp.version', dsappversion)
 with open(dsappSettings, 'wb') as cfgfile:
 	Config.write(cfgfile)
 
@@ -374,11 +373,23 @@ if len(sys.argv) == 0:
 		logger.debug('Assigning %s from %s' % ('GroupWise connector gAttachSize', 'gconfXML'))
 		gwConfig['gAttachSize'] = ds.xmlpath('.//settings/custom/attachmentMaxSize', XMLconfig['gconf'])
 		logger.debug('Assigning %s from %s' % ('GroupWise connector gListenAddress', 'gconfXML'))
-		gwConfig['gListenAddress'] = ds.xmlpath('.//settings/custom/soapServer', XMLconfig['gconf']).split("://",1)[1].split(":",1)[0]
+		if dsVersion >= ds_14x:
+			gwConfig['gListenAddress'] = ds.xmlpath('.//settings/custom/soapServer', XMLconfig['gconf']).split(":")[0]
+		else:
+			gwConfig['gListenAddress'] = ds.xmlpath('.//settings/custom/soapServer', XMLconfig['gconf']).split("://")[-1].split(":")[0]
+		gwConfig['gListenAddress'] = '151.155.215.94'
 		logger.debug('Assigning %s from %s' % ('GroupWise connector sPort', 'gconfXML'))
-		gwConfig['sPort'] = ds.xmlpath('.//settings/custom/soapServer', XMLconfig['gconf']).split("://",1)[1].split(":",1)[1].split("/",1)[0]
+		gwConfig['sPort'] = ds.xmlpath('.//settings/custom/soapServer', XMLconfig['gconf']).split(":")[-1]
 		logger.debug('Assigning %s from %s' % ('GroupWise connector sSecure', 'gconfXML'))
-		gwConfig['sSecure'] = ds.xmlpath('.//settings/custom/soapServer', XMLconfig['gconf']).split("://",1)[0]
+		if dsVersion >= ds_14x:
+			logger.debug('Assigning %s from %s' % ('GroupWise connector POASecure', 'gconfXML'))
+			gwConfig['POASecure'] = ds.xmlpath('.//settings/custom/sslPOAs', XMLconfig['gconf'])
+			if gwConfig['POASecure'] == '0':
+				gwConfig['sSecure'] = 'http'
+			elif gwConfig['POASecure'] == '1':
+				gwConfig['sSecure'] = 'https'
+		else:
+			gwConfig['sSecure'] = ds.xmlpath('.//settings/custom/soapServer', XMLconfig['gconf']).split(":")[0]
 
 		# Trusted app values
 		trustedConfig = {}
@@ -400,7 +411,6 @@ else:
 	ds.clear()
 
 # Test database connection
-# TODO : TEST on server with dbs
 if not ds.checkPostgresql(dbConfig):
 	sys.exit(1)
 
@@ -408,32 +418,12 @@ if not ds.checkPostgresql(dbConfig):
 #	Main
 ##################################################################################################
 import menus
-
-menus.getConfigs(dbConfig, ldapConfig, mobilityConfig, gwConfig, trustedConfig, XMLconfig)
+menus.getConfigs(dbConfig, ldapConfig, mobilityConfig, gwConfig, trustedConfig, XMLconfig, config_files)
 menus.main_menu()
 
 # TEST CODE / Definitions
-# ds.datasyncBanner(dsappversion)
-
-# myFile = ['/opt/novell/datasync/configengine/lib/configengine/__init__.pyc']
-# ds.ftfPatchlevel('918660.zip', myFile)
-
-# ds.ftfPatchlevelCheck('918660.zip')
-
-# userConfig = ds.verifyUser(dbConfig)
-# print userConfig
-
-
-# ds.remove_user(dbConfig)
-
-# ds.addGroup(dbConfig, ldapConfig)
-# ds.checkNightlyMaintenance(config_files, mobilityConfig)
-
-# ds.updateMobilityFTP()
-
 # ds.changeDBPass(dbConfig, config_files, XMLconfig)
 
-# ds.changeAppName(dbConfig)
+# print; ds.eContinue()
 
-ds.eContinue()
 sys.exit(0)

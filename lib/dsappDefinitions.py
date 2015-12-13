@@ -14,7 +14,7 @@ from urllib2 import urlopen, URLError, HTTPError
 from lxml import etree
 from xml.parsers.expat import ExpatError
 import logging, logging.config
-from multiprocessing import Process
+from multiprocessing import Process, Queue
 import ConfigParser
 Config = ConfigParser.ConfigParser()
 
@@ -47,13 +47,13 @@ rootDownloads = "/root/Downloads"
 
 # Misc variables
 serverinfo = "/etc/*release"
+initScripts = "/etc/init.d/"
 rpminfo = "datasync"
 dsapp_tar = "dsapp.tgz"
 isNum = '^[0-9]+$'
-ds_20x= 2000
-ds_21x = 2100
-previousVersion = 20153
-latestVersion = 210230
+ds_1x= 1
+ds_2x = 2
+ds_14x = 14
 rcScript = None
 mobilityVersion = 0
 version = "/opt/novell/datasync/version"
@@ -87,11 +87,20 @@ warn = "/var/log/warn"
 dsappSettings = dsappConf + "/setting.cfg"
 dsappLogSettings = dsappConf + "/logging.cfg"
 dsappLog = dsappConf + "/dsapp.log"
-ghcLog = dsappConf + "/generalHealthCheck.log"
+ghcLog = dsappLogs + "/generalHealthCheck.log"
 
 # Log Settings
 logging.config.fileConfig('%s/logging.cfg' % (dsappConf))
 logger = logging.getLogger(__name__)
+
+# Read Config
+Config.read(dsappSettings)
+dsappversion = Config.get('Misc', 'dsapp.version')
+
+# Text color formats
+colorGRN = "\033[01;32m{0}\033[00m"
+colorRED = "\033[01;31m{0}\033[00m"
+colorYELLOW = "\033[01;33m{0}\033[00m"
 
 # Define Variables for Eenou+ (2.x)
 def declareVariables2():
@@ -122,10 +131,6 @@ def declareVariables1():
 	mlog = log + "/connectors/default.pipeline1.mobility.log"
 	glog = log + "/connectors/default.pipeline1.groupwise.log"
 	rcScript="rcdatasync"
-
-def set_dsappversion(version):
-	global dsappversion
-	dsappversion = version
 
 def set_forcemode(force):
 	global forceMode
@@ -308,7 +313,7 @@ def xmlpath (elem, tree):
 	except AttributeError:
 		logger.warning('Unable to find %s' % (elem))
 
-def xmlpath_findall(elem, tree): # TODO : Fix to find all children with same tag
+def xmlpath_findall(elem, tree):
 	xml_list = []
 	try:
 		for node in tree.findall(elem):
@@ -360,7 +365,7 @@ def unzip_file(fileName):
 	    z.extractall()
 
 def untar_file(fileName):
-	with contextlib.closing(tarfile.open(fileName, 'r:gz')) as tar:
+	with contextlib.closing(tarfile.open(fileName, 'r:*')) as tar:
 		tar.extractall()
 
 def uncompressIt(fileName):
@@ -373,7 +378,7 @@ def zip_content(fileName):
 		return z.namelist()
 
 def tar_content(fileName):
-	with contextlib.closing(tarfile.open(fileName, 'r:gz')) as tar:
+	with contextlib.closing(tarfile.open(fileName, 'r:*')) as tar:
 		return tar.getnames()
 
 def file_content(fileName):
@@ -408,7 +413,7 @@ def DoesServiceExist(host, port):
     logger.info('Successfully tested to %s:%s' %(host,port))
     return True
 
-def dlfile(url,path=None, print_url=True):
+def dlfile(url,path=None, print_url=True, print_warn=True):
 	# Open the url
 	spinner = set_spinner()
 	save_path = None
@@ -431,7 +436,8 @@ def dlfile(url,path=None, print_url=True):
 		logger.warning("HTTP Error: %s %s" %(e.reason, url))
 		return False
 	except URLError, e:
-		print ("No such file or directory %s" % url)
+		if print_warn:
+			print ("No such file or directory %s" % url)
 		logger.warning("URL Error: %s %s" %(e.reason, url))
 		return False
 	else:
@@ -505,14 +511,14 @@ def autoUpdateDsapp():
 def getDSVersion():
 	if checkInstall(forceMode, installedConnector):
 		with open(version) as f:
-			value = f.read().translate(None, '.')[0:4]
-		return value
+			value = f.read().split('.')[0]
+		return int(value)
 
 def setVariables():
 	dsVersion = getDSVersion()
 	# Depends on version 1.x or 2.x
 	if checkInstall(forceMode, installedConnector):
-		if dsVersion > ds_20x:
+		if dsVersion >= ds_1x:
 			declareVariables2()
 		else:
 			declareVariables1()
@@ -606,7 +612,9 @@ def dsUpdate(repo):
 		logger.info('Mobility product successfully updated to %s' % version)
 
 
-#################### RPM definitions ###################
+##################################################################################################
+#	Start of RPM definitions
+##################################################################################################
 # Code used from: https://docs.fedoraproject.org/
 
 # Global file descriptor for the callback.
@@ -658,9 +666,16 @@ def getRPMs():
 	ts = rpm.TransactionSet()
 	mi = ts.dbMatch()
 	list = []
+	logger.info("Obtaining list of system RPMs")
+	time1 = time.time()
 	for h in mi:
 		list.append("%s-%s-%s" % (h['name'], h['version'], h['release']))
+	time2 = time.time()
+	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 	return list
+
+def queue_getRPMs(que):
+	que.put(getRPMs())
 
 def findRPM(rpmName):
 	ts = rpm.TransactionSet()
@@ -757,7 +772,9 @@ def removeRPM(rpmName):
 		print ("Error: Unresolved dependencies, transaction failed.")
 		print (unresolved_dependencies)
 
-#################### End of RPM definitions ###################
+##################################################################################################
+#	End of RPM definitions
+##################################################################################################
 
 def protect(msg, encode, path, host = None, key = None):
 # Code from GroupWise Mobility Service (GMS) datasync.util.
@@ -781,7 +798,7 @@ def protect(msg, encode, path, host = None, key = None):
 		logger.error('bad decrypt - error decoding %s' % (path))
 		os.remove(dsapptmp + '/decode_error_check')
 
-		# TODO: Prompt user to attempt to fix files
+		# TODO: Prompt user to attempt to fix files ... Maybe??
 		print ('\ndsapp has encountered an error. See log for more details')
 		sys.exit(1)
 	elif result:
@@ -824,16 +841,6 @@ def isProtected(tree, pro_path):
 		return True
 	elif int(protected) == 0:
 		return False
-
-
-def createPGPASS(config):
-	# TODO: May no longer be needed with psycopg2, or other methods to access the database
-	pgpass = '/root/.pgpass'
-	#Creating new .pgpass file
-	logger.debug('Creating new ~/.pgpass file')
-	with open(pgpass, 'w') as f:
-		f.write("*:*:*:*:%s" % (config['pass']))
-	os.chmod(pgpass, 0600)
 
 def backup_file(source, dest):
 	date_fmt = datetime.datetime.now().strftime('%X_%F')
@@ -1001,7 +1008,7 @@ def dropDatabases(dbConfig):
 		conn.close()
 		return
 
-	if mobile_version > ds_20x:
+	if mobile_version >= ds_1x:
 		print ("Dropping dsmonitor database")
 		try:
 			cur.execute("DROP DATABASE IF EXISTS dsmonitor")
@@ -1017,6 +1024,23 @@ def dropDatabases(dbConfig):
 	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 	cur.close()
 	conn.close()
+
+def dropSpecificDatabases(dbConfig, database):
+	conn = getConn(dbConfig, 'postgres')
+	cur = conn.cursor()
+
+	try:
+		cur.execute("DROP DATABASE %s" % database)
+		logger.info('Dropped %s database' % database)
+		cur.close()
+		conn.close()
+		return True
+	except:
+		print('Unable to drop %s database' % database)
+		logger.error('Unable to drop %s database' % database)
+		cur.close()
+		conn.close()
+		return False
 
 def verify_clean_database(dbConfig):
 	check = [('datasync',), ('mobility',), ('dsmonitor',)]
@@ -1048,7 +1072,7 @@ def createDatabases(dbConfig):
 	cur.execute("CREATE DATABASE mobility")
 	print("Mobility database done")
 	logger.info('mobility database created')
-	if mobile_version > ds_20x:
+	if mobile_version >= ds_1x:
 		cur.execute("CREATE DATABASE dsmonitor")
 		print("DSmonitor database done")
 		logger.info('dsmonitor database created')
@@ -1085,7 +1109,7 @@ def createDatabases(dbConfig):
 	cur.close()
 	conn.close()
 
-	if mobile_version > ds_20x:
+	if mobile_version >= ds_1x:
 		conn = getConn(dbConfig, 'dsmonitor')
 		cur = conn.cursor()
 		cur.execute(open(dirOptMobility + '/monitorengine/sql/monitor.sql', 'r').read())
@@ -1097,6 +1121,13 @@ def createDatabases(dbConfig):
 	print('\nDatabase creation done')
 	logger.info('Creating databases complete')
 	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
+def createSpecificDatabases(dbConfig, database):
+	conn = getConn(dbConfig, 'postgres')
+	cur = conn.cursor()
+	cur.execute("CREATE DATABASE %s" % database)
+	cur.close()
+	conn.close()
 
 ###### End of Postgresql Definitions ########
 
@@ -1122,9 +1153,9 @@ def cuso(dbConfig, op = 'everything'):
 				# Repopulating targets and membershipCache
 				conn = getConn(dbConfig, 'datasync')
 				cur = conn.cursor()
-				cur.execute(open(dsappdata +'/targets.sql').read())
+				cur.execute(open(dsappdata +'/targets.sql', 'r').read())
 				logger.info('Imported targets.sql into datasync database')
-				cur.execute(open(dsappdata +'/membershipCache.sql').read())
+				cur.execute(open(dsappdata +'/membershipCache.sql', 'r').read())
 				logger.info('Imported membershipCache.sql into datasync database')
 				cur.close()
 				conn.close()
@@ -1736,6 +1767,7 @@ def checkNightlyMaintenance(config_files, mobilityConfig):
 	setVariables()
 	problem = False
 
+	datasyncBanner(dsappversion)
 	print("Scanning logs for maintenance.. ")
 	logger.info("Scannning logs for maintenance..")
 	time1 = time.time()
@@ -1749,6 +1781,7 @@ def checkNightlyMaintenance(config_files, mobilityConfig):
 	with open(mAlog, 'r') as f:
 		for line in f:
 			if 'Nightly maintenance' in line: logReport.append(line.strip())
+			fileName = os.path.basename(mAlog)
 	
 	# If logReport is empty, check next 5 gziped logs
 	if len(logReport) == 0:
@@ -1763,6 +1796,7 @@ def checkNightlyMaintenance(config_files, mobilityConfig):
 				for line in f:
 					if 'Nightly maintenance' in line: logReport.append(line.strip())
 			if len(logReport) != 0:
+				fileName = file
 				break
 
 	time2 = time.time()
@@ -1777,8 +1811,8 @@ def checkNightlyMaintenance(config_files, mobilityConfig):
 		print ("\nNightly Maintenance disabled\n")
 	elif mobilityConfig['dbMaintenance'] == '1' and len(logReport) != 0:
 		print ("\nNightly Maintenance History:")
-		logger.info('Found maintenance history in: %s' % file)
-		print (file)
+		logger.info('Found maintenance history in: %s' % fileName)
+		print (fileName)
 		for line in logReport[-5:]:
 			print (line)
 	else:
@@ -1822,39 +1856,59 @@ def showStatus(dbConfig):
 		print ("No pending events")
 		logger.info("No pending events")
 
-def indexDB(dbConfig):
-	cmd = "PGPASSWORD=%(pass)s psql -U %(user)s datasync -c \"reindex database datasync\"" % dbConfig
-	logger.info("Indexing datasync database..")
-	time1 = time.time()
-	i = subprocess.Popen(cmd, shell=True)
-	i.wait()
-	time2 = time.time()
-	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+def indexDB(dbConfig, database=None):
+	if database is None:
+		cmd = "PGPASSWORD=%(pass)s psql -U %(user)s datasync -c \"reindex database datasync\"" % dbConfig
+		logger.info("Indexing datasync database..")
+		time1 = time.time()
+		i = subprocess.Popen(cmd, shell=True)
+		i.wait()
+		time2 = time.time()
+		logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
-	cmd = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"reindex database mobility\"" % dbConfig
-	logger.info("Indexing mobility database..")
-	time1 = time.time()
-	i = subprocess.Popen(cmd, shell=True)
-	i.wait()
-	time2 = time.time()
-	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+		cmd = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"reindex database mobility\"" % dbConfig
+		logger.info("Indexing mobility database..")
+		time1 = time.time()
+		i = subprocess.Popen(cmd, shell=True)
+		i.wait()
+		time2 = time.time()
+		logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
-def vacuumDB(dbConfig):
-	cmd = "PGPASSWORD=%(pass)s vacuumdb -U %(user)s datasync --full -v" % dbConfig
-	logger.info("Vacuuming datasync database..")
-	time1 = time.time()
-	v = subprocess.Popen(cmd, shell=True)
-	v.wait()
-	time2 = time.time()
-	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+	elif database:
+		cmd = "PGPASSWORD=%s psql -U %s %s -c \"reindex database %s\"" % (dbConfig['pass'], dbConfig['user'], database, database)
+		logger.info("Indexing mobility database..")
+		time1 = time.time()
+		i = subprocess.Popen(cmd, shell=True)
+		i.wait()
+		time2 = time.time()
+		logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
-	cmd = "PGPASSWORD=%(pass)s vacuumdb -U %(user)s mobility --full -v" % dbConfig
-	logger.info("Vacuuming mobility database..")
-	time1 = time.time()
-	v = subprocess.Popen(cmd, shell=True)
-	v.wait()
-	time2 = time.time()
-	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+def vacuumDB(dbConfig, database=None):
+	if database is None:
+		cmd = "PGPASSWORD=%(pass)s vacuumdb -U %(user)s datasync --full -v" % dbConfig
+		logger.info("Vacuuming datasync database..")
+		time1 = time.time()
+		v = subprocess.Popen(cmd, shell=True)
+		v.wait()
+		time2 = time.time()
+		logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
+		cmd = "PGPASSWORD=%(pass)s vacuumdb -U %(user)s mobility --full -v" % dbConfig
+		logger.info("Vacuuming mobility database..")
+		time1 = time.time()
+		v = subprocess.Popen(cmd, shell=True)
+		v.wait()
+		time2 = time.time()
+		logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
+	elif database:
+		cmd = "PGPASSWORD=%s vacuumdb -U %s %s --full -v" % (dbConfig['pass'], dbConfig['user'], database)
+		logger.info("Vacuuming %s database.." % database)
+		time1 = time.time()
+		v = subprocess.Popen(cmd, shell=True)
+		v.wait()
+		time2 = time.time()
+		logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
 def changeDBPass(dbConfig, config_files, XMLconfig):
 	datasyncBanner(dsappversion)
@@ -1974,7 +2028,9 @@ def reinitAllUsers(dbConfig):
 		print ("\nAll users have been set to re-initialize")
 
 
-####### Certificate functions #######
+##################################################################################################
+#	Start of Certificate
+##################################################################################################
 
 def certPath():
 	certPath = autoCompleteInput("Enter path to store certificate files: ")
@@ -2282,6 +2338,9 @@ def verifyCertifiateMatch(key = None, keyPass = None, crt = None, path = None):
 		logger.warning("Public certificate and private key mismatch")
 		return False
 
+##################################################################################################
+#	End of Certificate
+##################################################################################################
 
 def checkLDAP(XMLconfig ,ldapConfig):
 	if not (ldapConfig['port'] or ldapConfig['login'] or ldapConfig['host'] or ldapConfig['pass']) or (ldapConfig['port'] == None or ldapConfig['login'] == None or ldapConfig['host'] == None or ldapConfig['pass'] == None):
@@ -2290,9 +2349,15 @@ def checkLDAP(XMLconfig ,ldapConfig):
 		return False
 
 	if ldapConfig['secure'] == 'false':
-		cmd = "/usr/bin/ldapsearch -x -H ldap://%(host)s -D %(login)s -w %(pass)s %(login)s" % ldapConfig
+		if 'o=' not in ldapConfig['login']:
+			cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D %s -w %s -b %s" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], ldapConfig['group'][0])
+		else:
+			cmd = "/usr/bin/ldapsearch -x -H ldap://%(host)s:%(port)s -D %(login)s -w %(pass)s %(login)s" % ldapConfig
 	elif ldapConfig['secure'] == 'true':
-		cmd = "/usr/bin/ldapsearch -x -H ldaps://%(host)s -D %(login)s -w %(pass)s %(login)s" % ldapConfig
+		if 'o=' not in ldapConfig['login']:
+			cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D %s -w %s -b %s" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], ldapConfig['group'][0])
+		else:
+			cmd = "/usr/bin/ldapsearch -x -H ldaps://%(host)s:%(port)s -D %(login)s -w %(pass)s %(login)s" % ldapConfig
 
 	logger.info("Testing LDAP connection")
 	log_cmd = cmd.replace("-w " + ldapConfig['pass'],"-w *******")
@@ -2347,9 +2412,9 @@ def updateFDN(dbConfig, XMLconfig, ldapConfig):
 				userDN = []
 
 				if ldapConfig['secure'] == 'false':
-					cmd = "/usr/bin/ldapsearch -x -H ldap://%s -D %s -w %s -b %s" % (ldapConfig['host'], ldapConfig['login'], ldapConfig['pass'], userConfig['dName'])
+					cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D %s -w %s -b %s" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], userConfig['dName'])
 				elif ldapConfig['secure'] == 'true':
-					cmd = "/usr/bin/ldapsearch -x -H ldaps://%s -D %s -w %s -b %s" % (ldapConfig['host'], ldapConfig['login'], ldapConfig['pass'], userConfig['dName'])
+					cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D %s -w %s -b %s" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], userConfig['dName'])
 
 				tmp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 				out, err = tmp.communicate()
@@ -2366,9 +2431,9 @@ def updateFDN(dbConfig, XMLconfig, ldapConfig):
 						userDN = []
 						for container in ldapConfig['user']:
 							if ldapConfig['secure'] == 'false':
-								cmd = "/usr/bin/ldapsearch -x -H ldap://%s -D %s -w %s -b %s cn=%s" % (ldapConfig['host'], ldapConfig['login'], ldapConfig['pass'], container, userConfig['name'])
+								cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D %s -w %s -b %s cn=%s" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], container, userConfig['name'])
 							elif ldapConfig['secure'] == 'true':
-								cmd = "/usr/bin/ldapsearch -x -H ldaps://%s -D %s -w %s -b %s cn=%s" % (ldapConfig['host'], ldapConfig['login'], ldapConfig['pass'], container, userConfig['name'])
+								cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D %s -w %s -b %s cn=%s" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], container, userConfig['name'])
 							tmp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 							out, err = tmp.communicate()
 							search = re.findall('dn:.*', out)
@@ -2457,8 +2522,52 @@ def getApplicationNames(userConfig, dbConfig):
 	conn.close()
 	return userConfig
 
+def build_avaiable(list):
+	available = []
+	for i in range(len(list)):
+		available.append('%s' % i)
+	return available
+
+def printList(list, exitTxt = 'Back'):
+	count = 0
+	if len(list) != 0:
+		for x in range(len(list)):
+			print ("     %s. %s" % (count, list[x]))
+			count += 1
+		print ("\n     q. %s" % exitTxt)
+
+def get_choice(available, special=None):
+	if len(available) <= 9:
+		print ("\n     Selection: ", end='')
+	while True:
+		if len(available) <= 9:
+			choice = getch()
+			if special is not None and choice == special:
+				print()
+				return special
+			elif choice in available or choice == 'q' or choice == 'Q':
+				if choice == 'q' or choice == 'Q':
+					print()
+					return
+				else:
+					print()
+					return int(choice)
+		else:
+			choice = raw_input("\n     Selection: ")
+			if choice == 'q' or choice == 'Q':
+				print()
+				return
+			elif choice in available and choice.isdigit():
+				print()
+				return int(choice)
+			else:
+				datasyncBanner(dsappversion)
+				print ("Invalid selection")
+				return
+
+
 ##################################################################################################
-#	Patch / FTF Fixes
+#	Start of Patch / FTF Fixes
 ##################################################################################################
 
 def getExactMobilityVersion():
@@ -2483,23 +2592,529 @@ def ftfPatchlevel(ftpFile, files):
 				f.write(item + '\n')
 			f.write('\n')
 
-def ftfPatchlevelCheck(ftpFile):
+def ftfPatchlevelCheck(ftpFile, printList = True):
 	patchFile = dsappConf + '/patch-file.conf'
 	if not os.path.isfile(patchFile):
-		return False
+		return True
 	else:
 		with open(patchFile, 'r') as f:
 			patchFileContent = f.read()
-		print (patchFileContent)
+		if printList:
+			print (patchFileContent)
 		if ftpFile in patchFileContent:
 			datasyncBanner(dsappversion)
 			print ("Patch %s has already been applied" % ftpFile)
+			return False
+		else:
 			return True
 
-# def checkVersion():
-# 	if [ "$1" == "$daVersion" ]; then
-# 		info "\nVersion check ${bGREEN}passed${NC}.\n"
-# 		return 0;
-# 	else
-# 		error "This patch is intended for version $1, the server is running version $daVersion\n"
-# 		return 1;
+def buildFTFPatchList(filePath):
+	with open(filePath, 'r') as file:
+		list = file.read().splitlines()
+
+	patches = {}
+	mobile_version = getExactMobilityVersion()
+
+	patch_count = 0
+	patch_item = 0
+	patch_file = None
+	patch_location = None
+	patch_version = None
+	patch_detail = None
+
+	for item in list:
+		if item is not '' and '#' not in item:
+			if patch_item == 0:
+				patch_file = item
+			elif patch_item == 1:
+				patch_version = item
+			elif patch_item == 2:
+				patch_detail = item
+			elif patch_item == 3:
+				patch_location = item.split(' ')
+
+			patch_item += 1
+			if patch_item == 4:
+				if patch_version is not None and patch_version is not '' and mobile_version == patch_version:
+					logger.debug("Adding file: %s to patch list" % patch_file)
+					patches[patch_count] = {"file": patch_file, "version": patch_version, "detail": patch_detail, "location": patch_location}
+					patch_count += 1
+				patch_item = 0
+		else:
+			patch_item = 0
+	return patches
+
+def printFTFPatchList(patch_list):
+	if len(patch_list) != 0:
+		for x in range(len(patch_list)):
+			print ("     %s. %s" % (x, patch_list[x]['detail']))
+		print ("\n     q. Back")
+	else:
+		print ("No patches available")
+		logger.info("No patches available")
+		return
+
+def prepareFTF(patch_file):
+	datasyncBanner(dsappversion)
+	if DoesServiceExist('ftp.novell.com', 21):
+		if dlfile('ftp://ftp.novell.com/outgoing/%s' % patch_file['file'], dsapptmp):
+			os.chdir(dsapptmp)
+			fileList = file_content(patch_file['file'])
+			uncompressIt(patch_file['file'])
+
+			# Validate fileList contains items in patch_file['location']
+			for file in fileList:
+				for path in patch_file['location']:
+					if file not in path:
+						print ("Patch file(s) do not match install path(s)")
+						return
+
+			return fileList
+		return
+	else:
+		print ("Unable to connect to ftp.novell.com 21")
+		return
+
+def appyFTF(fileList, patch_file):
+	date_fmt = datetime.datetime.now().strftime('%s')
+	error = False
+	os.chdir(dsapptmp)
+	print ()
+	for files in patch_file['location']:
+		file = os.path.basename(files)
+		if file in fileList:
+			os.rename(files, files + '.bak_%s' % date_fmt)
+			print ("Applying %s at %s" % (file, files))
+			shutil.copy(file, files)
+			logger.debug('Copying %s to %s' % (file, files))
+		else:
+			print ("Unable to apply %s" % files)
+			logger.warning("Unable to apply: %s" % files)
+			error = True
+
+	if not error:
+		print ("\nSuccessfully applied patch: %s" % patch_file['file'])
+		print ("Restart Mobility for fixes")
+		logger.info("\nSuccessfully applied patch: %s" % patch_file['file'])
+		return True
+	else:
+		raw_input('wait')
+		# Revert file(s) if failed applying fix
+		print ("\nProblem applying files.\nReverting changes..")
+		logger.info("Reverting changes..")
+		for files in patch_file['location']:
+			try:
+				os.rename(files + '.bak_%s' % date_fmt, files)
+				logger.debug("Attempting to rename %s back to %s" % (files + '.bak_%s' % date_fmt, files))
+			except:
+				pass
+		return False
+
+def selectFTFPatch(patch_list):
+	available = build_avaiable(patch_list)
+	printFTFPatchList(patch_list)
+	choice = get_choice(available)
+	if choice == None or choice == '':
+		return
+
+	logger.debug("Selected patch option: %s" % choice)
+	choice = int(choice)
+	datasyncBanner(dsappversion)
+	if askYesOrNo("Apply patch: %s\n%s" % (patch_list[choice]['file'], patch_list[choice]['detail'])):
+		if ftfPatchlevelCheck(patch_list[choice]['file'], False):
+			fileList = prepareFTF(patch_list[choice])
+			if fileList is not None:
+				if appyFTF(fileList, patch_list[choice]):
+					ftfPatchlevel(patch_list[choice]['file'], patch_list[choice]['location'])
+	print ();eContinue()
+
+##################################################################################################
+#	End of Patch / FTF Fixes
+##################################################################################################
+
+def backupDatabase(dbConfig):
+	datasyncBanner(dsappversion)
+	DATE = datetime.datetime.now().strftime('%s')
+
+	path = autoCompleteInput("Enter backup output path: ")
+	if os.path.exists(path):
+		print ("\nDumping databases..")
+		logger.info("Dumping databases..")
+
+		cmd = "PGPASSWORD=%s pg_dump -U %s mobility > %s/mobility.BAK_%s.sql" % (dbConfig['pass'], dbConfig['user'], path, DATE)
+		p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		p.wait()
+		if not (p.communicate()[1]):
+			print ("\nMobility database dump created : mobility.BAK_%s.sql " % DATE)
+			logger.info("Mobility database dump created : mobility.BAK_%s.sql " % DATE)
+		else:
+			print ("\nError: Unable to dump mobility database")
+			logger.warning("Unable to dump mobility database")
+
+		cmd = "PGPASSWORD=%s pg_dump -U %s datasync > %s/datasync.BAK_%s.sql" % (dbConfig['pass'], dbConfig['user'], path, DATE)
+		p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		p.wait()
+		if not (p.communicate()[1]):
+			print ("Datasync database dump created : datasync.BAK_%s.sql " % DATE)
+			logger.info("Datasync database dump created : datasync.BAK_%s.sql " % DATE)
+		else:
+			print ("Error: Unable to dump datasync database")
+			logger.warning("Unable to dump datasync database")
+
+	else:
+		print ("Invalid path: %s" % path)
+		logger.warning("Invalid path: %s" % path)
+
+
+def restoreDatabase(dbConfig):
+	# Local variables
+	mobility_backup_count = 0
+	datasync_backup_count = 0
+	mobility_backup_list = []
+	datasync_backup_list = []
+	filesFound = False
+	m_choice = 0
+	d_choice = 0
+
+	datasyncBanner(dsappversion)
+
+	path = autoCompleteInput("Enter path to database backups: ")
+	if not os.path.exists(path):
+		print ("Invalid path")
+		return
+
+	# Check if any backup files are found
+	files = os.listdir(path)
+	for file in files:
+		if 'datasync.BAK' in file or 'mobility.BAK' in file:
+			if 'datasync.BAK' in file:
+				datasync_backup_count += 1
+				datasync_backup_list.append(file)
+			if 'mobility.BAK' in file:
+				mobility_backup_count += 1
+				mobility_backup_list.append(file)
+			filesFound = True
+	if not filesFound:
+		print ("No backups found in: %s" % path)
+		logger.warning("No backups found in: %s" % path)
+		return
+
+	# If multiple Mobility DBs found
+	if mobility_backup_count > 1:
+		datasyncBanner(dsappversion)
+		print ("Multiple mobility backups found\n")
+		logger.debug("Multiple mobility backups found")
+		available = build_avaiable(mobility_backup_list)
+		printList(mobility_backup_list)
+		m_choice = get_choice(available)
+		if m_choice is None or m_choice is '': return
+
+
+	# If multiple Datasync DBs found
+	if datasync_backup_count > 1:
+		datasyncBanner(dsappversion)
+		print ("Multiple datasync backups found\n")
+		logger.debug("Multiple datasync backups found")
+		available = build_avaiable(datasync_backup_list)
+		printList(datasync_backup_list)
+		d_choice = get_choice(available)
+		if d_choice is None or d_choice is '': return
+
+	datasyncBanner(dsappversion)
+	print ("Backups selected:")
+	if mobility_backup_count != 0:
+		print ("Mobility backup - %s" % mobility_backup_list[m_choice])
+		logger.info("Mobility backup selected: %s" % mobility_backup_list[m_choice])
+	if datasync_backup_count != 0:
+		print ("Datasync backup - %s" % datasync_backup_list[d_choice])
+		logger.info("Datasync backup selected: %s" % datasync_backup_list[d_choice])
+
+	print ()
+	if mobility_backup_count != 0:
+		if askYesOrNo("Restore Mobility database"):
+			# Dropping mobility database
+			if dropSpecificDatabases(dbConfig, 'mobility'):
+				createSpecificDatabases(dbConfig,'mobility')
+				cmd = "PGPASSWORD=%s psql -U %s mobility < %s/%s" % (dbConfig['pass'], dbConfig['user'], path, mobility_backup_list[m_choice])
+				print ("Restoring mobility: %s" % mobility_backup_list[m_choice])
+				logger.info("Restoring mobility: %s" % mobility_backup_list[m_choice])
+				p = subprocess.Popen(cmd,shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+				p.wait()
+				vacuumDB(dbConfig, 'mobility')
+				indexDB(dbConfig, 'mobility')
+
+	if datasync_backup_count != 0:
+		if askYesOrNo("Restore Datasync database"):
+			# Dropping datasync database
+			if dropSpecificDatabases(dbConfig, 'datasync'):
+				createSpecificDatabases(dbConfig,'datasync')
+				cmd = "PGPASSWORD=%s psql -U %s datasync < %s/%s" % (dbConfig['pass'], dbConfig['user'], path, datasync_backup_list[d_choice])
+				print ("Restoring mobility: %s" % mobility_backup_list[m_choice])
+				logger.info("Restoring mobility: %s" % mobility_backup_list[m_choice])
+				p = subprocess.Popen(cmd,shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+				p.wait()
+				vacuumDB(dbConfig, 'datasync')
+				indexDB(dbConfig, 'datasync')
+
+##################################################################################################
+#	Start General Health Check definitions
+##################################################################################################
+
+def generalHealthCheck(mobilityConfig, gwConfig, silent=False):
+	datasyncBanner(dsappversion)
+	DATE = datetime.datetime.now().strftime('%c')
+
+	# Rewrite health check log with timestamp and version
+	with open(ghcLog, 'w') as log:
+		log.write("##########################################################\n#  General Health Check\n##########################################################\n")
+		log.write("Gathered by dsapp v%s on %s\n\n" % (dsappversion, DATE))
+	logger.info("Starting General Health Check..")
+	time1 = time.time()
+
+	# Get system RPMs in background
+	rpm_queue = Queue()
+	rpm_process = Process(target=queue_getRPMs, args=(rpm_queue,))
+	rpm_process.start()
+
+	# Begin Health Checks
+	ghc_checkServices(mobilityConfig, gwConfig)
+	# ghc_checkLDAP
+	# ghc_checkPOA
+	# ghc_checkTrustedApp
+	# ghc_checkXML
+	# ghc_checkPSQLConfig
+	# ghc_checkRPMSave
+	# ghc_checkProxy
+	# ghc_checkDiskSpace
+	# ghc_checkMemory
+	# ghc_checkVMWare
+	# ghc_checkConfig
+	# ghc_checkUpdateSH
+	# ghc_checkManualMaintenance
+	# ghc_checkReferenceCount
+	# ghc_checkUserFDN
+	# ghc_verifyDatabaseIntegrity
+	# ghc_verifyTargetsIntegrity
+
+	# # Slower checks...
+	qhc_rpms = rpm_queue.get()
+	rpm_process.join() # Make sure rpm_process is done before continuing
+	ghc_checkRPMs(qhc_rpms)
+	# ghc_checkDiskIO
+	# ghc_verifyNightlyMaintenance
+
+	# # Lots of information...
+	# ghc_verifyCertificates
+
+	time2 = time.time()
+	logger.info("General Health Check took %0.3f ms" % ((time2 - time1) * 1000))
+
+	# Prompt View Logs
+
+	if not silent:
+		print ()
+		if askYesOrNo("Do you want to view the log file"):
+			cmd = "less %s" % ghcLog
+			subprocess.call(cmd, shell=True)
+
+		print ("Log created at: %s" % ghcLog)
+
+### Start Utility definitions for General Health Checks ###
+def ghc_util_NewHeader(header):
+	print ("\n%s" % header)
+	with open(ghcLog, 'a') as log:
+		log.write("==========================================================\n%s\n==========================================================\n" % header)
+
+def ghc_util_passFail(result, msg=None):
+	with open(ghcLog, 'a') as log:
+		if msg is not None:
+			log.write(msg)
+
+		if result is 'failed':
+			print (colorRED.format("Failed"))
+	 		log.write("\nFailed\n")
+	 	elif result is 'warning':
+	 		print (colorYELLOW.format("Warning"))
+	 		log.write("\nWarning\n")
+	 	elif result is 'passed':
+	 		print (colorGRN.format("Passed"))
+			log.write("\nPassed\n")
+
+def ghc_util_checkStatus(agent):
+	cmd = "rc%s status" % (agent)
+	p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+	p.wait()
+	out = p.communicate()
+	with open(ghcLog, 'a') as log:
+		log.write(out[0])
+
+	if 'running' not in out[0]:
+		return False
+	else:
+		return True
+
+def ghc_util_checkPostgresql():
+	cmd = "rcpostgresql status"
+	p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+	p.wait()
+	out = p.communicate()
+	with open(ghcLog, 'a') as log:
+		log.write(out[0])
+
+	if 'running' not in out[0]:
+		return False
+	else:
+		return True
+
+def ghc_util_checkMobility(mobilityConfig):
+	result = False
+	cmd = "netstat -pan | grep LISTEN | grep :%s" % mobilityConfig['mPort']
+	p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+	p.wait()
+	with open(ghcLog, 'a') as log:
+		try:
+			listener = p.communicate()[0].split('/')[1].strip()
+		except:
+			listener = None
+
+		if listener == 'python':
+			result = True
+			log.write("\nMobility Connector listening on port %s: %s" % (mobilityConfig['mPort'], result))
+		elif listener == 'httpd2-prefork':
+			result = False
+			log.write("\nApache2 listening on port %s: %s" % (mobilityConfig['mPort'], result))
+		elif listener != 'python' or listener is None:
+			result = False
+			log.write("\nMobility Connector not listening on port %s: %s" % (mobilityConfig['mPort'], result))
+	return result
+
+def ghc_util_checkGroupWise(gwConfig):
+	result = False
+	cmd = "netstat -pan | grep LISTEN | grep :%s" % gwConfig['gport']
+	p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+	p.wait()
+	with open(ghcLog, 'a') as log:
+		try:
+			listener = p.communicate()[0].split('/')[1].strip()
+		except:
+			listener = None
+
+		if listener == 'python':
+			result = True
+			log.write("\nGroupWise Connector listening on port %s: %s\n" % (gwConfig['gport'], result))
+		elif listener != 'python' or listener is None:
+			result = False
+			log.write("\nGroupWise Connector not listening on port %s: %s\n" % (gwConfig['gport'], result))
+	return result
+
+def ghc_util_checkMobPortConnectivity(mobilityConfig):
+	result = False
+	cmd = "netcat -z -w 2 %s %s -v" % (mobilityConfig['mlistenAddress'], mobilityConfig['mPort'])
+	p = subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE)
+	p.wait()
+	with open(ghcLog, 'a') as log:
+		try:
+			listener = p.communicate()[1].split(' ')[-1].strip()
+		except:
+			listener = None
+
+		if listener == 'open':
+			result = True
+			log.write("\nConnection successful on port %s\n" % mobilityConfig['mPort'])
+		elif listener != 'refused' or listener is None:
+			result = False
+			log.write("\nConnection refused on port %s\n" % mobilityConfig['mPort'])
+	return result
+
+def ghc_util_checkGWPortConnectivity(gwConfig):
+	result = False
+	cmd = "netcat -z -w 2 %s %s -v" % (gwConfig['sListenAddress'], gwConfig['gport'])
+	p = subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE)
+	p.wait()
+	with open(ghcLog, 'a') as log:
+		try:
+			listener = p.communicate()[1].split(' ')[-1].strip()
+		except:
+			listener = None
+
+		if listener == 'open':
+			result = True
+			log.write("Connection successful on port %s\n" % gwConfig['gport'])
+		elif listener != 'refused' or listener is None:
+			result = False
+			log.write("Connection refused on port %s\n" % gwConfig['gport'])
+	return result
+
+### End Utility definitions for General Health Checks ###
+
+### Start definitions for General Health Checks ###
+def ghc_checkServices(mobilityConfig, gwConfig):
+	ghc_util_NewHeader("Checking Mobility Services..")
+	logger.info("GHC : Checking Mobility Services..")
+	problem = False
+
+	datasync_scripts = []
+	for file in os.listdir(initScripts):
+		if 'datasync-' in file:
+			datasync_scripts.append(file)
+
+	for agent in datasync_scripts:
+		if not ghc_util_checkStatus(agent):
+			problem = True
+	if not ghc_util_checkPostgresql():
+		problem = True
+	if not ghc_util_checkMobility(mobilityConfig):
+		problem = True
+	if not ghc_util_checkGroupWise(gwConfig):
+		problem = True
+	if not ghc_util_checkMobPortConnectivity(mobilityConfig):
+		problem = True
+	if not ghc_util_checkGWPortConnectivity(gwConfig):
+		problem = True
+
+	if problem:
+		ghc_util_passFail('failed')
+	else:
+		ghc_util_passFail('passed')
+
+def ghc_checkRPMs(system_rpms):
+	ghc_util_NewHeader("Checking RPMs..")
+	logger.info("GHC : Checking RPMS..")
+	problem = False
+
+	if not os.path.isfile(dsappConf + '/ghc_RPMs.txt'):
+		problem = 'warning'
+	else:
+		# Read in conf/ghc_RPMs.txt
+		with open(dsappConf + '/ghc_RPMs.txt', 'r') as open_file:
+			required_RPMs = open_file.read().strip().splitlines()
+
+	if problem is not 'warning':
+		with open(ghcLog, 'a') as log:
+			for rpm in required_RPMs:
+				found = False
+				for r in system_rpms:
+					if rpm in r:
+						found = True
+
+				if not found:
+					log.write("Missing rpm: %s\n" % rpm)
+					problem = True
+
+	if problem is 'warning':
+		msg = "\nNo such file %s/ghc_RPMs.txt\n" % dsappConf
+		ghc_util_passFail('warning', msg)
+	elif problem:
+		msg = "\nSuggestion:\nInstall rpm(s) from YaST or with the following command:\nzypper in <packageName>\n"
+		ghc_util_passFail('failed', msg)
+	else:
+		msg = "All required RPMs found\n"
+		ghc_util_passFail('passed', msg)
+
+
+
+### End definitions for General Health Checks ###
+
+##################################################################################################
+#	End General Health Check definitions
+##################################################################################################

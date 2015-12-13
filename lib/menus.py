@@ -7,6 +7,7 @@ Config = ConfigParser.ConfigParser()
 import getch
 getch = getch._Getch()
 import textwrap
+import subprocess
 
 import dsappSoap as dsSOAP
 
@@ -37,12 +38,16 @@ mobilityConfig = None
 gwConfig = None
 trustedConfig = None
 XMLconfig = None
-def getConfigs(db, ldap, mobility, gw, trustedapp, xml):
+config_files = None
+
+def getConfigs(db, ldap, mobility, gw, trustedapp, xml, conf_files):
 	global dbConfig
 	global ldapConfig
 	global gwConfig
+	global mobilityConfig
 	global trustedConfig
 	global XMLconfig
+	global config_files
 
 	dbConfig = db
 	ldapConfig = ldap
@@ -50,6 +55,7 @@ def getConfigs(db, ldap, mobility, gw, trustedapp, xml):
 	gwConfig = gw
 	trustedConfig = trustedapp
 	XMLconfig = xml
+	config_files = conf_files
 
 def show_menu(menu_call):
 	ds.datasyncBanner(dsappversion)
@@ -94,13 +100,17 @@ def main_menu():
 	show_menu(menu)
 	choice = get_choice(available, 'd')
 	if choice == '0':
+		loop = False
 		return
 	elif choice == 'd':
-		pass # TODO : Log into database
-	sub_menus[choice]()
+		cmd = "PGPASSWORD=%(pass)s psql -U %(user)s datasync" % dbConfig
+		ds.clear()
+		subprocess.call(cmd, shell=True)
+	else:
+		sub_menus[choice]()
 
 
-## Sub menus  ##
+## Sub menus ##
 
 def log_menu():
 	menu = ['1. Upload logs', '2. Set logs to defaults', '3. Set logs to diagnostics/debug', '4. Log Capture', '\n     5. Remove log archives', '\n     0. Back']
@@ -135,12 +145,51 @@ def registerUpdate_menu():
 		if choice == '1':
 			pass
 		elif choice == '2':
-			pass
+			update_menu()
 		elif choice == '3':
-			pass
+			ds.datasyncBanner(dsappversion)
+			if ds.DoesServiceExist('ftp.novell.com', 21):
+				# Get latest FTFlist.txt file
+				FTFfile = dsappConf + '/dsapp_FTFlist.txt'
+				if os.path.isfile(FTFfile):
+					os.rename(FTFfile, FTFfile + '.bak')
+
+				if not ds.dlfile('ftp://ftp.novell.com/outgoing/dsapp_FTFlist.txt', dsappConf, False, False):
+					if os.path.isfile(FTFfile + '.bak'):
+						os.rename(FTFfile + '.bak', FTFfile)
+
+				if os.path.isfile(FTFfile):
+					patches = ds.buildFTFPatchList(FTFfile)
+					ds.selectFTFPatch(patches)
+				else:
+					print "No FTFs / Patches available"
+					print; ds.eContinue()
+			else:
+				print "FTFs / Patches require FTF access to download"
+				print; ds.eContinue()
 		elif choice == '0':
 			loop = False
 			main_menu()
+
+### Start ### Sub menu for Update Mobility (registerUpdate_menu) ###
+def update_menu():
+	menu = ['1. Update with Novell Update Channel', '2. Update with Local ISO', '3. Update with Novell FTP', '\n     0. Back']
+
+	available = build_avaialbe(menu)
+	loop = True
+	while loop:
+		show_menu(menu)
+		choice = get_choice(available)
+		if choice == '1':
+			pass
+		elif choice == '2':
+			pass
+		elif choice == '3':
+			ds.updateMobilityFTP()
+		elif choice == '0':
+			loop = False
+			return
+### End ### Sub menu for Update Mobility (registerUpdate_menu) ###
 
 def database_menu():
 	ds.datasyncBanner(dsappversion)
@@ -172,9 +221,11 @@ def database_menu():
 					print
 					ds.eContinue()
 			elif choice == '3':
-				pass
+				ds.backupDatabase(dbConfig)
+				print; ds.eContinue()
 			elif choice == '4':
-				pass
+				ds.restoreDatabase(dbConfig)
+				print; ds.eContinue()
 			elif choice == '5':
 				pass
 			elif choice == '6':
@@ -190,7 +241,6 @@ def database_menu():
 		main_menu()
 
 ### Start ### Sub menu for database_menu ###
-
 def cuso_menu():
 	menu = ['1. Clean up and start over (Except Users)', '2. Clean up and start over (Everything)', '\n     3. Uninstall Mobility', '\n     0. Back']
 
@@ -205,7 +255,7 @@ def cuso_menu():
 				ds.cuso(dbConfig, 'user')
 				print; ds.eContinue()
 		elif choice == '2':
-			ds.dsappversion(dsappversion)
+			ds.datasyncBanner(dsappversion)
 			if ds.askYesOrNo("Clean up and start over (Everything)"):
 				ds.cuso(dbConfig, 'everything')
 				print; ds.eContinue()
@@ -217,7 +267,6 @@ def cuso_menu():
 		elif choice == '0':
 			loop = False
 			return
-
 ### End ### Sub menu for database_menu ###
 
 def certificate_menu():
@@ -264,6 +313,7 @@ def userIssue_menu():
 			pass
 		elif choice == '6':
 			ds.updateFDN(dbConfig, XMLconfig, ldapConfig)
+			print; ds.eContinue()
 		elif choice == '7':
 			pass
 		elif choice == '8':
@@ -273,7 +323,6 @@ def userIssue_menu():
 			main_menu()
 
 ### Start ### Sub menus userIssue_menu ###
-
 def monitorUser_menu():
 	menu = ['1. Monitor user sync state (Mobility)', '2. Monitor user sync GW/MC count (Sync-Validate)', '3. Monitor active users sync state', '\n     0. Back']
 
@@ -342,7 +391,6 @@ def removeUser_menu():
 		elif choice == '0':
 			loop = False
 			return
-
 ### End ### Sub menus userIssue_menu ###
 
 def userInfo_menu():
@@ -370,11 +418,15 @@ def checksQueries_menu():
 		show_menu(menu)
 		choice = get_choice(available)
 		if choice == '1':
-			pass
+			ds.generalHealthCheck(mobilityConfig, gwConfig)
+			print; ds.eContinue()
 		elif choice == '2':
-			pass
+			ds.checkNightlyMaintenance(config_files, mobilityConfig)
+			print; ds.eContinue()
 		elif choice == '3':
-			pass
+			ds.datasyncBanner(dsappversion)
+			ds.showStatus(dbConfig)
+			print; ds.eContinue()
 		elif choice == '4':
 			pass
 		elif choice == '5':
@@ -388,7 +440,6 @@ def checksQueries_menu():
 			main_menu()
 
 ### Start ### Sub menus checkQueries_menu ###
-
 def viewAttachments_menu():
 	menu = ['1. View attachments by user', '2. Check Mobility attachments', '3. Check Mobility attachments count (beta)', '\n     0. Back']
 
@@ -406,5 +457,4 @@ def viewAttachments_menu():
 		elif choice == '0':
 			loop = False
 			return
-
 ### End ### Sub menus checkQueries_menu ###
