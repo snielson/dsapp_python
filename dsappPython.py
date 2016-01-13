@@ -9,7 +9,7 @@
 #
 ##################################################################################################
 
-dsappversion='226'
+dsappversion='227'
 
 ##################################################################################################
 #	Imports
@@ -37,8 +37,7 @@ if not os.path.exists('/opt/novell/datasync/tools/dsapp/logs/'):
 	os.makedirs('/opt/novell/datasync/tools/dsapp/logs/')
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)) + '/lib')
-import dsappDefinitions as ds
-import dsappSoap as dsSOAP
+import dsapp_Definitions as ds
 import spin
 
 ##################################################################################################
@@ -323,7 +322,8 @@ if len(sys.argv) == 0:
 		ldapConfig['login'] = ds.xmlpath('.//configengine/ldap/login/dn', XMLconfig['ceconf'])
 		logger.debug('Assigning %s from %s' % ('password', 'ceconfXML'))
 		ldapConfig['pass'] = ds.getDecrypted('.//configengine/ldap/login/password', XMLconfig['ceconf'], './/configengine/ldap/login/protected')
-		
+		ldapConfig['enc_pass'] = ds.xmlpath('.//configengine/ldap/login/password', XMLconfig['ceconf'])
+
 		logger.debug('Assigning %s from %s' % ('ldap enabled', 'ceconfXML'))
 		ldapConfig['enabled'] = ds.xmlpath('.//configengine/ldap/enabled', XMLconfig['ceconf'])
 		logger.debug('Assigning %s from %s' % ('LDAP group container', 'ceconfXML'))
@@ -377,7 +377,6 @@ if len(sys.argv) == 0:
 			gwConfig['gListenAddress'] = ds.xmlpath('.//settings/custom/soapServer', XMLconfig['gconf']).split(":")[0]
 		else:
 			gwConfig['gListenAddress'] = ds.xmlpath('.//settings/custom/soapServer', XMLconfig['gconf']).split("://")[-1].split(":")[0]
-		gwConfig['gListenAddress'] = '151.155.215.94'
 		logger.debug('Assigning %s from %s' % ('GroupWise connector sPort', 'gconfXML'))
 		gwConfig['sPort'] = ds.xmlpath('.//settings/custom/soapServer', XMLconfig['gconf']).split(":")[-1]
 		logger.debug('Assigning %s from %s' % ('GroupWise connector sSecure', 'gconfXML'))
@@ -398,6 +397,7 @@ if len(sys.argv) == 0:
 		logger.debug('Assigning %s from %s' % ('Trusted app key', 'gconfXML'))
 		trustedConfig['key'] = ds.getDecrypted('.//settings/custom/trustedAppKey',XMLconfig['gconf'], './/settings/custom/protected')
 
+
 		logger.debug('Assigning %s from %s' % ('wPort', 'wconfXML'))
 		wPort = ds.xmlpath('.//server/port', XMLconfig['wconf'])
 
@@ -412,18 +412,26 @@ else:
 
 # Test database connection
 if not ds.checkPostgresql(dbConfig):
+	ds.eContinue()
 	sys.exit(1)
 
 ##################################################################################################
 #	Main
 ##################################################################################################
-import menus
-menus.getConfigs(dbConfig, ldapConfig, mobilityConfig, gwConfig, trustedConfig, XMLconfig, config_files)
-menus.main_menu()
+import dsapp_menus as menus
+# menus.getConfigs(dbConfig, ldapConfig, mobilityConfig, gwConfig, trustedConfig, XMLconfig, config_files)
+# menus.main_menu()
 
 # TEST CODE / Definitions
 # ds.changeDBPass(dbConfig, config_files, XMLconfig)
 
-# print; ds.eContinue()
+import dsapp_ghc as ghc
+# ghc.generalHealthCheck(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedConfig, config_files)
+ghc.ghc_verifyCertificates()
+
+import dsapp_Soap as dsSoap
+# print dsSoap.soap_getUserList(trustedConfig, gwConfig)
+
+print; ds.eContinue()
 
 sys.exit(0)
