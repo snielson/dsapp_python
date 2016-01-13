@@ -1,0 +1,7 @@
+/etc/datasync/syncengine/connectors.xml
+/etc/datasync/syncengine/engine.xml
+/etc/datasync/webadmin/server.xml
+/etc/datasync/configengine/configengine.xml
+/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/groupwise/connector.xml
+/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/mobility/connector.xml
+/etc/datasync/configengine/engines/default/engine.xml
