@@ -23,7 +23,8 @@ Fix sync.pyc for iOS device - 7016617
 Fix 'None Folder' in dashboard
 /opt/novell/datasync/syncengine/connectors/mobility/lib/device/sync.pyc /opt/novell/datasync/syncengine/connectors/mobility/lib/device/ping.pyc
 
-912117.tar
-1420228
-Fix me
-/path/some
+962848.tar
+1420279
+Fix devices not getting notifications
+/opt/novell/datasync/syncengine/connectors/mobility/lib/device/sync.pyc
+
