@@ -1,9 +1,6 @@
 # Written by Shane Nielson <snielson@projectuminfinitas.com>
 # Special thanks to Tim Draper
 
-# NOTES during DEV
-# BAD SOAP record "Directory Services Data missing"
-
 import os, sys
 import suds.client
 import logging, logging.config
@@ -195,14 +192,18 @@ def soap_printUser(trustedConfig, gwConfig, userConfig):
 	if soap_userConfig == None:
 		return
 
-	results = """Host : %(soapAddr)s
-Domain : %(domain)s
-POA version : %(gwVersion)s-%(build)s 
+	# Remove right whitespace
+	for key in soap_userConfig:
+		soap_userConfig[key] = soap_userConfig[key].rstrip()
 
-User Name : %(name)s 
-User Email : %(email)s 
-User GroupWise ID : %(userid)s 
-User File ID : %(fid)s """ % soap_userConfig
+	results = """Host: %(soapAddr)s
+Domain: %(domain)s
+POA version: %(gwVersion)s-%(build)s 
+
+User Name: %(name)s 
+User Email: %(email)s 
+User GroupWise ID: %(userid)s 
+User File ID: %(fid)s """ % soap_userConfig
 
 	print results
 

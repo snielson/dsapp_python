@@ -1,3 +1,5 @@
+# Written by Shane Nielson <snielson@projectuminfinitas.com>
+
 import sys
 import os
 import dsapp_Definitions as ds
@@ -11,6 +13,10 @@ import subprocess
 
 import dsapp_ghc as ghc
 import dsapp_Soap as dsSOAP
+
+COMPANY_BU = 'Novell'
+# DISCLAIMER = "Use at your own discretion. dsapp is not supported by %s\n     See [dsapp --bug] to report issues" % COMPANY_BU
+DISCLAIMER = "%s accepts no liability for the consequences of any actions taken\n     by the use of this application. Use at your own discretion" % COMPANY_BU
 
 # Folder variables
 dsappDirectory = "/opt/novell/datasync/tools/dsapp"
@@ -40,8 +46,10 @@ gwConfig = None
 trustedConfig = None
 XMLconfig = None
 config_files = None
+webConfig = None
+authConfig = None
 
-def getConfigs(db, ldap, mobility, gw, trustedapp, xml, conf_files):
+def getConfigs(db, ldap, mobility, gw, trustedapp, xml, conf_files, web, auth):
 	global dbConfig
 	global ldapConfig
 	global gwConfig
@@ -49,6 +57,8 @@ def getConfigs(db, ldap, mobility, gw, trustedapp, xml, conf_files):
 	global trustedConfig
 	global XMLconfig
 	global config_files
+	global webConfig
+	global authConfig
 
 	dbConfig = db
 	ldapConfig = ldap
@@ -57,6 +67,8 @@ def getConfigs(db, ldap, mobility, gw, trustedapp, xml, conf_files):
 	trustedConfig = trustedapp
 	XMLconfig = xml
 	config_files = conf_files
+	webConfig = web
+	authConfig = auth
 
 def show_menu(menu_call):
 	ds.datasyncBanner(dsappversion)
@@ -99,6 +111,10 @@ def main_menu():
 	
 	available = build_avaialbe(menu)
 	show_menu(menu)
+
+	# Print disclaimer
+	ds.print_there(23,6, DISCLAIMER)
+	
 	choice = get_choice(available, 'd')
 	if choice == '0':
 		loop = False
@@ -114,7 +130,7 @@ def main_menu():
 ## Sub menus ##
 
 def log_menu():
-	menu = ['1. Upload logs', '2. Set logs to defaults', '3. Set logs to diagnostics/debug', '4. Log Capture', '\n     5. Remove log archives', '\n     0. Back']
+	menu = ['1. Upload logs','2. Remove log archives', '\n     0. Back']
 	
 	available = build_avaialbe(menu)
 	loop = True
@@ -122,15 +138,11 @@ def log_menu():
 		show_menu(menu)
 		choice = get_choice(available)
 		if choice == '1':
-			pass
+			ds.getLogs(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedConfig, config_files, webConfig)
+			print; ds.eContinue()
 		elif choice == '2':
-			pass
-		elif choice == '3':
-			pass
-		elif choice == '4':
-			pass
-		elif choice == '5':
-			pass
+			ds.cleanLog()
+			print; ds.eContinue()
 		elif choice == '0':
 			loop = False
 			main_menu()
@@ -144,18 +156,24 @@ def registerUpdate_menu():
 		show_menu(menu)
 		choice = get_choice(available)
 		if choice == '1':
-			pass
+			ds.datasyncBanner(dsappversion)
+			ds.registerDS()
+			print; ds.eContinue()
 		elif choice == '2':
 			update_menu()
 		elif choice == '3':
 			ds.datasyncBanner(dsappversion)
-			if ds.DoesServiceExist('ftp.novell.com', 21):
+
+			Config.read(dsappSettings)
+			serviceCheck = Config.get('URL', 'ftf.check.service')
+			dlPath = Config.get('URL', 'ftf.download.address')
+			if ds.DoesServiceExist(serviceCheck, 21):
 				# Get latest FTFlist.txt file
 				FTFfile = dsappConf + '/dsapp_FTFlist.txt'
 				if os.path.isfile(FTFfile):
 					os.rename(FTFfile, FTFfile + '.bak')
 
-				if not ds.dlfile('ftp://ftp.novell.com/outgoing/dsapp_FTFlist.txt', dsappConf, False, False):
+				if not ds.dlfile('%sdsapp_FTFlist.txt' % dlPath, dsappConf, False, False):
 					if os.path.isfile(FTFfile + '.bak'):
 						os.rename(FTFfile + '.bak', FTFfile)
 
@@ -174,7 +192,7 @@ def registerUpdate_menu():
 
 ### Start ### Sub menu for Update Mobility (registerUpdate_menu) ###
 def update_menu():
-	menu = ['1. Update with Novell Update Channel', '2. Update with Local ISO', '3. Update with Novell FTP', '\n     0. Back']
+	menu = ['1. Update via Local ISO', '2. Update via URL', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -182,11 +200,11 @@ def update_menu():
 		show_menu(menu)
 		choice = get_choice(available)
 		if choice == '1':
-			pass
+			ds.updateMobilityISO()
+			ds.eContinue()
 		elif choice == '2':
-			pass
-		elif choice == '3':
 			ds.updateMobilityFTP()
+			ds.eContinue()
 		elif choice == '0':
 			loop = False
 			return
@@ -228,9 +246,11 @@ def database_menu():
 				ds.restoreDatabase(dbConfig)
 				print; ds.eContinue()
 			elif choice == '5':
-				pass
+				ds.fix_gal(dbConfig)
+				print; ds.eContinue()
 			elif choice == '6':
-				pass
+				ds.addGroup(dbConfig, ldapConfig)
+				print; ds.eContinue()
 			elif choice == '7':
 				cuso_menu()
 			elif choice == '0':
@@ -295,7 +315,8 @@ def certificate_menu():
 			main_menu()
 
 def userIssue_menu():
-	menu = ['1. Monitor user sync options...', '2. GroupWise checks options...', '3. Remove & reinitialize users options...', '\n     4. User authentication issues', '5. Change user application name', '6. Change user FDN', '7. What deleted this (contact, email, folder, calendar)?', '8. List subjects of deleted items from device', '\n     0. Back']
+	# menu = ['1. Monitor user sync options...', '2. GroupWise checks options...', '3. Remove & reinitialize users options...', '\n     4. User authentication issues', '5. Change user application name', '6. Change user FDN', '7. What deleted this (contact, email, folder, calendar)?', '8. List subjects of deleted items from device', '\n     0. Back']
+	menu = ['1. Monitor user sync options...', '2. GroupWise checks options...', '3. Remove & reinitialize users options...', '\n     4. User authentication issues', '5. Change user application name', '6. Change user FDN', '7. What deleted this (contact, email, folder, calendar)?', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -309,14 +330,16 @@ def userIssue_menu():
 		elif choice == '3':
 			removeUser_menu()
 		elif choice == '4':
-			pass
+			ds.check_userAuth(dbConfig, authConfig)
+			ds.eContinue()
 		elif choice == '5':
-			pass
+			ds.changeAppName(dbConfig)
+			print; ds.eContinue()
 		elif choice == '6':
 			ds.updateFDN(dbConfig, XMLconfig, ldapConfig)
 			print; ds.eContinue()
 		elif choice == '7':
-			pass
+			ds.whereDidIComeFromAndWhereAmIGoingOrWhatHappenedToMe(dbConfig)
 		elif choice == '8':
 			pass
 		elif choice == '0':
@@ -335,7 +358,8 @@ def monitorUser_menu():
 		if choice == '1':
 			ds.monitorUser(dbConfig)
 		elif choice == '2':
-			pass
+			ds.monitor_Sync_validate(dbConfig)
+			print; ds.eContinue()
 		elif choice == '3':
 			ds.monitor_syncing_users(dbConfig)
 		elif choice == '0':
@@ -343,7 +367,7 @@ def monitorUser_menu():
 			return
 
 def groupwiseChecks_menu():
-	menu = ['1. Check user over SOAP', '2. Check GroupWise folder structure', '3. Remote GWcheck DELDUPFOLDERS (beta)', '\n     0. Back']
+	menu = ['1. Check user over SOAP', '2. Check GroupWise folder structure', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -354,14 +378,10 @@ def groupwiseChecks_menu():
 			userConfig = ds.verifyUser(dbConfig)
 			if userConfig['name'] != None:
 				dsSOAP.soap_printUser(trustedConfig, gwConfig, userConfig)
-				print
-				ds.eContinue()
+				print; ds.eContinue()
 		elif choice == '2':
 			dsSOAP.soap_checkFolderList(trustedConfig, gwConfig, ds.verifyUser(dbConfig))
-			print
-			ds.eContinue()
-		elif choice == '3':
-			pass
+			print; ds.eContinue()
 		elif choice == '0':
 			loop = False
 			return
@@ -376,14 +396,16 @@ def removeUser_menu():
 		choice = get_choice(available)
 		if choice == '1':
 			ds.remove_user(dbConfig, 1)
-			print
-			ds.eContinue()
+			print; ds.eContinue()
 		elif choice == '2':
 			ds.remove_user(dbConfig)
-			print
-			ds.eContinue()
+			print; ds.eContinue()
 		elif choice == '3':
-			pass
+			ds.datasyncBanner(dsappversion)
+			ds.removed_disabled(dbConfig)
+			print
+			ds.fix_referenceCount(dbConfig)
+			print; ds.eContinue()
 		elif choice == '4':
 			ds.setUserState(dbConfig, '7')
 		elif choice == '5':
@@ -403,15 +425,17 @@ def userInfo_menu():
 		show_menu(menu)
 		choice = get_choice(available)
 		if choice == '1':
-			pass
+			ds.list_deviceInfo(dbConfig)
+			ds.eContinue()
 		elif choice == '2':
-			pass
+			ds.list_usersAndEmails(dbConfig)
+			ds.eContinue()
 		elif choice == '0':
 			loop = False
 			main_menu()
 
 def checksQueries_menu():
-	menu = ['1. General Health Check (beta)', '2. Nightly Maintenance Check', '\n     3. Show Sync Status', '4. GW pending events by User (consumerevents)', '5. Mobility pending events by User (syncevents)', '\n     6. Attachments...', '7. Watch psql command (CAUTION)', '\n     0. Back']
+	menu = ['1. General Health Check (beta)', '2. Nightly Maintenance Check', '\n     3. Show Sync Status', '4. GW pending events by User (consumerevents)', '5. Mobility pending events by User (syncevents)', '\n     6. Attachments...', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -419,7 +443,7 @@ def checksQueries_menu():
 		show_menu(menu)
 		choice = get_choice(available)
 		if choice == '1':
-			ghc.generalHealthCheck(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedConfig, config_files)
+			ghc.generalHealthCheck(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedConfig, config_files, webConfig)
 			print; ds.eContinue()
 		elif choice == '2':
 			print ds.checkNightlyMaintenance(config_files, mobilityConfig)['output']
@@ -429,20 +453,20 @@ def checksQueries_menu():
 			ds.showStatus(dbConfig)
 			print; ds.eContinue()
 		elif choice == '4':
-			pass
+			ds.show_GW_syncEvents(dbConfig)
+			print; ds.eContinue()
 		elif choice == '5':
-			pass
+			ds.show_Mob_syncEvents(dbConfig)
+			ds.eContinue()
 		elif choice == '6':
 			viewAttachments_menu()
-		elif choice == '7':
-			pass
 		elif choice == '0':
 			loop = False
 			main_menu()
 
 ### Start ### Sub menus checkQueries_menu ###
 def viewAttachments_menu():
-	menu = ['1. View attachments by user', '2. Check Mobility attachments', '3. Check Mobility attachments count (beta)', '\n     0. Back']
+	menu = ['1. View attachments by user', '2. Check Mobility attachments count', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -450,11 +474,11 @@ def viewAttachments_menu():
 		show_menu(menu)
 		choice = get_choice(available)
 		if choice == '1':
-			pass
+			ds.view_attach_byUser(dbConfig)
+			ds.eContinue()
 		elif choice == '2':
-			pass
-		elif choice == '3':
-			pass
+			ds.check_mob_attachments(dbConfig)
+			print; ds.eContinue()
 		elif choice == '0':
 			loop = False
 			return
