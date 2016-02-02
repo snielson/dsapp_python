@@ -1,0 +1,1 @@
+python /opt/novell/datasync/tools/dsapp/dsapp.pyc $@

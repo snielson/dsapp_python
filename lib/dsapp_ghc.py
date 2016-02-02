@@ -1,8 +1,5 @@
 # Written by Shane Nielson <snielson@projectuminfinitas.com>
-<<<<<<< HEAD
 
-=======
->>>>>>> origin/Development
 from __future__ import print_function
 import os
 import sys
@@ -25,10 +22,7 @@ import getch
 getch = getch._Getch()
 import dsapp_Definitions as ds
 import dsapp_Soap as dsSoap
-<<<<<<< HEAD
 import ntplib
-=======
->>>>>>> origin/Development
 
 # Folder variables
 dsappDirectory = "/opt/novell/datasync/tools/dsapp"
@@ -53,16 +47,12 @@ ds_14x = 14
 rcScript = None
 mobilityVersion = 0
 version = "/opt/novell/datasync/version"
-<<<<<<< HEAD
 
 # Global variables
 silent = None
 mobile_serviceCheck = True
 web_serviceCheck = True
 serverDateCheck = True
-=======
-silent = None
->>>>>>> origin/Development
 
 # Mobility Directories
 dirOptMobility = "/opt/novell/datasync"
@@ -114,18 +104,11 @@ COL1 = "{0:35}"
 #  General Health Check definitions
 ##################################################################################################
 
-<<<<<<< HEAD
 def generalHealthCheck(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedConfig, config_files, webConfig, ghc_silent=False):
 	global silent
 	silent = ghc_silent
 	if not silent:
 		ds.datasyncBanner(dsappversion)
-=======
-def generalHealthCheck(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedConfig, config_files, ghc_silent=False):
-	global silent
-	silent = ghc_silent
-	ds.datasyncBanner(dsappversion)
->>>>>>> origin/Development
 	DATE = datetime.datetime.now().strftime('%c')
 
 	# Rewrite health check log with timestamp and version
@@ -141,11 +124,7 @@ def generalHealthCheck(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig
 	rpm_process.start()
 
 	# Begin Health Checks
-<<<<<<< HEAD
 	ghc_checkServices(mobilityConfig, gwConfig, webConfig)
-=======
-	ghc_checkServices(mobilityConfig, gwConfig)
->>>>>>> origin/Development
 	ghc_checkLDAP(XMLconfig ,ldapConfig)
 	# ghc_checkPOA
 	ghc_checkTrustedApp(trustedConfig, gwConfig)
@@ -173,12 +152,8 @@ def generalHealthCheck(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig
 	ghc_verifyNightlyMaintenance(config_files, mobilityConfig)
 
 	# # Lots of information...
-<<<<<<< HEAD
 	ghc_verifyServerDate()
 	ghc_verifyCertificates(mobilityConfig, webConfig)
-=======
-	# ghc_verifyCertificates
->>>>>>> origin/Development
 
 	time2 = time.time()
 	logger.info("General Health Check took %0.3f ms" % ((time2 - time1) * 1000))
@@ -306,7 +281,6 @@ def ghc_util_checkGroupWise(gwConfig):
 
 		if listener == 'python':
 			result = True
-<<<<<<< HEAD
 			log.write("\nGroupWise Connector listening on port %s: %s" % (gwConfig['gport'], result))
 		elif listener != 'python' or listener is None:
 			result = False
@@ -335,12 +309,6 @@ def ghc_util_checkWebAdmin(webConfig):
 		elif listener != 'python' or listener is None:
 			result = False
 			log.write("\nWeb Admin not listening on port %s: %s\n" % (webConfig['port'], result))
-=======
-			log.write("\nGroupWise Connector listening on port %s: %s\n" % (gwConfig['gport'], result))
-		elif listener != 'python' or listener is None:
-			result = False
-			log.write("\nGroupWise Connector not listening on port %s: %s\n" % (gwConfig['gport'], result))
->>>>>>> origin/Development
 
 	time2 = time.time()
 	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
@@ -400,7 +368,6 @@ def ghc_util_checkGWPortConnectivity(gwConfig):
 	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 	return result
 
-<<<<<<< HEAD
 def ghc_util_checkWebPortConnectivity(webConfig):
 	result = False
 	cmd = "netcat -z -w 5 %s %s -v" % (webConfig['ip'], webConfig['port'])
@@ -428,8 +395,6 @@ def ghc_util_checkWebPortConnectivity(webConfig):
 	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 	return result
 
-=======
->>>>>>> origin/Development
 def ghc_util_subprocess(cmd, error=False):
 	if not error:
 		p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
@@ -441,17 +406,11 @@ def ghc_util_subprocess(cmd, error=False):
 		out = p.communicate()
 	return out
 
-<<<<<<< HEAD
 def ghc_checkServices(mobilityConfig, gwConfig, webConfig):
 	ghc_util_NewHeader("Checking Mobility Services..")
 	problem = False
 	global mobile_serviceCheck
 	global web_serviceCheck
-=======
-def ghc_checkServices(mobilityConfig, gwConfig):
-	ghc_util_NewHeader("Checking Mobility Services..")
-	problem = False
->>>>>>> origin/Development
 
 	# Finds all datasync scripts in /etc/inid.d. Appends them to datasync_scripts
 	datasync_scripts = []
@@ -468,7 +427,6 @@ def ghc_checkServices(mobilityConfig, gwConfig):
 		problem = True
 	if not ghc_util_checkMobility(mobilityConfig):
 		problem = True
-<<<<<<< HEAD
 		mobile_serviceCheck = False
 	if not ghc_util_checkGroupWise(gwConfig):
 		problem = True
@@ -483,14 +441,6 @@ def ghc_checkServices(mobilityConfig, gwConfig):
 	if not ghc_util_checkWebPortConnectivity(webConfig):
 		problem = True
 		web_serviceCheck = False
-=======
-	if not ghc_util_checkGroupWise(gwConfig):
-		problem = True
-	if not ghc_util_checkMobPortConnectivity(mobilityConfig):
-		problem = True
-	if not ghc_util_checkGWPortConnectivity(gwConfig):
-		problem = True
->>>>>>> origin/Development
 
 	if problem:
 		ghc_util_passFail('failed')
@@ -1177,7 +1127,6 @@ def ghc_checkReferenceCount(dbConfig):
 		msg = "All reference counts are correct\n"
 		ghc_util_passFail('passed', msg)
 
-<<<<<<< HEAD
 def ghc_verifyCertificates(mobilityConfig, webConfig):
 	ghc_util_NewHeader("Checking Certificates..")
 	problem = False
@@ -1389,87 +1338,3 @@ def ghc_verifyServerDate():
 		ghc_util_passFail('failed')
 	elif not problem:
 		ghc_util_passFail('passed')	
-=======
-def ghc_verifyCertificates():
-	ghc_util_NewHeader("Checking Certificates..")
-	problem = True
-
-	devCert = "/var/lib/datasync/device/mobility.pem"
-	webCert = "/var/lib/datasync/webadmin/server.pem"
-	dateTolerance = 7776000
-
-	devChk = "openssl x509 -checkend %s -in %s" % (dateTolerance, devCert)
-	webChk = "openssl x509 -checkend %s -in %s" % (dateTolerance, webCert)
-	devOut = ghc_util_subprocess(devChk)
-	webOut = ghc_util_subprocess(webChk)
-
-	getDate = "openssl x509 -noout -enddate -in %s"
-
-	with open(ghcLog, 'a') as log:
-		cmd = getDate % devCert
-		out = ghc_util_subprocess(cmd)[0].split('=')[1]
-		if 'will expire' in devOut[0]:
-			log.write("File: %s\nCertificate has or will expire in 90 days\nExpiry date: %s\n" % (devCert,out))
-			problem = 'warning'
-		else:
-			log.write("File: %s\nExpiry date: %s\n" %(devCert,out))
-
-		cmd = getDate % webCert
-		out = ghc_util_subprocess(cmd)[0].split('=')[1]
-		if 'will expire' in webOut[0]:
-			log.write("File: %s\nCertificate has or will expire in 90 days\nExpiry date: %s\n" % (webCert,out))
-			problem = 'warning'
-		else:
-			log.write("File: %s\nExpiry date: %s\n" %(devCert,out))
-
-### OLD BASH CODE ### 
-# 			# Check Key-Pair
-# 			echo -e "\nChecking Certificate-Key Pair:\n------------------------------" >>$ghcLog
-# 			diff -qs <(openssl rsa -in $devCert -pubout >>$ghcLog 2>&1) <(openssl x509 -in $devCert -pubkey -noout >>$ghcLog 2>&1) >>$ghcLog 2>&1;
-# 			if [ $? -ne 0 ]; then
-# 				problem=true
-# 				echo "The certificate-key pair are not a match!" >>$ghcLog
-# 			fi
-# 			echo >>$ghcLog
-
-# 			# Check SSL Handshake
-# 			echo | openssl s_client -showcerts -connect $mlistenAddress:$mPort >>$ghcLog 2>&1;
-# 			if [ $? -ne 0 ]; then
-# 				problem=true
-# 			fi
-
-# 		# WebAdmin Certificate
-# 		echo -e "\n------------------------------------------------------------\nChecking WebAdmin Certificate:\n------------------------------------------------------------" >>$ghcLog
-
-# 			# Check Expiration Date
-# 			echo -e "\nChecking Expiration Date:\n----------------------------" >>$ghcLog
-# 			certExpirationDate=`echo | openssl s_client -connect $mlistenAddress:$wPort 2>/dev/null | openssl x509 -noout -enddate 2>/dev/null | cut -d "=" -f2 | awk '{print $1, $2, $4}'`
-# 			if [ $(date -d "$dateTolerance" +%s) -ge $(date -d "$certExpirationDate" +%s) ]; then
-# 				echo -e "WARNING: Certificate expires soon!\n$webCert" >>$ghcLog
-# 				warn=true;
-# 			fi
-# 			echo "The WebAdmin certificate will expire on $certExpirationDate" >>$ghcLog
-
-# 			# Check Key-Pair
-# 			echo -e "\nChecking Certificate-Key Pair:\n------------------------------" >>$ghcLog
-# 			diff -qs <(openssl rsa -in $webCert -pubout >>$ghcLog 2>&1) <(openssl x509 -in $webCert -pubkey -noout >>$ghcLog 2>&1) >>$ghcLog 2>&1;
-# 			if [ $? -ne 0 ]; then
-# 				problem=true
-# 				echo "The certificate-key pair are not a match!" >>$ghcLog
-# 			fi
-# 			echo >>$ghcLog
-
-# 			# Check SSL Handshake
-# 			echo | openssl s_client -showcerts -connect $mlistenAddress:$wPort >>$ghcLog 2>&1;
-# 			if [ $? -ne 0 ]; then
-# 				problem=true
-# 			fi
-# 	fi
-
-# 	# Check for dos2unix stuff...
-# 	grep -Pl "\r" $devCert $webCert &>/dev/null
-# 	if [ $? -eq 0 ]; then
-# 		problem=true
-# 		echo -e "\nProblem detected with certificates: ^M dos characters.\nSOLUTION: See TID 7014821." >>$ghcLog
-# 	fi
->>>>>>> origin/Development
