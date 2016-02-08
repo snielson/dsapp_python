@@ -7,44 +7,32 @@ import socket
 import subprocess
 import datetime
 import time
+import pydoc
 import logging, logging.config
+import ntplib
+import psycopg2
+import psycopg2.extras
+from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from multiprocessing import Process, Queue
 import ConfigParser
 Config = ConfigParser.ConfigParser()
+ghc_Config = ConfigParser.ConfigParser()
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 import spin
 import filestoreIdToPath
-import psycopg2
-import psycopg2.extras
-from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 import getch
 getch = getch._Getch()
 import dsapp_Definitions as ds
 import dsapp_Soap as dsSoap
-import ntplib
 
 # Folder variables
 dsappDirectory = "/opt/novell/datasync/tools/dsapp"
 dsappConf = dsappDirectory + "/conf"
 dsappLogs = dsappDirectory + "/logs"
-dsapplib = dsappDirectory + "/lib"
-dsappBackup = dsappDirectory + "/backup"
-dsapptmp = dsappDirectory + "/tmp"
-dsappupload = dsappDirectory + "/upload"
-dsappdata = dsappDirectory + "/data"
-rootDownloads = "/root/Downloads"
 
 # Misc variables
-serverinfo = "/etc/*release"
 initScripts = "/etc/init.d/"
-rpminfo = "datasync"
-dsapp_tar = "dsapp.tgz"
-isNum = '^[0-9]+$'
-ds_1x= 1
-ds_2x = 2
-ds_14x = 14
-rcScript = None
 mobilityVersion = 0
 version = "/opt/novell/datasync/version"
 
@@ -59,25 +47,13 @@ dirOptMobility = "/opt/novell/datasync"
 dirEtcMobility = "/etc/datasync"
 dirVarMobility = "/var/lib/datasync"
 log = "/var/log/datasync"
-dirPGSQL = "/var/lib/pgsql"
-mAttach = dirVarMobility + "/mobility/attachments/"
-
-# Mobility logs
-configenginelog = log + "/configengine/configengine.log"
-connectormanagerlog = log + "/syncengine/connectorManager.log"
-syncenginelog = log + "/syncengine/engine.log"
-monitorlog = log + "/monitorengine/monitor.log"
-systemagentlog = log + "/monitorengine/systemagent.log"
-updatelog = log + "/update.log"
-webadminlog = log + "/webadmin/server.log"
 
 # System logs / settings
-messages = "/var/log/messages"
-warn = "/var/log/warn"
 proxyConf = "/etc/sysconfig/proxy"
 
 # dsapp Conf / Logs
 dsappSettings = dsappConf + "/setting.cfg"
+ghcSettings = dsappConf + "/ghc_checks.cfg"
 dsappLogSettings = dsappConf + "/logging.cfg"
 dsappLog = dsappConf + "/dsapp.log"
 ghcLog = dsappLogs + "/generalHealthCheck.log"
@@ -100,11 +76,66 @@ colorBLUE = "\033[01;34m{0}\033[00m"
 # Printing Columns
 COL1 = "{0:35}"
 
+# Create ghc_setting.cfg if not found
+if not os.path.isfile(ghcSettings):
+	with open(ghcSettings, 'w') as cfgfile:
+		ghc_Config.add_section('GHC Checks')
+		ghc_Config.set('GHC Checks', 'services', True)
+		ghc_Config.set('GHC Checks', 'ldap', True)
+		ghc_Config.set('GHC Checks', 'trusted.app', True)
+		ghc_Config.set('GHC Checks', 'required.xmls', True)
+		ghc_Config.set('GHC Checks', 'xmls', True)
+		ghc_Config.set('GHC Checks', 'psql.config', True)
+		ghc_Config.set('GHC Checks', 'rpm.save', True)
+		ghc_Config.set('GHC Checks', 'proxy', True)
+		ghc_Config.set('GHC Checks', 'disk.space', True)
+		ghc_Config.set('GHC Checks', 'memory', True)
+		ghc_Config.set('GHC Checks', 'vmware', True)
+		ghc_Config.set('GHC Checks', 'config', True)
+		ghc_Config.set('GHC Checks', 'db.schema', True)
+		ghc_Config.set('GHC Checks', 'manual.maintenance', True)
+		ghc_Config.set('GHC Checks', 'reference.count', True)
+		ghc_Config.set('GHC Checks', 'user.fdn', True)
+		ghc_Config.set('GHC Checks', 'database.integrity', True)
+		ghc_Config.set('GHC Checks', 'targets.integrity', True)
+		ghc_Config.set('GHC Checks', 'rpms', True)
+		ghc_Config.set('GHC Checks', 'disk.io', True)
+		ghc_Config.set('GHC Checks', 'nightly.maintenance', True)
+		ghc_Config.set('GHC Checks', 'server.date', True)
+		ghc_Config.set('GHC Checks', 'certificates', True)
+		ghc_Config.write(cfgfile)
+
 ##################################################################################################
 #  General Health Check definitions
 ##################################################################################################
 
 def generalHealthCheck(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedConfig, config_files, webConfig, ghc_silent=False):
+	# Read Config
+	ghc_Config.read(ghcSettings)
+	check_services = ghc_Config.getboolean('GHC Checks', 'services')
+	check_ldap = ghc_Config.getboolean('GHC Checks', 'ldap')
+	check_trustedApp = ghc_Config.getboolean('GHC Checks', 'trusted.app')
+	check_requiredXMLs = ghc_Config.getboolean('GHC Checks', 'required.xmls')
+	check_xmls = ghc_Config.getboolean('GHC Checks', 'xmls')
+	check_psqlConfig = ghc_Config.getboolean('GHC Checks', 'psql.config')
+	check_rpmSave = ghc_Config.getboolean('GHC Checks', 'rpm.save')
+	check_proxy = ghc_Config.getboolean('GHC Checks', 'proxy')
+	check_diskSpace = ghc_Config.getboolean('GHC Checks', 'disk.space')
+	check_memory = ghc_Config.getboolean('GHC Checks', 'memory')
+	check_vmware = ghc_Config.getboolean('GHC Checks', 'vmware')
+	check_config = ghc_Config.getboolean('GHC Checks', 'config')
+	check_dbSchema = ghc_Config.getboolean('GHC Checks', 'db.schema')
+	check_manualMaintenance = ghc_Config.getboolean('GHC Checks', 'manual.maintenance')
+	check_referenceCount = ghc_Config.getboolean('GHC Checks', 'reference.count')
+	check_userFDN = ghc_Config.getboolean('GHC Checks', 'user.fdn')
+	check_databaseIntegrity = ghc_Config.getboolean('GHC Checks', 'database.integrity')
+	check_targetsIntegrity = ghc_Config.getboolean('GHC Checks', 'targets.integrity')
+	check_rpms = ghc_Config.getboolean('GHC Checks', 'rpms')
+	check_diskIO = ghc_Config.getboolean('GHC Checks', 'disk.io')
+	check_nightlyMaint = ghc_Config.getboolean('GHC Checks', 'nightly.maintenance')
+	check_serverDate = ghc_Config.getboolean('GHC Checks', 'server.date')
+	check_certificates = ghc_Config.getboolean('GHC Checks', 'certificates')
+
 	global silent
 	silent = ghc_silent
 	if not silent:
@@ -119,55 +150,77 @@ def generalHealthCheck(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig
 	time1 = time.time()
 
 	# Get system RPMs in background
-	rpm_queue = Queue()
-	rpm_process = Process(target=ds.queue_getRPMs, args=(rpm_queue,))
-	rpm_process.start()
+	if check_rpms:
+		rpm_queue = Queue()
+		rpm_process = Process(target=ds.queue_getRPMs, args=(rpm_queue,))
+		rpm_process.start()
 
 	# Begin Health Checks
-	ghc_checkServices(mobilityConfig, gwConfig, webConfig)
-	ghc_checkLDAP(XMLconfig ,ldapConfig)
+	if check_services:
+		ghc_checkServices(mobilityConfig, gwConfig, webConfig)
+	if check_ldap:
+		ghc_checkLDAP(XMLconfig ,ldapConfig)
+
 	# ghc_checkPOA
-	ghc_checkTrustedApp(trustedConfig, gwConfig)
-	ghc_checkReqXMLs()
-	ghc_checkXML()
-	ghc_checkPSQLConfig()
-	ghc_checkRPMSave()
-	ghc_checkProxy()
-	ghc_checkDiskSpace()
-	ghc_checkMemory(dbConfig)
-	ghc_checkVMWare()
-	ghc_checkConfig()
-	ghc_checkUpdateSH(dbConfig)
-	ghc_checkManualMaintenance(dbConfig)
-	ghc_checkReferenceCount(dbConfig)
-	ghc_checkUserFDN(dbConfig, XMLconfig ,ldapConfig)
-	ghc_verifyDatabaseIntegrity(dbConfig)
-	ghc_verifyTargetsIntegrity(dbConfig)
+	if check_trustedApp:
+		ghc_checkTrustedApp(trustedConfig, gwConfig)
+	if check_requiredXMLs:
+		ghc_checkReqXMLs()
+	if check_xmls:
+		ghc_checkXML()
+	if check_psqlConfig:
+		ghc_checkPSQLConfig()
+	if check_rpmSave:
+		ghc_checkRPMSave()
+	if check_proxy:
+		ghc_checkProxy()
+	if check_diskSpace:
+		ghc_checkDiskSpace()
+	if check_memory:
+		ghc_checkMemory(dbConfig)
+	if check_vmware:
+		ghc_checkVMWare()
+	if check_config:
+		ghc_checkConfig()
+	if check_dbSchema:
+		ghc_checkDBSchema(dbConfig)
+	if check_manualMaintenance:
+		ghc_checkManualMaintenance(dbConfig)
+	if check_referenceCount:
+		ghc_checkReferenceCount(dbConfig)
+	if check_userFDN:
+		ghc_checkUserFDN(dbConfig, XMLconfig ,ldapConfig)
+	if check_databaseIntegrity:
+		ghc_verifyDatabaseIntegrity(dbConfig)
+	if check_targetsIntegrity:
+		ghc_verifyTargetsIntegrity(dbConfig)
 
 	# # Slower checks...
-	qhc_rpms = rpm_queue.get()
-	rpm_process.join() # Make sure rpm_process is done before continuing
-	ghc_checkRPMs(qhc_rpms)
-	ghc_checkDiskIO()
-	ghc_verifyNightlyMaintenance(config_files, mobilityConfig)
+	if check_rpms:
+		qhc_rpms = rpm_queue.get()
+		rpm_process.join() # Make sure rpm_process is done before continuing
+		ghc_checkRPMs(qhc_rpms)
+	if check_diskIO:
+		ghc_checkDiskIO()
+	if check_nightlyMaint:
+		ghc_verifyNightlyMaintenance(config_files, mobilityConfig)
 
 	# # Lots of information...
-	ghc_verifyServerDate()
-	ghc_verifyCertificates(mobilityConfig, webConfig)
+	if check_serverDate:
+		ghc_verifyServerDate()
+	if check_certificates:
+		ghc_verifyCertificates(mobilityConfig, webConfig)
 
 	time2 = time.time()
 	logger.info("General Health Check took %0.3f ms" % ((time2 - time1) * 1000))
 
 	# Prompt View Logs
-
 	if not silent:
 		print ('\n')
-		if ds.askYesOrNo("Do you want to view the log file"):
-			cmd = "less %s" % ghcLog
-			subprocess.call(cmd, shell=True)
-
 		print ("Log created at: %s" % ghcLog)
-
+		if ds.askYesOrNo("View the %s" % os.path.basename(ghcLog)):
+			with open(ghcLog, 'r') as ghcfile:
+				pydoc.pager(ghcfile.read())
 
 ###  Utility definitions for General Health Checks ###
 def ghc_util_NewHeader(header):
@@ -711,12 +764,12 @@ def ghc_verifyNightlyMaintenance(config_files, mobilityConfig):
 		# msg = "Trusted Application is valid\n"
 		ghc_util_passFail('passed')
 
-def ghc_checkUpdateSH(dbConfig):
+def ghc_checkDBSchema(dbConfig):
 	ghc_util_NewHeader("Checking Database Schema..")
 	problem = False
 
 	with open(version, 'r') as file:
-		mobilityVersion = file.read()
+		mobilityVersion = file.read().strip()
 
 	conn = ds.getConn(dbConfig, 'datasync')
 	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
@@ -727,17 +780,17 @@ def ghc_checkUpdateSH(dbConfig):
 
 	for row in data:
 		try:
-			ghc_dbVersion = row['service_version']
+			ghc_dbVersion = row['service_version'].strip()
 		except:
 			ghc_dbVersion = None
 
 	with open(ghcLog, 'a') as log:
 		if ghc_dbVersion is not None and ghc_dbVersion == mobilityVersion:
-			log.write("Schema version: %s" % ghc_dbVersion)
-			log.write("Mobility version: %s" % mobilityVersion)
+			log.write("Schema version: %s\n" % ghc_dbVersion)
+			log.write("Mobility version: %s\n" % mobilityVersion)
 		elif ghc_dbVersion is not None and ghc_dbVersion != mobilityVersion:
-			log.write("Schema version: %s" % ghc_dbVersion)
-			log.write("Mobility version: %s" % mobilityVersion)
+			log.write("Schema version: %s\n" % ghc_dbVersion)
+			log.write("Mobility version: %s\n" % mobilityVersion)
 			problem = True
 		elif ghc_dbVersion is None:
 			problem = 'skipped'
@@ -976,7 +1029,7 @@ def ghc_checkUserFDN(dbConfig, XMLconfig ,ldapConfig):
 	if ds.checkLDAP(XMLconfig ,ldapConfig):
 		conn = ds.getConn(dbConfig, 'datasync')
 		cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
-		cur.execute("select distinct dn from targets where disabled='0'")
+		cur.execute("select distinct dn from targets where disabled='0' and dn ilike 'cn=%%'")
 		data = cur.fetchall()
 		cur.close()
 		conn.close()

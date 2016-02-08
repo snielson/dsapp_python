@@ -118,6 +118,7 @@ def main_menu():
 	choice = get_choice(available, 'd')
 	if choice == '0':
 		loop = False
+		ds.clear()
 		return
 	elif choice == 'd':
 		cmd = "PGPASSWORD=%(pass)s psql -U %(user)s datasync" % dbConfig
@@ -165,9 +166,10 @@ def registerUpdate_menu():
 			ds.datasyncBanner(dsappversion)
 
 			Config.read(dsappSettings)
-			serviceCheck = Config.get('URL', 'ftf.check.service')
-			dlPath = Config.get('URL', 'ftf.download.address')
-			if ds.DoesServiceExist(serviceCheck, 21):
+			serviceCheck = Config.get('FTF URL', 'check.service.address')
+			serviceCheckPort = Config.getint('FTF URL', 'check.service.port')
+			dlPath = Config.get('FTF URL', 'download.address')
+			if ds.DoesServiceExist(serviceCheck, serviceCheckPort):
 				# Get latest FTFlist.txt file
 				FTFfile = dsappConf + '/dsapp_FTFlist.txt'
 				if os.path.isfile(FTFfile):
@@ -377,7 +379,10 @@ def groupwiseChecks_menu():
 		if choice == '1':
 			userConfig = ds.verifyUser(dbConfig)
 			if userConfig['name'] != None:
-				dsSOAP.soap_printUser(trustedConfig, gwConfig, userConfig)
+				if userConfig['type'] != 'group':
+					dsSOAP.soap_printUser(trustedConfig, gwConfig, userConfig)
+				else:
+					print ("Input '%(name)s' is not a user. Type='%(type)s'" % userConfig)
 				print; ds.eContinue()
 		elif choice == '2':
 			dsSOAP.soap_checkFolderList(trustedConfig, gwConfig, ds.verifyUser(dbConfig))
@@ -387,7 +392,7 @@ def groupwiseChecks_menu():
 			return
 
 def removeUser_menu():
-	menu = ['1. Force remove user/group db references', '2. Remove user/group (restarts configengine)', '3. Remove disabled users & fix referenceCount', '\n     4. Reinitialize user (WebAdmin is recommended)', '5. Reinitialize all users (CAUTION - down time)', '\n     0. Back']
+	menu = ['1. Force remove user/group db references', '2. Remove user/group (restarts configengine)', '3. Remove disabled users & fix referenceCount', '\n     4. Reinitialize user', '5. Reinitialize all failed users', '6. Reinitialize all users', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -409,15 +414,18 @@ def removeUser_menu():
 		elif choice == '4':
 			ds.setUserState(dbConfig, '7')
 		elif choice == '5':
+			ds.reinitAllFailedUsers(dbConfig)
+			print;ds.eContinue()
+		elif choice == '6':
 			ds.reinitAllUsers(dbConfig)
-			ds.eContinue()
+			print;ds.eContinue()
 		elif choice == '0':
 			loop = False
 			return
 ### End ### Sub menus userIssue_menu ###
 
 def userInfo_menu():
-	menu = ['1. List all devices from db', '2. List of GMS users & emails', '\n     0. Back']
+	menu = ['1. List all devices from db', '2. List of GMS users & emails', '3. List user PAB content', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -430,6 +438,8 @@ def userInfo_menu():
 		elif choice == '2':
 			ds.list_usersAndEmails(dbConfig)
 			ds.eContinue()
+		elif choice == '3':
+			ds.getUserPAB(dbConfig)
 		elif choice == '0':
 			loop = False
 			main_menu()
@@ -483,3 +493,24 @@ def viewAttachments_menu():
 			loop = False
 			return
 ### End ### Sub menus checkQueries_menu ###
+
+# dsapp_re menu
+def re_menu(dbConfig, ldapConfig, mobilityConfig, gwConfig, trustedConfig, config_files, webConfig, authConfig):
+	import dsapp_re
+	menu = ['1. Backup Mobility settings','2. Restore / Install Mobility', '\n     0. Back']
+	
+	available = build_avaialbe(menu)
+	loop = True
+	while loop:
+		show_menu(menu)
+		choice = get_choice(available)
+		if choice == '1':
+			dsapp_re.dumpConfigs(dbConfig, ldapConfig, mobilityConfig, gwConfig, trustedConfig, config_files, webConfig, authConfig)
+			print; ds.eContinue()
+		elif choice == '2':
+			dsapp_re.install_settings()
+			print; ds.eContinue()
+		elif choice == '0':
+			loop = False
+			ds.clear()
+			sys.exit(0)
