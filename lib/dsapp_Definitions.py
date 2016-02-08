@@ -34,8 +34,8 @@ import dsapp_ghc as ghc
 # Global variables
 forceMode = False
 installedConnector = "/etc/init.d/datasync-connectors"
-isInstalled = False
 COMPANY_BU = 'Novell'
+ERROR_MSG = "\ndsapp has encountered an error. See dsapp.log for more details"
 
 # Folder variables
 dsappDirectory = "/opt/novell/datasync/tools/dsapp"
@@ -53,14 +53,13 @@ serverinfo = "/etc/*release"
 initScripts = "/etc/init.d/"
 rpminfo = "datasync"
 dsapp_tar = "dsapp.tgz"
-isNum = '^[0-9]+$'
 ds_1x= 1
 ds_2x = 2
 ds_14x = 14
-rcScript = None
 mobilityVersion = 0
 version = "/opt/novell/datasync/version"
 python_Directory = '/usr/bin/python'
+INIT_NAME = 'datasync-'
 
 # Mobility Directories
 dirOptMobility = "/opt/novell/datasync"
@@ -110,7 +109,6 @@ colorBLUE = "\033[01;34m{0}\033[00m"
 
 # Define Variables for Eenou+ (2.x)
 def declareVariables2():
-	global rcScript
 	global mAlog
 	global gAlog
 	global mlog
@@ -121,11 +119,9 @@ def declareVariables2():
 	gAlog = log + "/connectors/groupwise-agent.log"
 	mlog = log + "/connectors/mobility.log"
 	glog = log + "/connectors/groupwise.log"
-	rcScript = "rcgms"
 
 # Define Variables for Pre-Eenou (1.x)
 def declareVariables1():
-	global rcScript
 	global mAlog
 	global gAlog
 	global mlog
@@ -136,11 +132,6 @@ def declareVariables1():
 	gAlog = log + "/connectors/default.pipeline1.groupwise-AppInterface.log"
 	mlog = log + "/connectors/default.pipeline1.mobility.log"
 	glog = log + "/connectors/default.pipeline1.groupwise.log"
-	rcScript="rcdatasync"
-
-def set_forcemode(force):
-	global forceMode
-	forceMode = force
 
 def set_spinner():
 	spinner = spin.progress_bar_loading()
@@ -202,14 +193,28 @@ def kill_pid(pid, sig=1):
 	except OSError:
 		logger.warning('No such process: %s' %(pid))
 
-def removeLine(filePath, line):
+def removeLine(filePath, search):
+	found = False
 	try:
-		for fLine in fileinput.input(filePath, inplace=True):
-			if line in fLine:
-				continue
-			print(fLine, end='')
+		logger.debug("Searching for '%s' in %s" % (search, filePath))
+		with open(filePath, 'r') as openFile:
+			lines = openFile.readlines()
+		with open(filePath, 'w') as openFile:
+			lineNumber = 0
+			for line in lines:
+				lineNumber += 1
+				if search not in line:
+					openFile.write(line)
+				else:
+					logger.debug("Found line [%s] '%s'" % (lineNumber, line.strip()))
+					found = True
+
+			if not found:
+				logger.debug("No results for '%s'" % search)
+			else:
+				logger.debug("Done removing all '%s' lines" % search)
 	except OSError:
-		logger.warning('No such file or directory: ' + filePath)
+		logger.warning('No such file or directory: %s' + filePath)
 
 def removeAllFiles(path):
 	filelist = glob.glob(path +"/*")
@@ -217,7 +222,8 @@ def removeAllFiles(path):
 		try:
 			os.remove(f)
 		except OSError:
-			logger.warning('No such file or directory: %s' % (f))
+			if not os.path.isdir(f):
+				logger.warning('No such file: %s' % (f))
 		logger.debug('Removed: %s' % f)
 
 def removeAllFolders(path):
@@ -226,7 +232,8 @@ def removeAllFolders(path):
 		try:
 			shutil.rmtree(f)
 		except OSError:
-			logger.warning('No such directory: %s' % f)
+			if not os.path.isfile(f):
+				logger.warning('No such directory: %s' % f)
 		logger.debug('Removed: %s' % f)
 
 def eContinue():
@@ -260,8 +267,8 @@ def checkInstall(forceMode, installedConnector):
 		if not os.path.exists(installedConnector):
 			print ("Mobility is not installed")
 			logger.info('Mobility is not installed')
-			sys.exit(1)
-		return True
+			return False
+	return True
 
 def getVersion(isInstalled,version):
 	if isInstalled:
@@ -318,12 +325,12 @@ def getXMLTree(filePath):
 		return etree.parse(filePath)
 		logger.debug(filePath + " loaded as XML tree")
 	except IOError:
-		print ('\ndsapp has encountered an error. See log for more details')
+		print (ERROR_MSG)
 		logger.error('Unable to find file: ' + filePath)
 		eContinue()
 		sys.exit(1)
 	except ExpatError:
-		print ('\ndsapp has encountered an error. See log for more details')
+		print (ERROR_MSG)
 		logger.error('Unable to parse XML: %s' % (filePath))
 		eContinue()
 		sys.exit(1)
@@ -334,6 +341,7 @@ def xmlpath (elem, tree):
 		return (tree.find(elem).text)
 	except AttributeError:
 		logger.warning('Unable to find %s' % (elem))
+		return None
 
 def xmlpath_findall(elem, tree):
 	xml_list = []
@@ -343,6 +351,7 @@ def xmlpath_findall(elem, tree):
 		return (xml_list)
 	except AttributeError:
 		logger.warning('Unable to find %s' % (elem))
+		return None
 
 def setXML (elem, tree, value, filePath):
 	root = tree.getroot()
@@ -386,9 +395,9 @@ def unzip_file(fileName):
 	with contextlib.closing(zipfile.ZipFile(fileName, 'r')) as z:
 	    z.extractall()
 
-def untar_file(fileName):
+def untar_file(fileName, extractPath="."):
 	with contextlib.closing(tarfile.open(fileName, 'r:*')) as tar:
-		tar.extractall()
+		tar.extractall(path=extractPath)
 
 def uncompressIt(fileName):
 	extension = os.path.splitext(fileName)[1]
@@ -472,15 +481,16 @@ def updateDsapp(publicVersion):
 	print ('Updating dsapp to v%s' % (publicVersion))
 	logger.info('Updating dsapp to v%s' % (publicVersion))
 	Config.read(dsappSettings)
-	dlPath = Config.get('URL', 'dsapp.download.address')
+	dlPath = Config.get('dsapp URL', 'download.address')
+	fileName = Config.get('dsapp URL', 'download.filename')
 
 	# Download new version & extract
-	dlfile('%s%s' % (dlPath, dsapp_tar))
+	dlfile('%s%s' % (dlPath, fileName))
 	print ()
-	tar = tarfile.open(dsapp_tar, 'r:gz')
+	tar = tarfile.open(fileName, 'r:gz')
 	rpmFile = re.search('.*.rpm' ,'%s' % (tar.getnames()[0])).group(0)
 	tar.close()
-	uncompressIt(dsapp_tar)
+	uncompressIt(fileName)
 	check_rpm = checkRPM(rpmFile)
 	if check_rpm:
 		setupRPM(rpmFile)
@@ -500,17 +510,19 @@ def updateDsapp(publicVersion):
 	except OSError:
 		logger.warning('No such file: %s' % (rpmFile))
 	try:
-		os.remove(dsapp_tar)
+		os.remove(fileName)
 	except OSError:
-		logger.warning('No such file: %s' % (dsapp_tar))
+		logger.warning('No such file: %s' % (fileName))
 	# TODO: Close script, and relaunch
 
 def autoUpdateDsapp(skip=False):
 	# Assign variables based on settings.cfg
 	Config.read(dsappSettings)
 	autoUpdate = Config.getboolean('Settings', 'auto.update')
-	serviceCheck = Config.get('URL', 'dsapp.check.service')
-	dlPath = Config.get('URL', 'dsapp.download.address')
+	serviceCheck = Config.get('dsapp URL', 'check.service.address')
+	serviceCheckPort = Config.getint('dsapp URL', 'check.service.port')
+	dlPath = Config.get('dsapp URL', 'download.address')
+	dsapp_version_file = Config.get('dsapp URL', 'version.download.filename')
 
 	# Variable declared above autoUpdate=true
 	if skip:
@@ -518,13 +530,13 @@ def autoUpdateDsapp(skip=False):
 
 	if autoUpdate:
 		# Check FTP connectivity
-		if DoesServiceExist(serviceCheck, 21):
+		if DoesServiceExist(serviceCheck, serviceCheckPort):
 			# Fetch online dsapp and store to memory, check version
 			spinner = set_spinner()
 			logger.info('Checking for a newer version of dsapp')
 			print ('Checking for a newer version of dsapp... ', end='')
 			spinner.start(); time.sleep(.000001)
-			for line in urllib2.urlopen('%sdsapp-version.info' % dlPath):
+			for line in urllib2.urlopen('%s%s' % (dlPath, dsapp_version_file)):
 				publicVersion = line.split("'")[1]
 			spinner.stop(); print ()
 			clear()
@@ -806,7 +818,7 @@ def removeRPM(rpmName):
 #	End of RPM definitions
 ##################################################################################################
 
-def protect(msg, encode, path, host = None, key = None):
+def protect(msg, encode, path, host = None, key = None, skip=False):
 # Code from GroupWise Mobility Service (GMS) datasync.util.
 # Modified for dsapp
 	result = None
@@ -826,11 +838,13 @@ def protect(msg, encode, path, host = None, key = None):
 	# Check for errors
 	if os.path.isfile(dsapptmp + '/decode_error_check') and os.stat(dsapptmp + '/decode_error_check').st_size != 0 and path is not None:
 		logger.error('bad decrypt - error decoding %s' % (path))
-		os.remove(dsapptmp + '/decode_error_check')
 
-		print ('\ndsapp has encountered an error. See log for more details')
-		eContinue()
-		sys.exit(1)
+		if not skip:
+			os.remove(dsapptmp + '/decode_error_check')
+			print (ERROR_MSG)
+			sys.exit(1)
+		else:
+			return None
 	elif result:
 		return result
 def encryptMSG(msg):
@@ -850,7 +864,12 @@ def getEncrypted(msg, tree, pro_path, host = None):
 	elif int(protected) == 0:
 		return msg
 
-def getDecrypted(check_path, tree, pro_path, host = None):
+def getDecrypted(check_path, tree, pro_path, host=None, force=False):
+	valueEmpty = xmlpath(check_path, tree)
+	if valueEmpty is None:
+		logger.debug("No value at %s" % check_path)
+		return None
+		
 	try:
 		protected = xmlpath(pro_path, tree)
 	except:
@@ -859,7 +878,7 @@ def getDecrypted(check_path, tree, pro_path, host = None):
 	if protected is None:
 		return xmlpath(check_path, tree)
 	elif int(protected) == 1:
-		return protect(xmlpath(check_path, tree), 0, check_path, host)
+		return protect(xmlpath(check_path, tree), 0, check_path, host, skip=force)
 	elif int(protected) == 0:
 		return xmlpath(check_path,tree)
 
@@ -993,7 +1012,7 @@ def checkPostgresql(dbConfig):
 		logger.info('Successfully connected to postgresql [user=%s,pass=%s]' % (dbConfig['user'],"*" * len(dbConfig['pass'])))
 		conn.close()
 	except:
-		print ('\ndsapp has encountered an error. See log for more details')
+		print (ERROR_MSG)
 		logger.error('Unable to connect to postgresql [user=%s,pass=%s]' % (dbConfig['user'],"*" * len(dbConfig['pass'])))
 		return False
 	return True
@@ -1300,29 +1319,39 @@ def rcDS(status, op = None):
 	setVariables()
 	spinner = set_spinner()
 
+	# Get list of datasync scripts in /etc/init.d/
+	datasync_scripts = []
+	for file in os.listdir(initScripts):
+		if INIT_NAME in file:
+			datasync_scripts.append(file)
+
 	if status == "start" and op == None:
 		print('Starting Mobility.. ', end='')
 		spinner.start(); time.sleep(.000001)
-		d = subprocess.Popen(['%s' % rcScript, 'start'], stdout=subprocess.PIPE)
-		d.wait()
-		c = subprocess.Popen(['rccron', 'start'], stdout=subprocess.PIPE)
-		c.wait()
+		for agent in datasync_scripts:
+			cmd = '%s%s start' % (initScripts, agent)
+			out = util_subprocess(cmd)
+		cmd = 'rccron start'
+		out = util_subprocess(cmd)
 		spinner.stop(); print()
 
 	elif status == "start" and op == "nocron":
 		print('Starting Mobility.. ', end='')
 		spinner.start(); time.sleep(.000001)
-		d = subprocess.Popen(['%s' % rcScript, 'start'], stdout=subprocess.PIPE)
-		d.wait()
+		for agent in datasync_scripts:
+			cmd = '%s%s start' % (initScripts, agent)
+			out = util_subprocess(cmd)
 		spinner.stop(); print()
 
 	elif status == "stop" and op == None:
+		pids = get_pid(python_Directory)
 		print('Stopping Mobility.. ', end='')
 		spinner.start(); time.sleep(.000001)
-		d = subprocess.Popen(['%s' % rcScript, 'stop'], stdout=subprocess.PIPE)
-		d.wait()
-		c = subprocess.Popen(['rccron', 'stop'], stdout=subprocess.PIPE)
-		c.wait()
+		for agent in datasync_scripts:
+			cmd = '%s%s stop' % (initScripts, agent)
+			out = util_subprocess(cmd)
+		cmd = 'rccron stop'
+		out = util_subprocess(cmd)
 		pids = get_pid(python_Directory)
 		cpids = get_pid('cron')
 		for pid in pids:
@@ -1334,8 +1363,9 @@ def rcDS(status, op = None):
 	elif status == "stop" and op == "nocron":
 		print('Stopping Mobility.. ', end='')
 		spinner.start(); time.sleep(.000001)
-		d = subprocess.Popen(['%s' % rcScript, 'stop'], stdout=subprocess.PIPE)
-		d.wait()
+		for agent in datasync_scripts:
+			cmd = '%s%s stop' % (initScripts, agent)
+			out = util_subprocess(cmd)
 		pids = get_pid(python_Directory)
 		for pid in pids:
 			kill_pid(int(pid), 9)
@@ -1344,20 +1374,23 @@ def rcDS(status, op = None):
 	elif status == "restart" and op == None:
 		print('Restarting Mobility.. ', end='')
 		spinner.start(); time.sleep(.000001)
-		d = subprocess.Popen(['%s' % rcScript, 'stop'], stdout=subprocess.PIPE)
-		d.wait()
-		c = subprocess.Popen(['rccron', 'stop'], stdout=subprocess.PIPE)
-		c.wait()
+		for agent in datasync_scripts:
+			cmd = '%s%s stop' % (initScripts, agent)
+			out = util_subprocess(cmd)
+		cmd = 'rccron stop'
+		out = util_subprocess(cmd)
+
 		pids = get_pid(python_Directory)
 		cpids = get_pid('cron')
 		for pid in pids:
 			kill_pid(int(pid), 9)
 		for pid in cpids:
 			kill_pid(int(cpid))
-		d = subprocess.Popen(['%s' % rcScript, 'start'], stdout=subprocess.PIPE)
-		d.wait()
-		c = subprocess.Popen(['rccron', 'start'], stdout=subprocess.PIPE)
-		c.wait()
+
+		for agent in datasync_scripts:
+			cmd = '%s%s start' % (initScripts, agent)
+			out = util_subprocess(cmd)
+		cmd = 'rccron start'
 		spinner.stop(); print()
 
 def verifyUserMobilityDB(dbConfig, userConfig):
@@ -1375,7 +1408,7 @@ def verifyUserMobilityDB(dbConfig, userConfig):
 			logger.debug("Found '%s' in mobility database" % row['userid'])
 			userConfig['mName'] = row['userid']
 			return True
-	logger.warning('User %s not found in mobility database' % userConfig['name'])
+	logger.warning("'%s' not found in mobility database" % userConfig['name'])
 	userConfig['mName'] = None
 	return False
 
@@ -1385,7 +1418,7 @@ def verifyUserDataSyncDB(dbConfig, userConfig):
 	name = {'user': userConfig['name']}
 	conn = getConn(dbConfig, 'datasync')
 	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
-	cur.execute("select distinct dn from targets where (\"dn\" ~* '(%(user)s[.|,].*)$' OR dn ilike '%(user)s' OR \"targetName\" ilike '%(user)s') AND disabled='0'" % name)
+	cur.execute("select distinct dn,\"targetType\" from targets where (\"dn\" ~* '(%(user)s[.|,].*)$' OR dn ilike '%(user)s' OR \"targetName\" ilike '%(user)s') AND disabled='0'" % name)
 	validUser = cur.fetchall()
 	cur.close()
 	conn.close()
@@ -1393,9 +1426,11 @@ def verifyUserDataSyncDB(dbConfig, userConfig):
 		if row['dn'] != "":
 			logger.debug("Found '%s' in datasync database" % row['dn'])
 			userConfig['dName'] = row['dn']
+			userConfig['type'] = row['targetType']
 			return True
-	logger.warning('User %s not found in datasync database' % userConfig['name'])
+	logger.warning("'%s' not found in datasync database "% userConfig['name'])
 	userConfig['dName'] = None
+	userConfig['type'] = None
 	return False
 
 def get_username(userConfig):
@@ -1407,7 +1442,7 @@ def get_username(userConfig):
 	datasyncBanner(dsappversion)
 	print ("Enter 'q' to cancel")
 	while username == "":
-		username = raw_input("UserID: ")
+		username = raw_input("User/Group ID: ")
 		if username == 'q' or username == 'Q':
 			userConfig['name'] = None
 			return False
@@ -1440,19 +1475,13 @@ def verifyUser(dbConfig):
 
 	if verifyUserDataSyncDB(dbConfig, userConfig):
 		verifyCount += 2
+	if userConfig['type'] != 'group':
+		if verifyUserMobilityDB(dbConfig, userConfig):
+			verifyCount += 1
+	else:
+		logger.debug("Skipping verifyUserMobilityDB. Type='%s'" % userConfig['type'])
 
-	if verifyUserMobilityDB(dbConfig, userConfig):
-		verifyCount += 1
-
-	if verifyCount == 0:
-		userConfig['verify'] = 0
-	elif verifyCount == 1:
-		userConfig['verify'] = 1
-	elif verifyCount == 2:
-		userConfig['verify'] = 2
-	elif verifyCount == 3:
-		userConfig['verify'] = 3
-
+	userConfig['verify'] = verifyCount
 	userConfig = getApplicationNames(userConfig, dbConfig)
 
 	return userConfig
@@ -1556,8 +1585,12 @@ def mCleanup(dbConfig, userConfig):
 	cur.execute("select guid from users where userid ~* '(%(name)s[.|,].*)$' OR name ilike '%(name)s' OR userid ilike '%(name)s'" % userConfig)
 	data = cur.fetchall()
 	for row in data:
+		logger.debug("Found user guid: %s" % row['guid'])
 		uGuid = row['guid']
 
+	if uGuid == '':
+		logger.debug("%s not found in user guid" % userConfig['name'])
+		uGuid = userConfig['name']
 	logger.debug("uGuid assigned '%s'" % uGuid)
 
 	print ("Removing %s attachment maps from mobility.." % userConfig['name'])
@@ -1644,19 +1677,32 @@ def dCleanup(dbConfig, userConfig):
 	# Get user dn from targets table;
 	cur.execute("select distinct dn from targets where (\"dn\" ~* '(%(name)s[.|,].*)$' OR dn ilike '%(name)s' OR \"targetName\" ilike '%(name)s') AND disabled='0'" % userConfig)
 	data = cur.fetchall()
-	for row in uUser:
+	for row in data:
+		logger.debug("Found dn user: %s" % row['dn'])
 		uUser = row['dn']
 
 	# Get targetName from each connector
-	cur.execute("select \"targetName\" from targets where (dn ~* '(%(name)s[.|,].*)$' OR dn ilike '%(name)s' OR \"targetName\" ilike '%(name)s') AND \"connectorID\"='default.pipeline1.groupwise'" % userConfig)
+	cur.execute("select \"targetName\" from targets where (dn ~* '(%(name)s[.|,].*)$' OR dn ilike '%(name)s' OR \"targetName\" ilike '%(name)s') AND \"connectorID\"='default.pipeline1.groupwise' AND disabled='0'" % userConfig)
 	data = cur.fetchall()
 	for row in data:
+		logger.debug("Found gw appname: %s" % row['targetName'])
 		psqlAppNameG = row['targetName']
 
-	cur.execute("select \"targetName\" from targets where (dn ~* '(%(name)s[.|,].*)$' OR dn ilike '%(name)s' OR \"targetName\" ilike '%(name)s') AND \"connectorID\"='default.pipeline1.mobility'" % userConfig)
+	cur.execute("select \"targetName\" from targets where (dn ~* '(%(name)s[.|,].*)$' OR dn ilike '%(name)s' OR \"targetName\" ilike '%(name)s') AND \"connectorID\"='default.pipeline1.mobility' AND disabled='0'" % userConfig)
 	data = cur.fetchall()
 	for row in data:
+		logger.debug("Found mob appname: %s" % row['targetName'])
 		psqlAppNameM = row['targetName']
+
+	if uUser == '':
+		logger.debug("%s not found in targets" % userConfig['name'])
+		uUser = userConfig['name']
+	if psqlAppNameG == '':
+		logger.debug("%s not found in gw appname" % userConfig['name'])
+		psqlAppNameG = userConfig['name']
+	if psqlAppNameM == '':
+		logger.debug("%s not found in mob appname" % userConfig['name'])
+		psqlAppNameM = userConfig['name']
 
 	logger.debug("uUser assigned '%s'" % uUser)
 	logger.debug("psqlAppNameG assigned '%s'" % psqlAppNameG)
@@ -1746,59 +1792,67 @@ def addGroup(dbConfig, ldapConfig):
 	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
 
 	datasyncBanner(dsappversion)
-	ldapGroups = None
-	ldapGroupMembership = {}
+	ldapGroupMembership = dict()
+	member_and_group = []
 
 	logger.info("Obtaining all groups from Mobility")
 	cur.execute("select distinct dn from targets where \"targetType\"='group' AND dn ilike 'cn=%%'")
 	ldapGroups = cur.fetchall()
 
+	group_and_users = dict()
 	print ("\nMobility Group(s):")
 	for row in ldapGroups:
 		print (row['dn'])
 
 	print ("\nGroup Membership:")
 	for group in ldapGroups:
-		secure = "ldap"
-		if ldapConfig['port'] == "636":
-			secure = "ldaps"
-		cmd = "/usr/bin/ldapsearch -x -H %s://%s -D %s -w %s -b '%s' -s base | perl -p00e 's/\r?\n //g' | grep member: | cut -d \":\" -f 2 | sed 's/^[ \t]*//' | sed 's/^/\"/' | sed 's/$/\",\"%s\"/'" % (secure, ldapConfig['host'], ldapConfig['login'], ldapConfig['pass'], group['dn'], group['dn'])
-		ldap = os.popen(cmd).read().strip()
-		print(ldap)
-		ldapGroupMembership[group['dn']] = ldap
+		if ldapConfig['secure'] == 'false':
+			cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D %s -w %s -b '%s' -s base | grep 'member:' | cut -f2 -d ' '" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], group['dn'])
+		elif ldapConfig['secure'] == 'true':
+			cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D %s -w %s -b '%s' -s base | grep 'member:' | cut -f2 -d ' '" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], group['dn'])
 
-	print ()
-	if askYesOrNo("Does the above appear correct"):
-		copy_cmd = "copy \"membershipCache\"(memberdn,groupdn) from STDIN WITH DELIMITER ',' CSV HEADER"
+		ldapGroupMembership[group['dn']] = os.popen(cmd).read().strip().split('\n')
+
+	# build memberdn,groupdn list
+	for group in ldapGroupMembership:
+		for member in ldapGroupMembership[group]:
+			member_and_group.append('"%s","%s"' % (member.strip(), group.strip()))
+
+	# print memberdn, groupdn list & create list to import
+	with open(dsapptmp + '/ldapGroupMembership.dsapp' , 'a') as f:
+		f.write("memberdn,groupdn\n")
+		for i in xrange(len(member_and_group)):
+			print (member_and_group[i])
+			f.write(member_and_group[i] + '\n')
+
+	if askYesOrNo("\nDoes the above appear correct"):
+		copy_cmd = "copy \"membershipCache\" (memberdn,groupdn) from STDIN WITH DELIMITER ',' CSV HEADER"
 		cur.execute("delete from \"membershipCache\"")
 		logger.info('Removing old memberhipCache data')
-		with open(dsapptmp + '/ldapGroupMembership.dsapp' , 'a') as f:
-			f.write("memberdn,groupdn\n")
-			for group in ldapGroups:
-				f.write(ldapGroupMembership[group['dn']] + '\n')
 
 		with open(dsapptmp + '/ldapGroupMembership.dsapp' ,'r') as f:
 			logger.info("Updating membershipCache with current data")
 			cur.copy_expert(sql=copy_cmd, file=f)
 			
-		os.remove (dsapptmp + '/ldapGroupMembership.dsapp')
 		print ("\nGroup Membership has been updated\n")
 		logger.info("Group membership has been updated")
 
 		removed_disabled(dbConfig)
 		print ()
 		fix_referenceCount(dbConfig)
-		
+
+	os.remove (dsapptmp + '/ldapGroupMembership.dsapp')
 	cur.close()
 	conn.close()
 
 def updateMobilityFTP():
 	datasyncBanner(dsappversion)
 	Config.read(dsappSettings)
-	dlPath = Config.get('URL', 'update.download.address')
-	serviceCheck = Config.get('URL', 'update.check.service')
+	dlPath = Config.get('Update URL', 'download.address')
+	serviceCheck = Config.get('Update URL', 'check.service.address')
+	serviceCheckPort = Config.getint('Update URL', 'check.service.port')
 
-	if DoesServiceExist(serviceCheck, 21):
+	if DoesServiceExist(serviceCheck, serviceCheckPort):
 		print ("Mobility will restart during the upgrade")
 		if askYesOrNo("Continue with update"):
 			# Check URL connectivity
@@ -2173,15 +2227,31 @@ def changeAppName(dbConfig):
 
 def reinitAllUsers(dbConfig):
 	datasyncBanner(dsappversion)
-	print (textwrap.fill("Note: During the re-initialize, users will not be able to log in. This may take some time.", 80))
-	if askYesOrNo("Are you sure you want to re-initialize all the users"):
+	print (textwrap.fill("Note: During the reinitialize, users will not be able to log in. This may take some time.", 80))
+	if askYesOrNo("Are you sure you want to reinitialize all the users"):
 		conn = getConn(dbConfig, 'mobility')
-		cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+		cur = conn.cursor()
+		logger.info("Setting all users to reinitialize")
 		cur.execute("update users set state = '7'")
 
 		cur.close()
 		conn.close()
-		print ("\nAll users have been set to re-initialize")
+		print ("\nAll users have been set to reinitialize")
+		logger.info("All users have been set to reinitialize")
+
+def reinitAllFailedUsers(dbConfig):
+	datasyncBanner(dsappversion)
+	if askYesOrNo("Reinitialize all failed users"):
+		conn = getConn(dbConfig, 'mobility')
+		cur = conn.cursor()
+		logger.info("Setting all failed users to reinitialize")
+		cur.execute("update users set state = '7' where state='5'")
+
+		cur.close()
+		conn.close()
+		print ("\nAll failed users have been set to reinitialize")
+		logger.info("All failed users have been set to reinitialize")
+
 
 
 ##################################################################################################
@@ -2561,7 +2631,7 @@ def updateFDN(dbConfig, XMLconfig, ldapConfig):
 	datasyncBanner(dsappversion)
 	if checkLDAP(XMLconfig, ldapConfig):
 		userConfig = verifyUser(dbConfig)
-		if userConfig['verify'] != 0:
+		if userConfig['verify'] != 0 and userConfig['verify'] is not None:
 			if userLdapOrGw(userConfig, 'ldap'):
 				multiple = False
 				print ("Searching LDAP...")
@@ -2657,19 +2727,20 @@ def updateFDN(dbConfig, XMLconfig, ldapConfig):
 				print ("Unable to get FDN. User '%s' is not LDAP provisioned" % userConfig['name'])
 				logger.warning("Unable to get FDN. User '%s' is not LDAP provisioned" % userConfig['name'])
 		else:
-			print ("No such user '%s'" % userConfig['name'])
-			logger.warning("User '%s' not found in databases" % userConfig['name'])
+			if userConfig['verify'] is not None:
+				print ("No such user '%s'" % userConfig['name'])
+				logger.warning("User '%s' not found in databases" % userConfig['name'])
 
 def getApplicationNames(userConfig, dbConfig):
 	conn = getConn(dbConfig, 'datasync')
 	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
 
-	cur.execute("select \"targetName\" from targets where dn='%s' and \"connectorID\"='default.pipeline1.mobility'" % userConfig['dName'])
+	cur.execute("select \"targetName\" from targets where (dn='%s' or dn ilike '%s.%%' or dn ilike 'cn=%s,%%') and \"connectorID\"='default.pipeline1.mobility' and disabled='0'" % (userConfig['dName'], userConfig['name'], userConfig['name']))
 	data = cur.fetchall()
 	for row in data:
 		userConfig['mAppName'] = row['targetName']
 
-	cur.execute("select \"targetName\" from targets where dn='%s' and \"connectorID\"='default.pipeline1.groupwise'" % userConfig['dName'])
+	cur.execute("select \"targetName\" from targets where (dn='%s' or dn ilike '%s.%%' or dn ilike 'cn=%s,%%') and \"connectorID\"='default.pipeline1.groupwise' and disabled='0'" % (userConfig['dName'], userConfig['name'], userConfig['name']))
 	data = cur.fetchall()
 	for row in data:
 		userConfig['gAppName'] = row['targetName']
@@ -2815,10 +2886,11 @@ def printFTFPatchList(patch_list):
 def prepareFTF(patch_file):
 	datasyncBanner(dsappversion)
 	Config.read(dsappSettings)
-	serviceCheck = Config.get('URL', 'ftf.check.service')
-	dlPath = Config.get('URL', 'ftf.download.address')
+	serviceCheck = Config.get('FTF URL', 'check.service.address')
+	serviceCheckPort = Config.getint('FTF URL', 'check.service.port')
+	dlPath = Config.get('FTF URL', 'download.address')
 
-	if DoesServiceExist(serviceCheck, 21):
+	if DoesServiceExist(serviceCheck, serviceCheckPort):
 		if dlfile('%s%s' % (dlPath, patch_file['file']), dsapptmp):
 			os.chdir(dsapptmp)
 			fileList = file_content(patch_file['file'])
@@ -3127,11 +3199,12 @@ def getLogs(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedCo
 		os.remove(dsappupload + '/sync-status.txt')
 
 		Config.read(dsappSettings)
-		serviceCheck = Config.get('URL', 'upload.check.service')
-		upPath = Config.get('URL', 'upload.address')
+		serviceCheck = Config.get('Upload URL', 'check.service.address')
+		serviceCheckPort = Config.getint('Upload URL', 'check.service.port')
+		upPath = Config.get('Upload URL', 'address')
 		# FTP Send
 		if askYesOrNo("Upload logs to %s" % COMPANY_BU):
-			if DoesServiceExist(serviceCheck, 21):
+			if DoesServiceExist(serviceCheck, serviceCheckPort):
 				print ("Connecting to ftp..")
 				cmd = "curl -T %s/%s_%s.tgz %s" % (dsappupload ,sr_number, DATE, upPath)
 				out = util_subprocess(cmd,True)
@@ -3444,6 +3517,140 @@ def getUsers_and_Devices(dbConfig, showUsers=False, showDevices=False, showBoth=
 		returns['cmd'] = cmd
 
 	return returns
+
+def getUserPAB(dbConfig):
+	userConfig = verifyUser(dbConfig)
+	conn = getConn(dbConfig, 'mobility')
+	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+	logger.info("Getting PABs for '%s'.." % userConfig['name'])
+	cur.execute("select di.edata from deviceimages di INNER JOIN users u ON di.userid = u.guid WHERE u.userid ilike 'cn=%(name)s,%%' OR u.userid ilike '%(name)s.%%'" % userConfig)
+	data = cur.fetchall()
+	cur.close()
+	conn.close()
+
+	objectType = userConfig['type']
+	with open(dsapptmp + '/userPab.txt', 'w') as pabFile:
+		pabFile.write("%s '%s' PAB contacts\n" % (objectType.capitalize(), userConfig['name']))
+		pabFile.write("\nAddress Book | Name | Email | Home Phone | Mobile Phone | Office Phone\n")
+		pabFile.write("------------------------------\n")
+		for row in data:
+			addressBook = ''
+			firstname = ''
+			lastname = ''
+			middlename = ''
+			emailAddress = ''
+			mobileNumber = ''
+			homeNumber = ''
+			officeNumber = ''
+
+			if 'ApplicationData' in row['edata'] and 'Contacts:' in row['edata']:
+				try:
+					firstname = row['edata'].split('A1:FirstName>')[1].split('</')[0]
+				except:
+					pass
+
+				try:
+					lastname = row['edata'].split('A1:LastName>')[1].split('</')[0]
+				except:
+					pass
+
+				try:	
+					middlename= row['edata'].split('A1:MiddleName>')[1].split('</')[0]
+				except:
+					pass
+
+				try:
+					emailAddress = row['edata'].split('A1:Email1Address>')[1].split('</')[0]
+				except:
+					pass
+
+				try:
+					mobileNumber = row['edata'].split('A1:MobileTelephoneNumber>')[1].split('</')[0]
+				except:
+					pass
+
+				try:
+					officeNumber = row['edata'].split('A1:BusinessTelephoneNumber>')[1].split('</')[0]
+				except:
+					pass
+
+				try:
+					homeNumber = row['edata'].split('A1:HomeTelephoneNumber>')[1].split('</')[0]
+				except:
+					pass
+
+				try:
+					addressBook = row['edata'].split('A1:Category>')[1].split('</')[0]
+				except:
+					pass
+
+				pabFile.write("%s | %s %s %s | %s | %s | %s | %s\n" % (addressBook, firstname, middlename, lastname, emailAddress, homeNumber, mobileNumber, officeNumber))
+	
+	with open(dsapptmp + '/userPab.txt', 'r') as pabFile:
+		pydoc.pager(pabFile.read())
+
+def clearTextEncryption(config_files, XMLconfig, ldapConfig, authConfig):
+	datasyncBanner(dsappversion)
+	print ("This will remove all protected lines, and set passwords / key to clear text")
+	if not askYesOrNo("Remove encryption from XMLs"):
+		return
+
+	# Backup XML files
+	backup_config_files(config_files, 'clear_text_xmls')
+
+	print()
+	if ldapConfig['enabled'] == 'true':
+		ldapPass = getpass.getpass("LDAP password: ")
+	else:
+		ldapPass = 'default'
+	if authConfig['smtpPassword'] is not None:
+		smtpPass = getpass.getpass("SMTP Notification password: ")
+	else:
+		smtpPass = None
+
+	dbPass = getpass.getpass("PSQL datasync_user password: ")
+	trustedPass = autoCompleteInput("Trusted Application file or key: ")
+	if os.path.isfile(trustedPass):
+		with open(trustedPass, 'r') as trustFile:
+			trustKey = trustFile.read().strip()
+	else:
+		trustKey = trustedPass.strip()
+
+	print ("\nRemoving <protected> lines..")
+	logger.info(("Removing <protected> lines.."))
+	removeLine(config_files['ceconf'], "<protected>")
+	removeLine(config_files['econf'], "<protected>")
+	removeLine(config_files['mconf'], "<protected>")
+	removeLine(config_files['gconf'], "<protected>")
+
+	# Rebuilds XML trees
+	logger.info('Rebuilding XML trees started')
+	time1 = time.time()
+	logger.debug('Rebuilding %s tree from: %s' % ('mconfXML', config_files['mconf']))
+	XMLconfig['mconf'] = getXMLTree(config_files['mconf'])
+	logger.debug('Rebuilding %s tree from: %s' % ('econfXML', config_files['econf']))
+	XMLconfig['econf'] = getXMLTree(config_files['econf'])
+	logger.debug('Rebuilding %s tree from: %s' % ('ceconfXML', config_files['ceconf']))
+	XMLconfig['ceconf'] = getXMLTree(config_files['ceconf'])
+	logger.debug('Rebuilding %s tree from: %s' % ('gconfXML', config_files['gconf']))
+	XMLconfig['gconf'] = getXMLTree(config_files['gconf'])
+	time2 = time.time()
+	logger.info('Rebuilding XML trees complete')
+	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
+	# Set all clear text passwords / key in XMLs
+	print ("Updating XMLs with inputs..")
+	logger.info("Updating XMLs with inputs..")
+
+	setXML ('.//configengine/ldap/login/password', XMLconfig['ceconf'], ldapPass, config_files['ceconf'])
+	if smtpPass is not None:
+		setXML ('.//configengine/notification/smtpPassword', XMLconfig['ceconf'], smtpPass, config_files['ceconf'])
+	setXML('.//settings/custom/trustedAppKey', XMLconfig['gconf'], trustKey, config_files['gconf'])
+	setXML('.//configengine/database/password', XMLconfig['ceconf'], dbPass, config_files['ceconf'])
+	setXML('.//settings/database/password', XMLconfig['econf'], dbPass, config_files['econf'])
+	setXML('.//settings/custom/dbpass', XMLconfig['mconf'], dbPass, config_files['mconf'])
+
+	print ("\nRun %s/update.sh to re-encrypt XMLs" % dirOptMobility)
 
 
 # TODO : Finish this - Is it needed???

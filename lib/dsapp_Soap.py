@@ -98,7 +98,7 @@ def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False
 		logger.error('Missing value for http(s)')
 		return
 
-	logger.info("Starting GroupWise SOAP check on %s at %s://%s:%s/soap" % (userid,gwConfig['sSecure'], gwConfig['gListenAddress'], gwConfig['sPort']))
+	logger.info("Starting GroupWise SOAP check on '%s' at %s://%s:%s/soap" % (userid,gwConfig['sSecure'], gwConfig['gListenAddress'], gwConfig['sPort']))
 	soap = loginRequest % (userid, trustedConfig['name'], trustedConfig['key'])
 	soapClient = suds.client.Client(WSDL, location='%(sSecure)s://%(gListenAddress)s:%(sPort)s/soap' % gwConfig)
 	soapAddr = '%(sSecure)s://%(gListenAddress)s:%(sPort)s/soap' % gwConfig
@@ -131,12 +131,12 @@ def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False
 				return
 
 	# Create new userConfig dictionary if status code is 0
-	logger.info("Done checking %s on GroupWise SOAP" % userid)
+	logger.info("Done checking '%s' on GroupWise SOAP" % userid)
 	if results['status']['code'] == 0:
 		soap_userConfig = {'session': results['session'], 'name': results[1]['name'], 'email': results[1]['email'], 'userid': results[1]['userid'], 'domain': results[1]['domain'], 'postoffice': results[1]['postOffice'], 'fid': results[1]['fid'], 'gwVersion': results['gwVersion'], 'build': results['build'], 'soapAddr': soapAddr}
 	elif results['status']['description'] is not None:
-		print "Problem with %s\n%s" % (userid, results['status']['description'])
-		logger.warning("Problem with %s - %s" % (userid, results['status']['description']))
+		print "Problem with '%s'\n%s" % (userid, results['status']['description'])
+		logger.warning("Problem with '%s' - %s" % (userid, results['status']['description']))
 		return
 	else:
 		print "Unable to return results for %s" % userid
@@ -198,6 +198,7 @@ def soap_printUser(trustedConfig, gwConfig, userConfig):
 
 	results = """Host: %(soapAddr)s
 Domain: %(domain)s
+Post Office: %(postoffice)s
 POA version: %(gwVersion)s-%(build)s 
 
 User Name: %(name)s 
