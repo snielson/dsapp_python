@@ -1,13 +1,19 @@
-# dsapp_python
+### dsapp (python)
 dsapp - rewritten in python
+
+See original at:
 https://github.com/tdharris/dsapp
 
-Rewritten in Python by Shane Nielson <snielson@novell.com>, <snielson@projectuminfinitas.com>, <shaneanielson@gmail.com>
-dsapp_python will one day replace dsapp.
+Created by Shane Nielson <snielson@projectuminfinitas.com>
 
-Many improvments made to dsapp in python, such as:
-Logging
-Error / exception handling
-Threading
-Outputs
-Overall performance
+##### Notes
+dsapp 227 is the last build of the bash version. Progress will continue under this repo for python.
+
+##### Changes
+* Added Logging
+* Error / exception handling
+* Multi-Threading
+* Cleaner outputs
+* Better Performance
+* Configuration files
+* New functions
