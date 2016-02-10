@@ -6,8 +6,7 @@
 *.exe
 *.o
 *.so
-*.pyc
-!filestoreIdToPath.pyc
+*.changelog
 
 # Sublime #
 ###################
