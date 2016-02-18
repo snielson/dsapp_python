@@ -1409,8 +1409,9 @@ def ghc_verifyServerDate():
 	# Append all ntp servers to list
 	cmd = "ntpq -nc peers | tail -n +3 | cut -c 2-17"
 	out = ghc_util_subprocess(cmd)
-	for server in out[0].split():
-		ntpServerList.append(server.strip())
+	if not out[1]:
+		for server in out[0].split():
+			ntpServerList.append(server.strip())
 
 	# Get NTP daytime from ntpServer
 	with open(ghcLog, 'a') as log:
