@@ -9,7 +9,7 @@
 #
 ##################################################################################################
 
-dsappversion='229'
+dsappversion='230'
 
 ##################################################################################################
 #	Imports
@@ -108,17 +108,17 @@ if not os.path.isfile(dsappSettings):
 		Config.add_section('dsapp URL')
 		Config.set('FTF URL', 'check.service.address', 'ftp.novell.com')
 		Config.set('Update URL', 'check.service.address', 'ftp.novell.com')
-		Config.set('dsapp URL', 'check.service.address', 'ftp.novell.com')
+		Config.set('dsapp URL', 'check.service.address', 'www.github.com')
 		Config.set('Upload URL', 'check.service.address', 'ftp.novell.com')
 		Config.set('FTF URL', 'check.service.port', 21)
 		Config.set('Update URL', 'check.service.port', 21)
-		Config.set('dsapp URL', 'check.service.port', 21)
+		Config.set('dsapp URL', 'check.service.port', 443)
 		Config.set('Upload URL', 'check.service.port', 21)
 		Config.set('FTF URL', 'download.address', 'ftp://ftp.novell.com/outgoing/')
 		Config.set('Update URL', 'download.address', 'ftp://ftp.novell.com/outgoing/')
-		Config.set('dsapp URL', 'download.address', 'ftp://ftp.novell.com/outgoing/')
+		Config.set('dsapp URL', 'download.address', 'https://github.com/snielson/dsapp_python/releases/download/latest/')
 		Config.set('Upload URL', 'address', 'ftp://ftp.novell.com/incoming/')
-		Config.set('dsapp URL', 'download.filename', 'dsapp.tgz')
+		Config.set('dsapp URL', 'download.filename', 'dsapp.zip')
 		Config.set('dsapp URL', 'version.download.filename', 'dsapp-version.info')
 		Config.set('Misc', 'dsapp.version', dsappversion)
 		Config.set('Misc', 'hostname', dsHostname)
@@ -311,12 +311,11 @@ dsHostname = Config.get('Misc', 'hostname')
 mobilityVersion = ds.getVersion(ds.checkInstall(forceMode, installedConnector), version)
 
 # Only call autoUpdateDsapp() if filename is dsapp.pyc
-if __file__ == 'dsapp.pyc':
+if os.path.basename(__file__) == 'dsapp.pyc':
 	ds.autoUpdateDsapp()
 
 # Get current working directory
 cPWD = os.getcwd()
-
 
 ##################################################################################################
 #	Initialization

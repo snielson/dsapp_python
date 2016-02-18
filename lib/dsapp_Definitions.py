@@ -487,9 +487,16 @@ def updateDsapp(publicVersion):
 	# Download new version & extract
 	dlfile('%s%s' % (dlPath, fileName))
 	print ()
-	tar = tarfile.open(fileName, 'r:gz')
-	rpmFile = re.search('.*.rpm' ,'%s' % (tar.getnames()[0])).group(0)
-	tar.close()
+	files = file_content(fileName)
+	rpmFile = None
+	for file in files:
+		if 'rpm' in file:
+			rpmFile = file
+	if rpmFile is None:
+		print ("Unable to find a valid RPM in: %s" % fileName)
+		logger.error("Unable to find a valid RPM in: %s" % fileName)
+		return
+
 	uncompressIt(fileName)
 	check_rpm = checkRPM(rpmFile)
 	if check_rpm:
@@ -501,10 +508,6 @@ def updateDsapp(publicVersion):
 		logger.warning('%s is older than installed version' % (rpmFile))
 
 	# Clean up files
-	try:
-		os.remove('dsapp.sh')
-	except OSError:
-		logger.warning('No such file: dsapp.sh')
 	try:
 		os.remove(rpmFile)
 	except OSError:
@@ -1568,7 +1571,7 @@ def file_mCleanup(filePath, fileCount):
 				except OSError:
 					f.write("Warning: file %s not found\n" % removeF)
 
-			f.write("------- Complete : %s files removed -------" % count)
+			f.write("------- Complete : %s files removed -------\n" % count)
 
 		os.remove(filePath)
 		os.remove(dsappConf + '/fileIDs.dsapp')
@@ -2179,15 +2182,9 @@ def changeAppName(dbConfig):
 	datasyncBanner(dsappversion)
 	userConfig = verifyUser(dbConfig)
 	if confirm_user(userConfig, 'datasync'):
-		conn = getConn(dbConfig, 'datasync')
-		cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
 
-		# Assign application names from database to default variables
-		cur.execute("select \"targetName\" from targets where dn ilike '%%%s%%' AND \"connectorID\"='default.pipeline1.mobility'" % userConfig['name'])
-		defaultMAppName = cur.fetchall()[0]['targetName']
-
-		cur.execute("select \"targetName\" from targets where dn ilike '%%%s%%' AND \"connectorID\"='default.pipeline1.groupwise'" % userConfig['name'])
-		defaultGAppName = cur.fetchall()[0]['targetName']
+		defaultMAppName = userConfig['mAppName']
+		defaultGAppName = userConfig['gAppName']
 
 		if defaultMAppName and defaultGAppName:
 
@@ -2211,19 +2208,24 @@ def changeAppName(dbConfig):
 			if askYesOrNo("Update %s application names" % userConfig['name']):
 				logger.info("Updating %s application names" % userConfig['name'])
 				
+				conn = getConn(dbConfig, 'datasync')
+				cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+
 				# pdates users application names with variable entries
 				cur.execute("UPDATE targets set \"targetName\"='%s' where dn ilike '%%%s%%' AND \"connectorID\"='default.pipeline1.mobility'" % (mAppName, userConfig['name']))
 				logger.info("Set mobility application name to: %s" % mAppName)
 				cur.execute("UPDATE targets set \"targetName\"='%s' where dn ilike '%%%s%%' AND \"connectorID\"='default.pipeline1.groupwise'" % (gAppName, userConfig['name']))
 				logger.info("Set groupwise application name to: %s" % gAppName)
 
+				cur.close()
+				conn.close()
+
 				print ("\nRestart mobility to pick up changes.")
 		else:
 			print ("Unable to find application names")
 			logger.warning("Unalbe to find all application names")
 
-		cur.close()
-		conn.close()
+		
 
 def reinitAllUsers(dbConfig):
 	datasyncBanner(dsappversion)
@@ -2568,10 +2570,14 @@ def verifyCertifiateMatch(key = None, keyPass = None, crt = None, path = None):
 #	End of Certificate
 ##################################################################################################
 
-def checkLDAP(XMLconfig ,ldapConfig):
+def checkLDAP(XMLconfig ,ldapConfig, ghc=False):
 	if not (ldapConfig['port'] or ldapConfig['login'] or ldapConfig['host'] or ldapConfig['pass']) or (ldapConfig['port'] == None or ldapConfig['login'] == None or ldapConfig['host'] == None or ldapConfig['pass'] == None):
-		print ("Unable to determine ldap variables")
+		if not ghc:
+			print ("Unable to determine ldap variables")
 		logger.warning("Unable to determine ldap variables")
+		for key in ldapConfig:
+			if ldapConfig[key] is None:
+				logger.warning("ldapConfig missing value in key: %s" % key)
 		return False
 
 	if ldapConfig['secure'] == 'false':

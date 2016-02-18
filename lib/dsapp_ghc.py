@@ -8,6 +8,7 @@ import subprocess
 import datetime
 import time
 import pydoc
+import urllib2
 import logging, logging.config
 import ntplib
 import psycopg2
@@ -41,6 +42,7 @@ silent = None
 mobile_serviceCheck = True
 web_serviceCheck = True
 serverDateCheck = True
+proxy_enabled = False
 
 # Mobility Directories
 dirOptMobility = "/opt/novell/datasync"
@@ -448,6 +450,48 @@ def ghc_util_checkWebPortConnectivity(webConfig):
 	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 	return result
 
+def ghc_util_checkTime(remoteTime, localTime):
+	difference = dict()
+	difference['day'] = localTime['day'] - remoteTime['day']
+	difference['month'] = localTime['month'] - remoteTime['month']
+	difference['year'] = localTime['year'] - remoteTime['year']
+
+	# day in future or past?
+	if difference['day'] == 0:
+		difference['day_result'] = True
+		difference['day_output'] = 'synced'
+	elif difference['day'] < 0:
+		difference['day_result'] = False
+		difference['day_output'] = 'past'
+	elif difference['day'] > 1:
+		difference['day_result'] = False
+		difference['day_output'] = 'future'
+
+	# month in future or past?
+	if difference['month'] == 0:
+		difference['month_result'] = True
+		difference['month_output'] = 'synced'
+	elif difference['month'] < 0:
+		difference['month_result'] = False
+		difference['month_output'] = 'past'
+	elif difference['month'] > 1:
+		difference['day_result'] = False
+		difference['day_output'] = 'future'
+
+	# year in future or past?
+	if difference['year'] == 0:
+		difference['year_result'] = True
+		difference['year_output'] = 'synced'
+	elif difference['year'] < 0:
+		difference['year_result'] = False
+		difference['year_output'] = 'past'
+	elif difference['year'] > 1:
+		difference['day_result'] = False
+		difference['day_output'] = 'future'
+
+	return difference
+
+
 def ghc_util_subprocess(cmd, error=False):
 	if not error:
 		p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
@@ -507,7 +551,7 @@ def ghc_checkLDAP(XMLconfig ,ldapConfig):
 	if ldapConfig['enabled'] != 'true':
 		problem = 'skipped'
 	elif ldapConfig['enabled'] == 'true':
-		if not ds.checkLDAP(XMLconfig ,ldapConfig):
+		if not ds.checkLDAP(XMLconfig ,ldapConfig, ghc=True):
 			problem = True
 
 	if problem == 'skipped':
@@ -559,6 +603,7 @@ def ghc_checkRPMs(system_rpms):
 def ghc_checkProxy():
 	ghc_util_NewHeader("Checking Proxy Configuration..")
 	problem = False
+	global proxy_enabled
 
 	if os.path.isfile(proxyConf):
 		with open(proxyConf, 'r') as proxyFile:
@@ -578,6 +623,7 @@ def ghc_checkProxy():
 		if noProxy is not None:
 			if 'PROXY_ENABLED="yes"' in proxy_settings:
 				log.write("Proxy enabled detected\n\n")
+				proxy_enabled = True
 			elif proxy_settings == '':
 				log.write("Proxy settings detected\nUnable to validate enabled\n")
 
@@ -593,6 +639,7 @@ def ghc_checkProxy():
 
 		elif 'PROXY_ENABLED="yes"' in proxy_settings and noProxy is None:
 			problem = 'warning-2'
+			proxy_enabled = True
 
 
 	if problem == 'warning-1':
@@ -1026,7 +1073,7 @@ def ghc_checkUserFDN(dbConfig, XMLconfig ,ldapConfig):
 	ghc_util_NewHeader("Checking users FDN..")
 	problem = False
 
-	if ds.checkLDAP(XMLconfig ,ldapConfig):
+	if ds.checkLDAP(XMLconfig ,ldapConfig, ghc=True):
 		conn = ds.getConn(dbConfig, 'datasync')
 		cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
 		cur.execute("select distinct dn from targets where disabled='0' and dn ilike 'cn=%%'")
@@ -1325,68 +1372,84 @@ def ghc_verifyCertificates(mobilityConfig, webConfig):
 
 def ghc_verifyServerDate():
 	ghc_util_NewHeader("Checking Sever Date..")
-	problem = False
+	problem = True
+	extra_pass = False
 	global serverDateCheck
-	data = []
+	global proxy_enabled
+	ntpServerList = []
+	ntpServer_results = dict()
 	c = ntplib.NTPClient()
 
 	Config.read(dsappSettings)
-	SERVER = Config.get('GHC', 'ntp.server')
-
-	# Get NTP daytime
-	try:
-		data = datetime.datetime.utcfromtimestamp(c.request(SERVER, timeout=1).tx_time).strftime('%y %m %d').split(' ')
-	except ntplib.NTPException:
-		problem = 'bad-ntp'
-		logger.error("No response from '%s'" % SERVER)
-	except socket.gaierror:
-		problem = 'bad-dns'
-		logger.error("Name or service not known '%s'" % SERVER)
-	except Exception, e:
-		problem = True
-		logger.error(e)
-
-	if len(data) == 3:
-		ntpDate = {'year': int(data[0]), 'month': int(data[1]), 'day': int(data[2])}
-	elif len(data) != 3 and not problem:
-		problem = 'bad-value'
-		logger.error("Could not get year, month, day values from '%s'" % SERVER)
+	ntpServerList.append(Config.get('GHC', 'ntp.server'))
 
 	# Get server daytime
 	data = datetime.datetime.utcnow().strftime('%y %m %d').split(' ')
-	serverDate = {'year': int(data[0]), 'month': int(data[1]), 'day': int(data[2])}
+	localTime = {'year': int(data[0]), 'month': int(data[1]), 'day': int(data[2])}
 
-	# Check drift
-	if not problem:
-		yearDrift = ntpDate['year'] - serverDate['year']
-		monthDrift = ntpDate['month'] - serverDate['month']
-		dayDrift = ntpDate['day'] - serverDate['day']
-
-	# Write values to logs
 	with open(ghcLog, 'a') as log:
-		if not problem:
-			log.write("NTP server date: %s\n" % SERVER)
-			log.write("Year: %(year)s\nMonth: %(month)s\nDay: %(day)s\n\n" % ntpDate)
-		if problem:
-			log.write("Failure with NTP server: %s\n\n" % SERVER)
-		log.write("Local server date:\n")
-		log.write("Year: %(year)s\nMonth: %(month)s\nDay: %(day)s\n" % serverDate)
-	if not problem:
-		if yearDrift != 0 or monthDrift != 0 or dayDrift != 0:
-			problem = True
-			log.write("Server time drift detected. Check NTP or local time\n")
+		log.write("(Source - year/month/day)\n")
+		log.write("Local - %(year)s/%(month)s/%(day)s\n" % localTime)
 
+	# Get date from www.google.com
+	try:
+		google_data = datetime.datetime.strptime(urllib2.urlopen('https://www.google.com').info().dict['date'], '%a, %d %b %Y %H:%M:%S GMT').strftime('%y %m %d').split(' ')
+	except:
+		google_data = []
+	if len(google_data) == 3:
+		remoteTime = {'year': int(google_data[0]), 'month': int(google_data[1]), 'day': int(google_data[2])}
+		difference = ghc_util_checkTime(remoteTime, localTime)
+		if not difference['year_result'] or not difference['month_result'] or not difference['day_result']:
+			ntpServer_results['Google'] = False
+		else:
+			ntpServer_results['Google'] = True
+		with open(ghcLog, 'a') as log:
+			log.write("Google - %(year)s/%(month)s/%(day)s\n" % remoteTime)
 
-	if problem == 'bad-ntp':
-		msg = "\nNo response from '%s'\n" % SERVER
-		ghc_util_passFail('failed', msg)
-	elif problem == 'bad-dns':
-		msg = "\nName or service not known '%s'\n" % SERVER
-		ghc_util_passFail('failed', msg)
-	elif problem == 'bad-value':
-		msg = "\nCould not get year, month, day values from '%s'\n" % SERVER
-		ghc_util_passFail('failed', msg)
-	elif problem:
+	# Append all ntp servers to list
+	cmd = "ntpq -nc peers | tail -n +3 | cut -c 2-17"
+	out = ghc_util_subprocess(cmd)
+	for server in out[0].split():
+		ntpServerList.append(server.strip())
+
+	# Get NTP daytime from ntpServer
+	with open(ghcLog, 'a') as log:
+		log.write("\nNTP server(s)\n-------------------------\n")
+		for ntpServer in ntpServerList:
+			data = []
+			logger.debug("Checking NTP server '%s'" % ntpServer)
+			try:
+				data = datetime.datetime.utcfromtimestamp(c.request(ntpServer, timeout=1).tx_time).strftime('%y %m %d').split(' ')
+			except ntplib.NTPException:
+				if not proxy_enabled:
+					log.write("%s - No response\n" % ntpServer)
+				else:
+					log.write("%s - No response\nPossible NTP problems due to detected proxy settings\n" % ntpServer)
+				logger.error("%s - No response" % ntpServer)
+			except socket.gaierror:
+				log.write("%s - Name or service not known" % ntpServer)
+				logger.error("%s - Name or service not known" % ntpServer)
+			except Exception, e:
+				logger.error(e)
+
+			if len(data) == 3:
+				remoteTime = {'year': int(data[0]), 'month': int(data[1]), 'day': int(data[2])}
+				difference = ghc_util_checkTime(remoteTime, localTime)
+				if not difference['year_result'] or not difference['month_result'] or not difference['day_result']:
+					ntpServer_results[ntpServer] = False
+				else:
+					ntpServer_results[ntpServer] = True
+				log.write("%s - %s/%s/%s\n" % (ntpServer, remoteTime['year'], remoteTime['month'], remoteTime['day']))
+
+			elif len(data) != 3 and not problem:
+				ntpServer_results[ntpServer] = False
+				logger.warning("%s - Could not get year, month, day values" % ntpServer)
+
+	for key in ntpServer_results:
+		if ntpServer_results[key]:
+			problem = False
+
+	if problem:
 		serverDateCheck = False
 		ghc_util_passFail('failed')
 	elif not problem:
