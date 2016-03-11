@@ -9,7 +9,7 @@
 #
 ##################################################################################################
 
-dsappversion='230'
+dsappversion='231'
 
 ##################################################################################################
 #	Imports
@@ -24,6 +24,7 @@ import time
 import atexit
 import pydoc
 import subprocess
+import traceback
 import ConfigParser
 Config = ConfigParser.ConfigParser()
 
@@ -94,6 +95,12 @@ dsappSettings = dsappConf + "/setting.cfg"
 dsappLogSettings = dsappConf + "/logging.cfg"
 dsappLog = dsappConf + "/dsapp.log"
 
+# Create dsapp folder stucture
+dsapp_folders = [dsappDirectory, dsappConf, dsappLogs, dsappBackup, dsapptmp, dsappupload, rootDownloads, dsapplib, dsappdata]
+for folder in dsapp_folders:
+	if not os.path.exists(folder):
+		os.makedirs(folder)
+
 # Create setting.cfg if not found
 if not os.path.isfile(dsappSettings):
 	dsHostname = os.popen('echo `hostname -f`').read().rstrip()
@@ -137,6 +144,7 @@ import dsapp_Definitions as ds
 ##################################################################################################
 
 logging.config.fileConfig(dsappLogSettings)
+excep_logger = logging.getLogger('exceptions_log')
 logger = logging.getLogger(__name__)
 logger.info('------------- Starting dsapp -------------')
 
@@ -163,7 +171,15 @@ def exit_cleanup():
 def signal_handler_SIGINT(signal, frame):
 	# Clean up dsapp
 	exit_cleanup()
-	sys.exit(1)
+	sys.exit(0)
+
+def my_handler(type, value, tb):
+	tmp = traceback.format_exception(type, value, tb)
+	excep_logger.error("Uncaught exception:\n%s" % ''.join(tmp).strip())
+	print ''.join(tmp).strip()
+
+# Install exception handler
+sys.excepthook = my_handler
 
 def set_spinner():
 	spinner = spin.progress_bar_loading()
@@ -181,13 +197,7 @@ def set_spinner():
 atexit.register(exit_cleanup)
 
 # SIG trap dsapp
-signal.signal(signal.SIGINT, signal_handler_SIGINT)
-
-# Create dsapp folder stucture
-dsapp_folders = [dsappDirectory, dsappConf, dsappLogs, dsappBackup, dsapptmp, dsappupload, rootDownloads, dsapplib, dsappdata]
-for folder in dsapp_folders:
-	if not os.path.exists(folder):
-		os.makedirs(folder)
+# signal.signal(signal.SIGINT, signal_handler_SIGINT)
 
 # Get dsapp PID
 with open(dsappConf + '/dsapp.pid', 'a') as pidFile:
@@ -228,9 +238,15 @@ parser.add_argument('-ch', '--changeHost', action='store_true', dest='host', hel
 parser.add_argument('-f', '--force', action='store_true', dest='force', help='Force runs dsapp')
 parser.add_argument('-db', '--database', action='store_true', dest='db', help='Change database password')
 parser.add_argument('-cl', '--clear', action='store_true', dest='clear', help='Remove encryption from XMLs')
-parser.add_argument('-re', '--restore', action='store_true', dest='re', help='Restore Mobility Menu')
+parser.add_argument('--config', dest='re', choices=['backup', 'restore'], help='Backup settings or install Mobility with backup')
 parser.add_argument('--setlog', dest='loglevel', choices=['debug','info','warning'], help='Set the logging level')
 args = parser.parse_args()
+
+if args.re == 'restore':
+	import dsapp_re
+	dsapp_re.install_settings()
+	print; ds.eContinue()
+	sys.exit(0)
 
 if args.bug:
 	ds.datasyncBanner(dsappversion)
@@ -270,7 +286,7 @@ if args.autoUpdate:
 # Check / set force mode
 forceMode = args.force
 
-if args.re or args.clear:
+if args.clear or args.db:
 	forceMode = True
 
 # Check if installed
@@ -279,14 +295,14 @@ if not ds.checkInstall(forceMode, installedConnector):
 
 # Give force mode warning
 if forceMode:
-	if not args.re and not args.clear:
+	if not args.re and not args.clear and not args.db:
 		ds.datasyncBanner(dsappversion)
 		print ("Running force mode. Some options may not work properly.\n")
 		logger.warning('Running in force mode')
 		ds.eContinue()
 
 # Get mobility version
-dsVersion = ds.getDSVersion()
+dsVersion = ds.getDSVersion(forceMode)
 
 # Debug logging: dsVersion
 if dsVersion >= ds_14x:
@@ -308,10 +324,11 @@ Config.read(dsappSettings)
 dsHostname = Config.get('Misc', 'hostname')
 
 # Get Mobility Version
-mobilityVersion = ds.getVersion(ds.checkInstall(forceMode, installedConnector), version)
+if not forceMode:
+	mobilityVersion = ds.getVersion(ds.checkInstall(forceMode, installedConnector), version)
 
-# Only call autoUpdateDsapp() if filename is dsapp.pyc
-if os.path.basename(__file__) == 'dsapp.pyc':
+# Only call autoUpdateDsapp() if filename is dsapp.pyc and no args are passed
+if os.path.basename(__file__) == 'dsapp.pyc' and len(sys.argv) == 1:
 	ds.autoUpdateDsapp()
 
 # Get current working directory
@@ -430,8 +447,12 @@ logger.debug('Assigning %s from %s' % ('Mobility connector mAttachSize', 'mconfX
 mobilityConfig['mAttachSize'] = ds.xmlpath('.//settings/custom/attachmentMaxSize', XMLconfig['mconf'])
 logger.debug('Assigning %s from %s' % ('Mobility connector dbMaintenance', 'mconfXML'))
 mobilityConfig['dbMaintenance'] = ds.xmlpath('.//settings/custom/databaseMaintenance', XMLconfig['mconf'])
+logger.debug('Assigning %s from %s' % ('Mobility log level', 'mconfXML'))
+mobilityConfig['logLevel'] = ds.xmlpath('.//settings/common/log/level', XMLconfig['mconf'])
 
 # GroupWise / SOAP values
+logger.debug('Assigning %s from %s' % ('GroupWise log level', 'gconfXML'))
+gwConfig['logLevel'] = ds.xmlpath('.//settings/common/log/level', XMLconfig['gconf'])
 logger.debug('Assigning %s from %s' % ('GroupWise connector sListenAddress', 'gconfXML'))
 gwConfig['sListenAddress'] = ds.xmlpath('.//settings/custom/listeningLocation', XMLconfig['gconf'])
 logger.debug('Assigning %s from %s' % ('GroupWise connector gPort', 'gconfXML'))
@@ -446,6 +467,7 @@ else:
 logger.debug('Assigning %s from %s' % ('GroupWise connector sPort', 'gconfXML'))
 gwConfig['sPort'] = ds.xmlpath('.//settings/custom/soapServer', XMLconfig['gconf']).split(":")[-1]
 logger.debug('Assigning %s from %s' % ('GroupWise connector sSecure', 'gconfXML'))
+
 if dsVersion >= ds_14x:
 	logger.debug('Assigning %s from %s' % ('GroupWise connector POASecure', 'gconfXML'))
 	gwConfig['POASecure'] = ds.xmlpath('.//settings/custom/sslPOAs', XMLconfig['gconf'])
@@ -484,7 +506,7 @@ if not forceMode:
 ##################################################################################################
 # Change db pass
 if args.db:
-	ds.changeDBPass(dbConfig, config_files, XMLconfig)
+	ds.changeDBPass(config_files, XMLconfig)
 	ds.eContinue()
 	sys.exit(0)
 
@@ -566,9 +588,10 @@ if args.devices:
 	sys.exit(0)
 
 # Load restore menu
-if args.re:
+if args.re == 'backup':
 	import dsapp_re
-	dsapp_re.call_re(dbConfig, ldapConfig, mobilityConfig, gwConfig, trustedConfig, config_files, webConfig, authConfig)
+	dsapp_re.dumpConfigs(dbConfig, ldapConfig, mobilityConfig, gwConfig, trustedConfig, config_files, webConfig, authConfig)
+	print; ds.eContinue()
 	sys.exit(0)
 
 # Remove all encryption from XMLs

@@ -2,6 +2,7 @@
 
 import sys
 import os
+import traceback
 import dsapp_Definitions as ds
 import logging, logging.config
 import ConfigParser
@@ -33,6 +34,15 @@ dsappSettings = dsappConf + "/setting.cfg"
 # Log Settings
 logging.config.fileConfig('%s/logging.cfg' % (dsappConf))
 logger = logging.getLogger('__main__')
+excep_logger = logging.getLogger('exceptions_log')
+
+def my_handler(type, value, tb):
+	tmp = traceback.format_exception(type, value, tb)
+	excep_logger.error("Uncaught exception:\n%s" % ''.join(tmp).strip())
+	print ''.join(tmp).strip()
+
+# Install exception handler
+sys.excepthook = my_handler
 
 # Read Config
 Config.read(dsappSettings)
@@ -149,7 +159,7 @@ def log_menu():
 			main_menu()
 
 def registerUpdate_menu():
-	menu = ['1. Register Mobility', '2. Update Mobility', '3. Apply FTF / Patch Files', '\n     0. Back']
+	menu = ['1. Register Mobility', '2. Update Mobility', '3. FTF options...', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -163,6 +173,24 @@ def registerUpdate_menu():
 		elif choice == '2':
 			update_menu()
 		elif choice == '3':
+			ftf_menu()
+		elif choice == '0':
+			loop = False
+			main_menu()
+
+### Start ### Sub menu for FTF
+def ftf_menu():
+	menu = ['1. Show applied FTFs','2. Apply FTFs', '\n     0. Back']
+	
+	available = build_avaialbe(menu)
+	loop = True
+	while loop:
+		show_menu(menu)
+		choice = get_choice(available)
+		if choice == '1':
+			ds.showAppliedPatches()
+			ds.eContinue()
+		elif choice == '2':
 			ds.datasyncBanner(dsappversion)
 
 			Config.read(dsappSettings)
@@ -190,7 +218,8 @@ def registerUpdate_menu():
 				print; ds.eContinue()
 		elif choice == '0':
 			loop = False
-			main_menu()
+			return
+### End ### Sub menu for FTF
 
 ### Start ### Sub menu for Update Mobility (registerUpdate_menu) ###
 def update_menu():
@@ -493,24 +522,3 @@ def viewAttachments_menu():
 			loop = False
 			return
 ### End ### Sub menus checkQueries_menu ###
-
-# dsapp_re menu
-def re_menu(dbConfig, ldapConfig, mobilityConfig, gwConfig, trustedConfig, config_files, webConfig, authConfig):
-	import dsapp_re
-	menu = ['1. Backup Mobility settings','2. Restore / Install Mobility', '\n     0. Back']
-	
-	available = build_avaialbe(menu)
-	loop = True
-	while loop:
-		show_menu(menu)
-		choice = get_choice(available)
-		if choice == '1':
-			dsapp_re.dumpConfigs(dbConfig, ldapConfig, mobilityConfig, gwConfig, trustedConfig, config_files, webConfig, authConfig)
-			print; ds.eContinue()
-		elif choice == '2':
-			dsapp_re.install_settings()
-			print; ds.eContinue()
-		elif choice == '0':
-			loop = False
-			ds.clear()
-			sys.exit(0)

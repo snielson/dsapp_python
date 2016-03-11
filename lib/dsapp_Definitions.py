@@ -9,12 +9,13 @@ from pipes import quote
 import io
 import gzip
 import pydoc
+import traceback
 import urllib2
 import readline
 import operator
 import StringIO
+from tabulate import tabulate
 from urllib2 import urlopen, URLError, HTTPError
-from lxml import etree
 from xml.parsers.expat import ExpatError
 import logging, logging.config
 from multiprocessing import Process, Queue
@@ -22,11 +23,16 @@ import ConfigParser
 Config = ConfigParser.ConfigParser()
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+from lxml import etree
+# Pass import (GMS not installed)
+try:
+	import psycopg2
+	import psycopg2.extras
+	from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+except:
+	pass
 import spin
 import filestoreIdToPath
-import psycopg2
-import psycopg2.extras
-from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 import getch
 getch = getch._Getch()
 import dsapp_ghc as ghc
@@ -96,6 +102,15 @@ ghcLog = dsappLogs + "/generalHealthCheck.log"
 # Log Settings
 logging.config.fileConfig('%s/logging.cfg' % (dsappConf))
 logger = logging.getLogger(__name__)
+excep_logger = logging.getLogger('exceptions_log')
+
+def my_handler(type, value, tb):
+	tmp = traceback.format_exception(type, value, tb)
+	excep_logger.error("Uncaught exception:\n%s" % ''.join(tmp).strip())
+	print (''.join(tmp).strip())
+
+# Install exception handler
+sys.excepthook = my_handler
 
 # Read Config
 Config.read(dsappSettings)
@@ -378,19 +393,23 @@ def askYesOrNo(question, default=None):
     elif default == 'skip':
     	return True
     else:
-        raise ValueError("invalid default answer: '%s'" % default)
+        raise ValueError("Invalid default answer: '%s'" % default)
 
-    while True:
-        choice = raw_input(question + prompt).lower()
-        if default is not None and choice == '':
-        	logger.debug('%s: %s' % (question, valid[default]))
-        	return valid[default]
-        elif choice in valid:
-        	logger.debug('%s: %s' % (question, valid[choice]))
-        	return valid[choice]
-        else:
-            sys.stdout.write("Please respond with 'yes' or 'no' "
-                             "(or 'y' or 'n').\n")
+    try:
+        while True:
+            choice = raw_input(question + prompt).lower()
+            if default is not None and choice == '':
+            	logger.debug('%s: %s' % (question, valid[default]))
+            	return valid[default]
+            elif choice in valid:
+            	logger.debug('%s: %s' % (question, valid[choice]))
+            	return valid[choice]
+            else:
+                sys.stdout.write("Please respond with 'yes' or 'no' "
+                                 "(or 'y' or 'n').\n")
+    except KeyboardInterrupt:
+    	logger.warning("KeyboardInterrupt detected")
+
 def unzip_file(fileName):
 	with contextlib.closing(zipfile.ZipFile(fileName, 'r')) as z:
 	    z.extractall()
@@ -501,6 +520,11 @@ def updateDsapp(publicVersion):
 	check_rpm = checkRPM(rpmFile)
 	if check_rpm:
 		setupRPM(rpmFile)
+		Config.read(dsappSettings)
+		Config.set('Misc', 'dsapp.version', publicVersion)
+		with open(dsappSettings, 'wb') as cfgfile:
+			Config.write(cfgfile)
+		print ("Exiting dsapp..")
 	elif check_rpm == None:
 		setupRPM(rpmFile, 'i')
 	else:
@@ -516,7 +540,9 @@ def updateDsapp(publicVersion):
 		os.remove(fileName)
 	except OSError:
 		logger.warning('No such file: %s' % (fileName))
-	# TODO: Close script, and relaunch
+
+	sys.exit(0)
+
 
 def autoUpdateDsapp(skip=False):
 	# Assign variables based on settings.cfg
@@ -553,10 +579,18 @@ def autoUpdateDsapp(skip=False):
 				print ('dsapp is current at v%s' % dsappversion)
 				logger.info('dsapp is current at v%s' % dsappversion)
 
-def getDSVersion():
+def getDSVersion(forceMode=False):
 	if checkInstall(forceMode, installedConnector):
-		with open(version) as f:
-			value = f.read().split('.')[0]
+		if forceMode:
+			try:
+				with open(version) as f:
+					value = f.read().split('.')[0]
+			except:
+				return None
+		else:
+			with open(version) as f:
+				value = f.read().split('.')[0]
+				
 		return int(value)
 
 def setVariables():
@@ -936,9 +970,6 @@ def check_hostname(old_host, XMLconfig, config_files, forceFix=False):
 	elif old_host == new_host:
 		return True
 
-def find_old_hostname():
-	pass # TODO: Write the code to match old dsapp, or simply prompt for old hostname?
-
 def update_xml_encrypt(XMLconfig, config_files, old_host, new_host):
 	# Attempt to get all encrypted in clear text using old_host
 	before = {}
@@ -1255,6 +1286,8 @@ def cuso(dbConfig, op = 'everything'):
 	else:
 		if askYesOrNo('Continue with cleanup'):
 			continue_cleanup = True
+		else:
+			return
 
 	if continue_cleanup:
 		# vacuum & index
@@ -1523,7 +1556,7 @@ def monitor_command(dbConfig, command, refresh):
 				print('  ' + states[row['state']] + '    |  ' + row['userid'])
 			time.sleep(refresh)
 			sys.stdout.write(clearLine)
-	except:
+	except KeyboardInterrupt:
 		logger.debug('Ending monitor')
 
 	clear()
@@ -1869,10 +1902,11 @@ def updateMobilityFTP():
 				# Decompress file
 				uncompressIt(ds)
 
-				zypper = subprocess.Popen(["zypper", "rr", "mobility"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-				zypper.wait()
-				zypper = subprocess.Popen(["zypper", "addrepo", "iso:///?iso=%s&url=file:///root/Downloads" % dsISO[0], "mobility"], stdout=subprocess.PIPE)
-				zypper.wait()
+				cmd = "zypper rr mobility"
+				zypper = util_subprocess(cmd, True)
+
+				cmd = "zypper addrepo 'iso:///?iso=%s&url=file:///root/Downloads' mobility" % dsISO[0]
+				zypper = util_subprocess(cmd, True)
 
 				dsUpdate('mobility')
 	else:
@@ -1886,12 +1920,31 @@ def updateMobilityISO():
 
 	# Get path / file
 	print ()
+	isoPath = getMobilityISO()
+
+	# Verify ISO is mobility iso
+	if not checkISO_content(isoPath):
+		return
+
+	# All checks paasses - Add isoPath as 'mobility' repo
+	datasyncBanner(dsappversion)
+	print ("Setting up mobility repository..")
+	logger.info("Setting up mobility repository")
+	cmd = "zypper rr mobility"
+	zypper = util_subprocess(cmd, True)
+
+	cmd = "zypper addrepo 'iso:///?iso=%s&url=file://%s' mobility" % (os.path.basename(isoPath), os.path.dirname(isoPath))
+	zypper = util_subprocess(cmd, True)
+
+	dsUpdate('mobility')
+
+def getMobilityISO():
 	isoPath = autoCompleteInput("Path to ISO directory or file: ")
 	if os.path.isfile(isoPath):
 		if not os.path.basename(isoPath).endswith('.iso'):
 			print ("\nIncorrect extension type\nPlease select a ISO file")
 			eContinue
-			return
+			return None
 	elif os.path.isdir(isoPath):
 		# Create list of ISOs
 		fileList = []
@@ -1913,50 +1966,44 @@ def updateMobilityISO():
 
 			choice = get_choice(available)
 			if choice == None or choice == '':
-				return
+				return None
 			else:
 				isoPath = isoPath + "/" + fileList[choice]
 
 		else:
 			print ("\nNo ISOs found at: %s" % isoPath)
 			eContinue
-			return
+			return None
 	else:
 		print ("No such directory or file: %s" % isoPath)
 		logger.warning("No such directory or file: %s" % isoPath)
+		return None
+	return isoPath
 
+def checkISO_content(isoPath):
 	# Verify ISO is mobility iso
 	cmd = "isoinfo -i %s -x \"/CONTENT.;1\"" % isoPath
 	out = util_subprocess(cmd,True)
 
 	output = StringIO.StringIO(out[0])
 	isoContent = dict((i.split()[0].rstrip(' '),i.split()[1:]) for i in output.readlines())
-	# print(' '.join(isoContent['LABEL'])) # Print all values in key, with spaces
+	# print(' '.join(isoContent['LABEL'])) # DEV Print all values in key, with spaces
 
 	try:
 		if 'Mobility' not in isoContent['LABEL'] and 'mobility' not in isoContent['LABEL']:
 			datasyncBanner(dsappversion)
 			print ("Not able to find mobility in ISO content")
 			if not askYesOrNo("Continue with ISO (%s): " % os.path.basename(isoPath)):
-				return
+				return False
 	except:
 		# No such key 'LABEL'
 		datasyncBanner(dsappversion)
 		print ("Unable to find content in ISO (%s)" % os.path.basename(isoPath))
 		logger.error("Unable to find content in ISO (%s)" % os.path.basename(isoPath))
-		return
+		return False
 
 	logger.info("ISO (%s) selected" % os.path.basename(isoPath))
-	# All checks paasses - Add isoPath as 'mobility' repo
-	datasyncBanner(dsappversion)
-	print ("Setting up mobility repository..")
-	logger.info("Setting up mobility repository")
-	zypper = subprocess.Popen(["zypper", "rr", "mobility"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-	zypper.wait()
-	zypper = subprocess.Popen(["zypper", "addrepo", "iso:///?iso=%s&url=file://%s" % (os.path.basename(isoPath), os.path.dirname(isoPath)), "mobility"], stdout=subprocess.PIPE)
-	zypper.wait()
-
-	dsUpdate('mobility')
+	return True
 
 def checkNightlyMaintenance(config_files, mobilityConfig, healthCheck=False):
 	setVariables()
@@ -2034,12 +2081,10 @@ def showStatus(dbConfig):
 	cur.close()
 	conn.close()
 	if len(data) != 0:
-		print ("\nGroupWise-connector:")
+		print ("\nGroupWise events")
 		data_found = True
 		logger.info("Found pending consumerevents")
-		print (" state | count\n-------+-------")
-		for row1 in data:
-			print (" %s | %s " % (row['state'], row['count']))
+		print (tabulate(data, headers="keys", tablefmt='orgtbl'))
 
 	conn = getConn(dbConfig, 'mobility')
 	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
@@ -2048,12 +2093,10 @@ def showStatus(dbConfig):
 	cur.close()
 	conn.close()
 	if len(data) != 0:
-		print ("\nMobility-connector:")
+		print ("\nMobility events")
 		data_found = True
 		logger.info("Found pending syncevents")
-		print (" state | count\n-------+-------")
-		for row1 in data:
-			print (" %s | %s " % (row['state'], row['count']))
+		print (tabulate(data, headers="keys", tablefmt='orgtbl'))
 
 	if not data_found:
 		print ("No pending events")
@@ -2123,7 +2166,7 @@ def vacuumDB(dbConfig, database=None):
 		print ("\nUnable to vacuum databases. Mobility PID detected")
 		logger.error("Unable to vacuum databases. Mobility PID detected")
 
-def changeDBPass(dbConfig, config_files, XMLconfig):
+def changeDBPass(config_files, XMLconfig):
 	datasyncBanner(dsappversion)
 	if askYesOrNo("Change psql datasync_user password?"):
 		p_input = getpass.getpass("Enter new password: ")
@@ -2138,22 +2181,18 @@ def changeDBPass(dbConfig, config_files, XMLconfig):
 
 		print()
 
-		#Get Encrypted password from user input
+		# Get Encrypted password from user input
 		inputEncrpt = encryptMSG(p_input)
 
 		print ("Changing database password..")
-		conn = getConn(dbConfig, 'postgres')
-		cur = conn.cursor()
+		cmd = "su postgres -c \"cd /;psql -c \\\"ALTER USER datasync_user WITH password '%s';\\\"\"" % p_input
 		logger.info("Changeing datasync_user database password")
-		try:
-			cur.execute("ALTER USER datasync_user WITH password \'%s\'" % p_input)
-		except:
-			print ("Failed to change database password")
-			logger.error("Failed to change datasync_user database password")
-			sys.exit(1)
+		out = util_subprocess(cmd, True)
+		if out[1]:
+			print ("Failed changing database password")
+			logger.error("Failed changing database password\n")
+			return
 
-		cur.close()
-		conn.close()
 		# Backup conf files
 		backup_config_files(config_files, 'changeDBPass')
 
@@ -2176,7 +2215,7 @@ def changeDBPass(dbConfig, config_files, XMLconfig):
 			setXML('.//settings/custom/dbpass', XMLconfig['mconf'], p_input, config_files['mconf'])
 		logger.info("Updated database password in %s" % config_files['mconf'])
 
-		print ("\nDatabase password updated. Please restart mobility.")
+		print ("\nDatabase password updated. Please restart mobility\n")
 
 def changeAppName(dbConfig):
 	datasyncBanner(dsappversion)
@@ -2265,7 +2304,6 @@ def certPath():
 	if promptVerifyPath(certPath):
 		return certPath
 	return ""
-
 
 def newCertPass():
 	keyPass = getpass.getpass("Enter password for private key: ")
@@ -2970,6 +3008,46 @@ def selectFTFPatch(patch_list):
 					ftfPatchlevel(patch_list[choice]['file'], patch_list[choice]['location'])
 	print ();eContinue()
 
+def showAppliedPatches():
+	datasyncBanner(dsappversion)
+	print ("Listing applied fixes..\n")
+	patchFile = dsappConf + '/patch-file.conf'
+	ftfList = dsappConf + '/dsapp_FTFlist.txt'
+	currentVersion = getExactMobilityVersion()
+	printNext = False
+	printNextFTF = False
+	skipNext = False
+	patchFound = False
+
+	if os.path.isfile(patchFile):
+		with open(patchFile, 'r') as f:
+			for line in f:
+				patch = None
+				if currentVersion in line:
+					print (line.strip().rstrip(':'))
+					printNext = True
+					patchFound = True
+
+					# Find and print the description
+					patch = (line.strip().split(' ')[2].strip())
+					if os.path.isfile(ftfList) and patch is not None:
+						with open(ftfList) as f2:
+							for line2 in f2:
+								if patch in line2:
+									skipNext = True
+								elif skipNext:
+									skipNext = False
+									printNextFTF = True
+								elif printNextFTF:
+									printNextFTF = False
+									print ("Description: " + line2.strip())
+				elif printNext:
+					print ("File(s): " + line)
+					printNext = False
+	if not patchFound:
+		print ("No FTFs have been applied via dsapp\n")
+	
+
 ##################################################################################################
 #	End of Patch / FTF Fixes
 ##################################################################################################
@@ -3101,6 +3179,7 @@ def restoreDatabase(dbConfig):
 def getLogs(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedConfig, config_files, webConfig):
 	datasyncBanner(dsappversion)
 	uploadVersion = dsappupload + '/' + 'version'
+	exceptionLog = dsappLogs + '/exceptions.log'
 
 	if not askYesOrNo("Grab log files"):
 		return
@@ -3164,6 +3243,7 @@ def getLogs(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedCo
 
 	print ("\nCompressing logs for upload..")
 	compress_it.append(dsappLog)
+	compress_it.append(exceptionLog)
 	compress_it.append(sudslog)
 	compress_it.append(webadminlog)
 	compress_it.append(configenginelog)
@@ -3327,9 +3407,8 @@ def show_GW_syncEvents(dbConfig):
 					userCount[row['edata'].split('>')[1].split('<')[0]] = 1
 		sorted_users = sorted(userCount.items(), key=operator.itemgetter(1),reverse=True)
 
-		print ("  User  |  Events\n")
-		for key in sorted_users:
-			print (key[0], userCount[key[0]])
+		header = ['User', 'Events']
+		print (tabulate(sorted_users, header, tablefmt='orgtbl'))
 	else:
 		print ("consumerevents table has no events (psql:datasync)")
 		logger.info("consumerevents table has no events (psql:datasync)")

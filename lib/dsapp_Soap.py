@@ -156,10 +156,13 @@ def soap_getFolderList(trustedConfig, gwConfig, userConfig):
 
 def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
 	problem = False
+	print ("Getting folder list..")
+	logger.info("Getting folder list..")
 	soap_folderList = soap_getFolderList(trustedConfig, gwConfig, userConfig)
 	if soap_folderList == None:
 		return
 
+	# Get root folder ID
 	if soap_folderList[0][0][0]['sid'] == 1:
 		root_id = soap_folderList[0][0][0]['id']
 	else:
@@ -172,6 +175,7 @@ def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
 				logger.warning("Unable to find the root folder for %s" % userConfig['name'])
 				return
 
+	print ("Checking %s folder structure..\n" % userConfig['name'])
 	logger.info("Checking %s folder structure" % userConfig['name'])
 	folder_check = ['Mailbox', 'Calendar', 'Contacts']
 	for folder in soap_folderList[0][0]:
@@ -179,9 +183,13 @@ def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
 			if folder['folderType'] in folder_check:
 				if folder['parent'] != root_id:
 					print "Problem with folder structure\n%s not found under root of mailbox\n" % folder['folderType']
-					logger.debug("Problem with folder structure - %s not found under root of mailbox\n" % folder['folderType'])
+					logger.error("Problem with folder structure - %s not found under root of mailbox\n" % folder['folderType'])
 					problem = True
-
+				else:
+					if folder['folderType'] == 'Contacts':
+						if check_subContacts(soap_folderList, folder['id']): problem = True
+					if folder['folderType'] == 'Calendar':
+						if check_subCalendars(soap_folderList, folder['id']): problem = True
 	if not problem:
 		print "No problems found with GroupWise folder structure"
 		logger.info("No problems found with GroupWise folder structure")
@@ -222,3 +230,45 @@ def soap_getUserList(trustedConfig, gwConfig, noout='true'):
 	except:
 		results = None
 	return results
+
+def check_subCalendars(folderList, parent_id):
+	logger.info("Checking sub calendars..")
+	problem = False
+	for folder in folderList[0][0]:
+		try:
+			if folder['calendarAttribute']:
+				if folder['parent'] != parent_id:
+					print ("Folder structure problem with calendar: %s" % folder['name'])
+					logger.warning("Folder structure problem with calendar: %s" % folder['name'])
+					problem = True
+		except:
+			pass
+
+	return problem
+
+def check_subContacts(folderList, parent_id):
+	logger.info("Checking sub contacts..")
+	problem = False
+	for folder in folderList[0][0]:
+		try:
+			if folder['folderType'] == 'UserContacts':
+				if folder['parent'] != parent_id:
+					print ("Folder structure problem with address book: %s" % folder['name'])
+					logger.warning("Folder structure problem with address book: %s" % folder['name'])
+					problem = True
+		except:
+			pass
+
+	return problem
+
+def soap_checkFolderListTEST(trustedConfig, gwConfig, userConfig):
+	problem = False
+	print ("Getting folder list..")
+	logger.info("Getting folder list..")
+	soap_folderList = soap_getFolderList(trustedConfig, gwConfig, userConfig)
+	if soap_folderList == None:
+		return
+
+	print soap_folderList
+
+	
