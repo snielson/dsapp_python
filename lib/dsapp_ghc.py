@@ -8,18 +8,23 @@ import subprocess
 import datetime
 import time
 import pydoc
+import traceback
 import urllib2
 import logging, logging.config
 import ntplib
-import psycopg2
-import psycopg2.extras
-from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from multiprocessing import Process, Queue
 import ConfigParser
 Config = ConfigParser.ConfigParser()
 ghc_Config = ConfigParser.ConfigParser()
 
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+# Pass import (GMS not installed)
+try:
+	import psycopg2
+	import psycopg2.extras
+	from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+except:
+	pass
 import spin
 import filestoreIdToPath
 import getch
@@ -63,6 +68,15 @@ ghcLog = dsappLogs + "/generalHealthCheck.log"
 # Log Settings
 logging.config.fileConfig('%s/logging.cfg' % (dsappConf))
 logger = logging.getLogger('dsapp_Definitions')
+excep_logger = logging.getLogger('exceptions_log')
+
+def my_handler(type, value, tb):
+	tmp = traceback.format_exception(type, value, tb)
+	excep_logger.error("Uncaught exception:\n%s" % ''.join(tmp).strip())
+	print (''.join(tmp).strip())
+
+# Install exception handler
+sys.excepthook = my_handler
 
 # Read Config
 Config.read(dsappSettings)
@@ -106,6 +120,7 @@ if not os.path.isfile(ghcSettings):
 		ghc_Config.set('GHC Checks', 'server.date', True)
 		ghc_Config.set('GHC Checks', 'certificates', True)
 		ghc_Config.write(cfgfile)
+
 
 ##################################################################################################
 #  General Health Check definitions
@@ -805,10 +820,12 @@ def ghc_verifyNightlyMaintenance(config_files, mobilityConfig):
 
 	problem = results['result']
 	if problem:
-		# msg = "Invalid key for trusted application\n"
-		ghc_util_passFail('failed')
+		if mobilityConfig['logLevel'] == 'info' or mobilityConfig['logLevel'] == 'debug':
+			ghc_util_passFail('failed')
+		else:
+			msg = "Logging in %s. Logging level does not log maintenance\n" % mobilityConfig['loglevel']
+			ghc_util_passFail('warning', msg)
 	elif not problem:
-		# msg = "Trusted Application is valid\n"
 		ghc_util_passFail('passed')
 
 def ghc_checkDBSchema(dbConfig):
@@ -1408,7 +1425,7 @@ def ghc_verifyServerDate():
 
 	# Append all ntp servers to list
 	cmd = "ntpq -nc peers | tail -n +3 | cut -c 2-17"
-	out = ghc_util_subprocess(cmd)
+	out = ghc_util_subprocess(cmd,True)
 	if not out[1]:
 		for server in out[0].split():
 			ntpServerList.append(server.strip())
