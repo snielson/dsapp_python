@@ -1503,6 +1503,7 @@ def verifyUser(dbConfig):
 	get_username(userConfig)
 	if userConfig['name'] is None:
 		userConfig['mName'] = None
+		userConfig['type'] = None
 		userConfig['dName'] = None
 		userConfig['verify'] = None
 		return userConfig
@@ -1530,13 +1531,13 @@ def confirm_user(userConfig, database = None):
 	if database == 1:
 		return True
 	elif database == 'mobility' and userConfig['verify'] == 2:
-		print ("%s not found in Mobility" % userConfig['name'])
+		print ("'%s' not found in Mobility" % userConfig['name'])
 		return False
 	elif database == 'datasync' and userConfig['verify'] == 1:
-		print ("%s not found in Mobility" % userConfig['name'])
+		print ("'%s' not found in Mobility" % userConfig['name'])
 		return False
 	if userConfig['verify'] == 0:
-		print ("%s not found in Mobility" % userConfig['name'])
+		print ("'%s' not found in Mobility" % userConfig['name'])
 		return False
 	return True
 
@@ -1576,9 +1577,14 @@ def monitorUser(dbConfig, userConfig = None, refresh = 1):
 		command = "SELECT state,userID FROM users WHERE userid ilike '%%%s%%'" % userConfig['mName']
 		monitor_command(dbConfig, command, refresh)
 
+	print(); eContinue()
+
 def setUserState(dbConfig, state):
 	# verifyUser sets vuid variable used in setUserState and removeAUser functions
 	userConfig = verifyUser(dbConfig)
+	if userConfig['name'] is None:
+		return
+
 	if confirm_user(userConfig, 'mobility'):
 		conn = getConn(dbConfig, 'mobility')
 		cur = conn.cursor()
@@ -1588,6 +1594,8 @@ def setUserState(dbConfig, state):
 		conn.close()
 
 		monitorUser(dbConfig, userConfig)
+
+	print(); eContinue()
 
 def file_mCleanup(filePath, fileCount):
 	date = datetime.datetime.now().strftime("%H:%M:%S on %b %d, %Y")
@@ -1775,6 +1783,9 @@ def dCleanup(dbConfig, userConfig):
 def remove_user(dbConfig, op = None):
 	# Pass in 1 for op to skip user database check in confirm_user()
 	userConfig = verifyUser(dbConfig)
+	if userConfig['name'] is None:
+		return
+
 	datasyncBanner(dsappversion)
 	if op == 1:
 		logger.debug("Skipping user database check")
@@ -1824,6 +1835,8 @@ def remove_user(dbConfig, op = None):
 			dCleanup(dbConfig, userConfig)
 			print()
 			mCleanup(dbConfig, userConfig)
+
+	print(); eContinue()
 
 def addGroup(dbConfig, ldapConfig):
 	conn = getConn(dbConfig, 'datasync')
@@ -2222,6 +2235,9 @@ def changeDBPass(config_files, XMLconfig):
 def changeAppName(dbConfig):
 	datasyncBanner(dsappversion)
 	userConfig = verifyUser(dbConfig)
+	if userConfig['name'] is None:
+		return
+
 	if confirm_user(userConfig, 'datasync'):
 
 		defaultMAppName = userConfig['mAppName']
@@ -2266,7 +2282,7 @@ def changeAppName(dbConfig):
 			print ("Unable to find application names")
 			logger.warning("Unalbe to find all application names")
 
-		
+	print(); eContinue()
 
 def reinitAllUsers(dbConfig):
 	datasyncBanner(dsappversion)
@@ -2675,8 +2691,11 @@ def userLdapOrGw(userConfig, pro_type):
 
 def updateFDN(dbConfig, XMLconfig, ldapConfig):
 	datasyncBanner(dsappversion)
+	userConfig = verifyUser(dbConfig)
+	if userConfig['name'] is None:
+		return
+
 	if checkLDAP(XMLconfig, ldapConfig):
-		userConfig = verifyUser(dbConfig)
 		if userConfig['verify'] != 0 and userConfig['verify'] is not None:
 			if userLdapOrGw(userConfig, 'ldap'):
 				multiple = False
@@ -2776,6 +2795,7 @@ def updateFDN(dbConfig, XMLconfig, ldapConfig):
 			if userConfig['verify'] is not None:
 				print ("No such user '%s'" % userConfig['name'])
 				logger.warning("User '%s' not found in databases" % userConfig['name'])
+	print(); eContinue()
 
 def getApplicationNames(userConfig, dbConfig):
 	conn = getConn(dbConfig, 'datasync')
@@ -3321,6 +3341,9 @@ def fix_gal(dbConfig):
 def monitor_Sync_validate(dbConfig):
 	datasyncBanner(dsappversion)
 	userConfig = verifyUser(dbConfig)
+	if userConfig['name'] is None:
+		return
+
 	if userConfig['verify'] != 0:
 		results_found = False
 		print ("\nScanning log for sync validate..\n")
@@ -3335,8 +3358,10 @@ def monitor_Sync_validate(dbConfig):
 			print ("No results found")
 			logger.info("No results found")
 	else:
-		print ("No such user: %s" % userConfig['name'])
-		logger.warning("No such user: %s" % userConfig['name'])
+		print ("No such user '%s'" % userConfig['name'])
+		logger.warning("No such user '%s'" % userConfig['name'])
+
+	print(); eContinue()
 
 def removed_disabled(dbConfig):
 	# datasyncBanner(dsappversion)
@@ -3481,13 +3506,17 @@ def check_userAuth(dbConfig, authConfig):
 	# User Authentication
 	datasyncBanner(dsappversion)
 	userConfig = verifyUser(dbConfig)
-	setVariables()
+	if userConfig['name'] is None:
+		return
 
 	# Confirm user exists in database
 	if userConfig['verify'] == 0:
 		print ("User '%s' not found" % userConfig['name'])
+		logger.warning("User '%s' not found" % userConfig['name'])
+		print(); eContinue()
 		return
 
+	setVariables()
 	print ("\nCheck for User Authentication Problems:")
 	print ("Checking log files..\n")
 	logger.info("Checking log files for '%s'" % userConfig['mAppName'])
@@ -3566,6 +3595,8 @@ def check_userAuth(dbConfig, authConfig):
 		logger.info("No problems detected")
 		print ("\nNo problems detected")
 
+	eContinue()
+
 def whereDidIComeFromAndWhereAmIGoingOrWhatHappenedToMe(dbConfig):
 	datasyncBanner(dsappversion)
 	displayName = raw_input("Item name (subject, folder, contact, calendar): ")
@@ -3607,6 +3638,15 @@ def getUsers_and_Devices(dbConfig, showUsers=False, showDevices=False, showBoth=
 
 def getUserPAB(dbConfig):
 	userConfig = verifyUser(dbConfig)
+	if userConfig['name'] is None:
+		return
+
+	if userConfig['type'] is None:
+		print("Unable to find object type for '%s'" % userConfig['name'])
+		logger.warning("Unable to find object type for '%s'" % userConfig['name'])
+		eContinue()
+		return
+
 	conn = getConn(dbConfig, 'mobility')
 	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
 	logger.info("Getting PABs for '%s'.." % userConfig['name'])

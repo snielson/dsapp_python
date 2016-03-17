@@ -362,13 +362,10 @@ def userIssue_menu():
 			removeUser_menu()
 		elif choice == '4':
 			ds.check_userAuth(dbConfig, authConfig)
-			ds.eContinue()
 		elif choice == '5':
 			ds.changeAppName(dbConfig)
-			print; ds.eContinue()
 		elif choice == '6':
 			ds.updateFDN(dbConfig, XMLconfig, ldapConfig)
-			print; ds.eContinue()
 		elif choice == '7':
 			ds.whereDidIComeFromAndWhereAmIGoingOrWhatHappenedToMe(dbConfig)
 		elif choice == '8':
@@ -390,7 +387,6 @@ def monitorUser_menu():
 			ds.monitorUser(dbConfig)
 		elif choice == '2':
 			ds.monitor_Sync_validate(dbConfig)
-			print; ds.eContinue()
 		elif choice == '3':
 			ds.monitor_syncing_users(dbConfig)
 		elif choice == '0':
@@ -415,7 +411,6 @@ def groupwiseChecks_menu():
 				print; ds.eContinue()
 		elif choice == '2':
 			dsSOAP.soap_checkFolderList(trustedConfig, gwConfig, ds.verifyUser(dbConfig))
-			print; ds.eContinue()
 		elif choice == '0':
 			loop = False
 			return
@@ -430,10 +425,8 @@ def removeUser_menu():
 		choice = get_choice(available)
 		if choice == '1':
 			ds.remove_user(dbConfig, 1)
-			print; ds.eContinue()
 		elif choice == '2':
 			ds.remove_user(dbConfig)
-			print; ds.eContinue()
 		elif choice == '3':
 			ds.datasyncBanner(dsappversion)
 			ds.removed_disabled(dbConfig)

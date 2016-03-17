@@ -5,6 +5,7 @@ import os, sys
 import suds.client
 import logging, logging.config
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+import dsapp_Definitions as ds
 
 # Global paths
 dsappDirectory = "/opt/novell/datasync/tools/dsapp"
@@ -155,11 +156,16 @@ def soap_getFolderList(trustedConfig, gwConfig, userConfig):
 	return results
 
 def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
+	if userConfig['name'] is None:
+		return
+
 	problem = False
 	print ("Getting folder list..")
 	logger.info("Getting folder list..")
 	soap_folderList = soap_getFolderList(trustedConfig, gwConfig, userConfig)
 	if soap_folderList == None:
+		logger.debug("SOAP folder list is None")
+		print; ds.eContinue()
 		return
 
 	# Get root folder ID
@@ -193,6 +199,8 @@ def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
 	if not problem:
 		print "No problems found with GroupWise folder structure"
 		logger.info("No problems found with GroupWise folder structure")
+
+	print; ds.eContinue()
 
 
 def soap_printUser(trustedConfig, gwConfig, userConfig):
