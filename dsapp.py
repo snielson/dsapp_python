@@ -9,7 +9,7 @@
 #
 ##################################################################################################
 
-dsappversion='231'
+dsappversion='232'
 
 ##################################################################################################
 #	Imports
@@ -210,10 +210,11 @@ with open(dsappConf + '/dsapp.pid', 'r') as pidFile:
 			ds.removeLine(dsappConf + '/dsapp.pid', line)
 
 # Get Console Size
-windowSize = rows, columns = os.popen('stty size', 'r').read().split()
-if int(windowSize[0]) < int(24) or int(windowSize[1]) < int(80):
-	print ("Terminal window does not meet size requirements\nCurrent Size: [%s x %s]\nPlease resize window to [80 x 24] or greater\n" % (windowSize[1],windowSize[0]))
-	sys.exit(1)
+if sys.stdout.isatty():
+	windowSize = rows, columns = os.popen('stty size', 'r').read().split()
+	if int(windowSize[0]) < int(24) or int(windowSize[1]) < int(80):
+		print ("Terminal window does not meet size requirements\nCurrent Size: [%s x %s]\nPlease resize window to [80 x 24] or greater\n" % (windowSize[1],windowSize[0]))
+		sys.exit(1)
 
 
 ##################################################################################################
@@ -224,7 +225,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--version', action='version', version='%(prog)s (version {version})'.format(version=dsappversion))
 parser.add_argument('--updateDsapp', action='store_true', dest='dsUpdate', help='Updates dsapp to latest version')
 parser.add_argument('--autoUpdate', action='store_true', dest='autoUpdate', help='Toggles dsapp auto update')
-parser.add_argument('-b', '--bug', dest='bug', action='store_true', help="How to report a issue for dsapp")
+parser.add_argument('--bug', dest='bug', action='store_true', help="How to report a issue for dsapp")
 parser.add_argument('-ghc', '--gHealthCheck', action='store_true', dest='ghc', help='Run dsapp gneral health check')
 parser.add_argument('-ul', '--uploadLogs', action='store_true', dest='upload', help='Upload mobility logs to FTP')
 parser.add_argument('-c', '--check', action='store_true', dest='check', help='Check nightly maintenance')
@@ -250,8 +251,8 @@ if args.re == 'restore':
 
 if args.bug:
 	ds.datasyncBanner(dsappversion)
-	print "Report issues to: https://github.com/tdharris/dsapp/issues"
-	print "Please describe the issue in detail.\n\nInclude some of the following if possible:\nLine number\nOutput on screen\nFunction name\nScreenshots"
+	print "Report issues to: https://github.com/snielson/dsapp_python/issues"
+	print "Please describe the issue in detail.\n\nInclude logs from ../dsapp/logs/ directory possible."
 	print "\nThanks you,\n\nShane Nielson\nTyler Harris\n"
 	ds.eContinue()
 	sys.exit(0)
