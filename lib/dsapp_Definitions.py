@@ -252,30 +252,32 @@ def removeAllFolders(path):
 		logger.debug('Removed: %s' % f)
 
 def eContinue():
-	print("Press Enter to continue ", end='')
-	while True:
-		enter = getch()
-		if ord(enter) == 13:
-			break
-	print()
+	if sys.stdout.isatty():
+		print("Press Enter to continue ", end='')
+		while True:
+			enter = getch()
+			if ord(enter) == 13:
+				break
+		print()
 
 def break_loop():
 	return True
 
 def eContinueTime(timeout=5):
-	signal.signal(signal.SIGALRM, break_loop)
-	print("Press Enter to continue ", end='')
-	signal.alarm(timeout)
-	loop = True
-	try:
-		while loop:
-			enter = getch()
-			if ord(enter) == 13:
-				loop = False
-	except:
-		loop = False
-	signal.alarm(0)
-	print()
+	if sys.stdout.isatty():
+		signal.signal(signal.SIGALRM, break_loop)
+		print("Press Enter to continue ", end='')
+		signal.alarm(timeout)
+		loop = True
+		try:
+			while loop:
+				enter = getch()
+				if ord(enter) == 13:
+					loop = False
+		except:
+			loop = False
+		signal.alarm(0)
+		print()
 
 def checkInstall(forceMode, installedConnector):
 	if not forceMode:
@@ -1393,7 +1395,7 @@ def rcDS(status, op = None):
 		for pid in pids:
 			kill_pid(int(pid), 9)
 		for pid in cpids:
-			kill_pid(int(cpid))
+			kill_pid(int(pid))
 		spinner.stop(); print()
 
 	elif status == "stop" and op == "nocron":
@@ -1421,7 +1423,7 @@ def rcDS(status, op = None):
 		for pid in pids:
 			kill_pid(int(pid), 9)
 		for pid in cpids:
-			kill_pid(int(cpid))
+			kill_pid(int(pid))
 
 		for agent in datasync_scripts:
 			cmd = '%s%s start' % (initScripts, agent)

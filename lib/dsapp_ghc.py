@@ -823,7 +823,7 @@ def ghc_verifyNightlyMaintenance(config_files, mobilityConfig):
 		if mobilityConfig['logLevel'] == 'info' or mobilityConfig['logLevel'] == 'debug':
 			ghc_util_passFail('failed')
 		else:
-			msg = "Logging in %s. Logging level does not log maintenance\n" % mobilityConfig['loglevel']
+			msg = "Logging in %s. Logging level does not log maintenance\n" % mobilityConfig['logLevel']
 			ghc_util_passFail('warning', msg)
 	elif not problem:
 		ghc_util_passFail('passed')
