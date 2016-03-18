@@ -955,6 +955,8 @@ def check_hostname(old_host, XMLconfig, config_files, forceFix=False):
 		if not forceFix:
 			print ("Hostname %s does not match configured %s" % (new_host, old_host))
 			logger.warning('Hostname %s does not match %s' % (new_host,old_host))
+			if not sys.stdout.isatty():
+				return False
 		print ("This will fix encryption with old hostname '%s'" % old_host)
 		if askYesOrNo('Run now'):
 			update_xml_encrypt(XMLconfig, config_files, old_host, new_host)
@@ -1365,6 +1367,7 @@ def rcDS(status, op = None):
 
 	if status == "start" and op == None:
 		print('Starting Mobility.. ', end='')
+		logger.info("Starting Mobility agents..")
 		spinner.start(); time.sleep(.000001)
 		for agent in datasync_scripts:
 			cmd = '%s%s start' % (initScripts, agent)
@@ -1375,6 +1378,7 @@ def rcDS(status, op = None):
 
 	elif status == "start" and op == "nocron":
 		print('Starting Mobility.. ', end='')
+		logger.info("Starting Mobility agents..")
 		spinner.start(); time.sleep(.000001)
 		for agent in datasync_scripts:
 			cmd = '%s%s start' % (initScripts, agent)
@@ -1384,6 +1388,7 @@ def rcDS(status, op = None):
 	elif status == "stop" and op == None:
 		pids = get_pid(python_Directory)
 		print('Stopping Mobility.. ', end='')
+		logger.info("Stopping Mobility agents..")
 		spinner.start(); time.sleep(.000001)
 		for agent in datasync_scripts:
 			cmd = '%s%s stop' % (initScripts, agent)
@@ -1400,6 +1405,7 @@ def rcDS(status, op = None):
 
 	elif status == "stop" and op == "nocron":
 		print('Stopping Mobility.. ', end='')
+		logger.info("Stopping Mobility agents..")
 		spinner.start(); time.sleep(.000001)
 		for agent in datasync_scripts:
 			cmd = '%s%s stop' % (initScripts, agent)
@@ -1411,6 +1417,7 @@ def rcDS(status, op = None):
 
 	elif status == "restart" and op == None:
 		print('Restarting Mobility.. ', end='')
+		logger.info("Stopping Mobility agents..")
 		spinner.start(); time.sleep(.000001)
 		for agent in datasync_scripts:
 			cmd = '%s%s stop' % (initScripts, agent)
@@ -1425,6 +1432,7 @@ def rcDS(status, op = None):
 		for pid in cpids:
 			kill_pid(int(pid))
 
+		logger.info("Starting Mobility agents..")
 		for agent in datasync_scripts:
 			cmd = '%s%s start' % (initScripts, agent)
 			out = util_subprocess(cmd)
