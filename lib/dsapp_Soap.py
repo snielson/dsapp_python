@@ -188,8 +188,8 @@ def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
 		if 'folderType' in folder:
 			if folder['folderType'] in folder_check:
 				if folder['parent'] != root_id:
-					print "Problem with folder structure\n%s not found under root of mailbox\n" % folder['folderType']
-					logger.error("Problem with folder structure - %s not found under root of mailbox\n" % folder['folderType'])
+					print "Problem with system folder structure\n%s not found under root of mailbox\n" % folder['folderType']
+					logger.error("Problem with system folder structure - %s not found under root of mailbox\n" % folder['folderType'])
 					problem = True
 				else:
 					if folder['folderType'] == 'Contacts':

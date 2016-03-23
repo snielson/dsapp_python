@@ -443,7 +443,8 @@ def install_settings():
 	if ds.askYesOrNo("Restore users and groups"):
 		pass # TODO
 
-	# TODO : Check current hostname, and validate with backup certificates
+	# TODO : Check current hostname, and validate if backup certificates common name will work on new server
+	# Pass warning if common name != install hostname
 
 	# Prompt for backup certs to be applied
 	if ds.askYesOrNo("Restore backup certificates"):

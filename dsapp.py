@@ -164,8 +164,6 @@ def exit_cleanup():
 	# Clear dsapp/tmp
 	ds.removeAllFolders("/opt/novell/datasync/tools/dsapp/tmp/")
 	ds.removeAllFiles("/opt/novell/datasync/tools/dsapp/tmp/")
-	# ds.removeLine(dsappConf + '/dsapp.pid', str(os.getpid()))
-
 	logger.info('------------- Successfully shutdown dsapp -------------')
 
 def signal_handler_SIGINT(signal, frame):
@@ -195,19 +193,6 @@ def set_spinner():
 
 # Register exit_cleanup with atexit
 atexit.register(exit_cleanup)
-
-# SIG trap dsapp
-# signal.signal(signal.SIGINT, signal_handler_SIGINT)
-
-# # Get dsapp PID
-# with open(dsappConf + '/dsapp.pid', 'a') as pidFile:
-# 	pidFile.write(str(os.getpid()) + '\n')
-	
-# # Clean up previous PIDs if not found
-# with open(dsappConf + '/dsapp.pid', 'r') as pidFile:
-# 	for line in pidFile:
-# 		if not ds.check_pid(int(line)):
-# 			ds.removeLine(dsappConf + '/dsapp.pid', line)
 
 # Get Console Size
 if sys.stdout.isatty():

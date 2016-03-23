@@ -40,8 +40,13 @@ import dsapp_ghc as ghc
 # Global variables
 forceMode = False
 installedConnector = "/etc/init.d/datasync-connectors"
-COMPANY_BU = 'Novell'
+COMPANY_BU = 'Micro Focus'
 ERROR_MSG = "\ndsapp has encountered an error. See dsapp.log for more details"
+if sys.stdout.isatty():
+	WINDOW_SIZE = rows, columns = os.popen('stty size', 'r').read().split()
+else:
+	# Default terminal size
+	WINDOW_SIZE = [24,80]
 
 # Folder variables
 dsappDirectory = "/opt/novell/datasync/tools/dsapp"
@@ -1331,7 +1336,7 @@ def registerDS():
 		time2 = time.time()
 		spinner.stop(); print()
 		if err != '':
-		    print(textwrap.fill("\n\nThe code or email address you provided appear to be invalid or there is trouble contacting registration servers\n").lstrip())
+		    print(textwrap.fill("\n\nThe code or email address you provided appear to be invalid or there is trouble contacting registration servers\n", int(WINDOW_SIZE[1])).lstrip())
 		    logger.warning('Failed to register mobility')
 		else:
 			print("\nYour Mobility product has been successfully activated.")
@@ -2294,7 +2299,7 @@ def changeAppName(dbConfig):
 
 def reinitAllUsers(dbConfig):
 	datasyncBanner(dsappversion)
-	print (textwrap.fill("Note: During the reinitialize, users will not be able to log in. This may take some time.", 80))
+	print (textwrap.fill("Note: During the reinitialize, users will not be able to log in. This may take some time.", int(WINDOW_SIZE[1])))
 	if askYesOrNo("Are you sure you want to reinitialize all the users"):
 		conn = getConn(dbConfig, 'mobility')
 		cur = conn.cursor()
@@ -2946,9 +2951,11 @@ def buildFTFPatchList(filePath):
 	return patches
 
 def printFTFPatchList(patch_list):
+	wrapper = textwrap.TextWrapper(subsequent_indent='        ', width=int(WINDOW_SIZE[1])-8)
+
 	if len(patch_list) != 0:
 		for x in range(len(patch_list)):
-			print ("     %s. %s" % (x, patch_list[x]['detail']))
+			print(wrapper.fill("     %s. %s" % (x, patch_list[x]['detail'])))
 		print ("\n     q. Back")
 	else:
 		print ("No patches available")
@@ -2991,7 +2998,7 @@ def appyFTF(fileList, patch_file):
 	for files in patch_file['location']:
 		file = os.path.basename(files)
 		if file in fileList:
-			print (files)
+			# print (files)
 			os.rename(files, files + '.bak_%s' % date_fmt)
 			print ("Applying %s at %s" % (file, files))
 			shutil.copy(file, files)
@@ -3039,6 +3046,8 @@ def selectFTFPatch(patch_list):
 	print ();eContinue()
 
 def showAppliedPatches():
+	wrapper = textwrap.TextWrapper(subsequent_indent='             ', width=int(WINDOW_SIZE[1])-8)
+
 	datasyncBanner(dsappversion)
 	print ("Listing applied fixes..\n")
 	patchFile = dsappConf + '/patch-file.conf'
@@ -3058,19 +3067,19 @@ def showAppliedPatches():
 					printNext = True
 					patchFound = True
 
-					# Find and print the description
+					# Find and print the description # DEV: Maybe use next() ?
 					patch = (line.strip().split(' ')[2].strip())
 					if os.path.isfile(ftfList) and patch is not None:
 						with open(ftfList) as f2:
 							for line2 in f2:
-								if patch in line2:
+								if patch == line2.strip():
 									skipNext = True
 								elif skipNext:
 									skipNext = False
 									printNextFTF = True
 								elif printNextFTF:
 									printNextFTF = False
-									print ("Description: " + line2.strip())
+									print(wrapper.fill("Description: " + line2.strip()))
 				elif printNext:
 					print ("File(s): " + line)
 					printNext = False

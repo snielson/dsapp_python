@@ -15,7 +15,7 @@ import subprocess
 import dsapp_ghc as ghc
 import dsapp_Soap as dsSOAP
 
-COMPANY_BU = 'Novell'
+COMPANY_BU = 'Micro Focus'
 # DISCLAIMER = "Use at your own discretion. dsapp is not supported by %s\n     See [dsapp --bug] to report issues" % COMPANY_BU
 DISCLAIMER = "%s accepts no liability for the consequences of any actions taken\n     by the use of this application. Use at your own discretion" % COMPANY_BU
 
@@ -96,8 +96,8 @@ def get_choice(available, special=None):
 		if special is not None and choice == special:
 			print
 			return special
-		elif choice in available or choice == 'q':
-			if choice == '0' or choice == 'q':
+		elif choice in available or choice == 'q' or choice == 'Q':
+			if choice == '0' or choice == 'q' or choice == 'Q':
 				print
 				return '0'
 			else:
