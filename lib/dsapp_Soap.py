@@ -1,10 +1,15 @@
+#!/usr/bin/env python
 # Written by Shane Nielson <snielson@projectuminfinitas.com>
-# Special thanks to Tim Draper
+__author__ = "Shane Nielson"
+__credits__ = ["Tyler Harris", "Tim Draper"]
+__maintainer__ = "Shane Nielson"
+__email__ = "snielson@projectuminfinitas.com"
 
 import os, sys
 import suds.client
 import logging, logging.config
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+import dsapp_Definitions as ds
 
 # Global paths
 dsappDirectory = "/opt/novell/datasync/tools/dsapp"
@@ -155,11 +160,16 @@ def soap_getFolderList(trustedConfig, gwConfig, userConfig):
 	return results
 
 def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
+	if userConfig['name'] is None:
+		return
+
 	problem = False
 	print ("Getting folder list..")
 	logger.info("Getting folder list..")
 	soap_folderList = soap_getFolderList(trustedConfig, gwConfig, userConfig)
 	if soap_folderList == None:
+		logger.debug("SOAP folder list is None")
+		print; ds.eContinue()
 		return
 
 	# Get root folder ID
@@ -182,8 +192,8 @@ def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
 		if 'folderType' in folder:
 			if folder['folderType'] in folder_check:
 				if folder['parent'] != root_id:
-					print "Problem with folder structure\n%s not found under root of mailbox\n" % folder['folderType']
-					logger.error("Problem with folder structure - %s not found under root of mailbox\n" % folder['folderType'])
+					print "Problem with system folder structure\n%s not found under root of mailbox\n" % folder['folderType']
+					logger.error("Problem with system folder structure - %s not found under root of mailbox\n" % folder['folderType'])
 					problem = True
 				else:
 					if folder['folderType'] == 'Contacts':
@@ -193,6 +203,8 @@ def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
 	if not problem:
 		print "No problems found with GroupWise folder structure"
 		logger.info("No problems found with GroupWise folder structure")
+
+	print; ds.eContinue()
 
 
 def soap_printUser(trustedConfig, gwConfig, userConfig):

@@ -1,4 +1,9 @@
+#!/usr/bin/env python
 # Written by Shane Nielson <snielson@projectuminfinitas.com>
+__author__ = "Shane Nielson"
+__credits__ = "Tyler Harris"
+__maintainer__ = "Shane Nielson"
+__email__ = "snielson@projectuminfinitas.com"
 
 import sys
 import os
@@ -15,7 +20,7 @@ import subprocess
 import dsapp_ghc as ghc
 import dsapp_Soap as dsSOAP
 
-COMPANY_BU = 'Novell'
+COMPANY_BU = 'Micro Focus'
 # DISCLAIMER = "Use at your own discretion. dsapp is not supported by %s\n     See [dsapp --bug] to report issues" % COMPANY_BU
 DISCLAIMER = "%s accepts no liability for the consequences of any actions taken\n     by the use of this application. Use at your own discretion" % COMPANY_BU
 
@@ -96,8 +101,8 @@ def get_choice(available, special=None):
 		if special is not None and choice == special:
 			print
 			return special
-		elif choice in available or choice == 'q':
-			if choice == '0' or choice == 'q':
+		elif choice in available or choice == 'q' or choice == 'Q':
+			if choice == '0' or choice == 'q' or choice == 'Q':
 				print
 				return '0'
 			else:
@@ -362,13 +367,10 @@ def userIssue_menu():
 			removeUser_menu()
 		elif choice == '4':
 			ds.check_userAuth(dbConfig, authConfig)
-			ds.eContinue()
 		elif choice == '5':
 			ds.changeAppName(dbConfig)
-			print; ds.eContinue()
 		elif choice == '6':
 			ds.updateFDN(dbConfig, XMLconfig, ldapConfig)
-			print; ds.eContinue()
 		elif choice == '7':
 			ds.whereDidIComeFromAndWhereAmIGoingOrWhatHappenedToMe(dbConfig)
 		elif choice == '8':
@@ -390,7 +392,6 @@ def monitorUser_menu():
 			ds.monitorUser(dbConfig)
 		elif choice == '2':
 			ds.monitor_Sync_validate(dbConfig)
-			print; ds.eContinue()
 		elif choice == '3':
 			ds.monitor_syncing_users(dbConfig)
 		elif choice == '0':
@@ -415,7 +416,6 @@ def groupwiseChecks_menu():
 				print; ds.eContinue()
 		elif choice == '2':
 			dsSOAP.soap_checkFolderList(trustedConfig, gwConfig, ds.verifyUser(dbConfig))
-			print; ds.eContinue()
 		elif choice == '0':
 			loop = False
 			return
@@ -430,10 +430,8 @@ def removeUser_menu():
 		choice = get_choice(available)
 		if choice == '1':
 			ds.remove_user(dbConfig, 1)
-			print; ds.eContinue()
 		elif choice == '2':
 			ds.remove_user(dbConfig)
-			print; ds.eContinue()
 		elif choice == '3':
 			ds.datasyncBanner(dsappversion)
 			ds.removed_disabled(dbConfig)

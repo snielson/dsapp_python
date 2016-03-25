@@ -1,9 +1,15 @@
+#!/usr/bin/env python
 # Written by Shane Nielson <snielson@projectuminfinitas.com>
-
 from __future__ import print_function
+
+__author__ = "Shane Nielson"
+__credits__ = "Tyler Harris"
+__maintainer__ = "Shane Nielson"
+__email__ = "snielson@projectuminfinitas.com"
+
 import os,base64,binascii,sys,signal,select,getpass,shutil,fileinput,glob,atexit,time,datetime,itertools,pprint,textwrap
 import subprocess,socket,re,rpm,contextlib
-import tarfile, zipfile
+import tarfile, zipfile, bz2
 import thread, threading
 from pipes import quote
 import io
@@ -40,8 +46,13 @@ import dsapp_ghc as ghc
 # Global variables
 forceMode = False
 installedConnector = "/etc/init.d/datasync-connectors"
-COMPANY_BU = 'Novell'
+COMPANY_BU = 'Micro Focus'
 ERROR_MSG = "\ndsapp has encountered an error. See dsapp.log for more details"
+if sys.stdout.isatty():
+	WINDOW_SIZE = rows, columns = os.popen('stty size', 'r').read().split()
+else:
+	# Default terminal size
+	WINDOW_SIZE = [24,80]
 
 # Folder variables
 dsappDirectory = "/opt/novell/datasync/tools/dsapp"
@@ -423,6 +434,7 @@ def untar_file(fileName, extractPath="."):
 def uncompressIt(fileName):
 	extension = os.path.splitext(fileName)[1]
 	options = {'.tar': untar_file,'.zip': unzip_file, '.tgz': untar_file}
+	logger.debug("Uncompressing %s with %s extension" % (fileName, extension))
 	options[extension](fileName)
 
 def zip_content(fileName):
@@ -436,6 +448,7 @@ def tar_content(fileName):
 def file_content(fileName):
 	extension = os.path.splitext(fileName)[1]
 	options = {'.tar': tar_content,'.zip': zip_content, '.tgz': tar_content}
+	logger.debug("Getting %s content with %s extension" % (fileName, extension))
 	return options[extension](fileName)
 
 def DoesServiceExist(host, port):
@@ -955,6 +968,8 @@ def check_hostname(old_host, XMLconfig, config_files, forceFix=False):
 		if not forceFix:
 			print ("Hostname %s does not match configured %s" % (new_host, old_host))
 			logger.warning('Hostname %s does not match %s' % (new_host,old_host))
+			if not sys.stdout.isatty():
+				return False
 		print ("This will fix encryption with old hostname '%s'" % old_host)
 		if askYesOrNo('Run now'):
 			update_xml_encrypt(XMLconfig, config_files, old_host, new_host)
@@ -1329,7 +1344,7 @@ def registerDS():
 		time2 = time.time()
 		spinner.stop(); print()
 		if err != '':
-		    print(textwrap.fill("\n\nThe code or email address you provided appear to be invalid or there is trouble contacting registration servers\n").lstrip())
+		    print(textwrap.fill("\n\nThe code or email address you provided appear to be invalid or there is trouble contacting registration servers\n", int(WINDOW_SIZE[1])).lstrip())
 		    logger.warning('Failed to register mobility')
 		else:
 			print("\nYour Mobility product has been successfully activated.")
@@ -1365,6 +1380,7 @@ def rcDS(status, op = None):
 
 	if status == "start" and op == None:
 		print('Starting Mobility.. ', end='')
+		logger.info("Starting Mobility agents..")
 		spinner.start(); time.sleep(.000001)
 		for agent in datasync_scripts:
 			cmd = '%s%s start' % (initScripts, agent)
@@ -1375,6 +1391,7 @@ def rcDS(status, op = None):
 
 	elif status == "start" and op == "nocron":
 		print('Starting Mobility.. ', end='')
+		logger.info("Starting Mobility agents..")
 		spinner.start(); time.sleep(.000001)
 		for agent in datasync_scripts:
 			cmd = '%s%s start' % (initScripts, agent)
@@ -1384,6 +1401,7 @@ def rcDS(status, op = None):
 	elif status == "stop" and op == None:
 		pids = get_pid(python_Directory)
 		print('Stopping Mobility.. ', end='')
+		logger.info("Stopping Mobility agents..")
 		spinner.start(); time.sleep(.000001)
 		for agent in datasync_scripts:
 			cmd = '%s%s stop' % (initScripts, agent)
@@ -1400,6 +1418,7 @@ def rcDS(status, op = None):
 
 	elif status == "stop" and op == "nocron":
 		print('Stopping Mobility.. ', end='')
+		logger.info("Stopping Mobility agents..")
 		spinner.start(); time.sleep(.000001)
 		for agent in datasync_scripts:
 			cmd = '%s%s stop' % (initScripts, agent)
@@ -1411,6 +1430,7 @@ def rcDS(status, op = None):
 
 	elif status == "restart" and op == None:
 		print('Restarting Mobility.. ', end='')
+		logger.info("Stopping Mobility agents..")
 		spinner.start(); time.sleep(.000001)
 		for agent in datasync_scripts:
 			cmd = '%s%s stop' % (initScripts, agent)
@@ -1425,6 +1445,7 @@ def rcDS(status, op = None):
 		for pid in cpids:
 			kill_pid(int(pid))
 
+		logger.info("Starting Mobility agents..")
 		for agent in datasync_scripts:
 			cmd = '%s%s start' % (initScripts, agent)
 			out = util_subprocess(cmd)
@@ -1503,6 +1524,7 @@ def verifyUser(dbConfig):
 	get_username(userConfig)
 	if userConfig['name'] is None:
 		userConfig['mName'] = None
+		userConfig['type'] = None
 		userConfig['dName'] = None
 		userConfig['verify'] = None
 		return userConfig
@@ -1530,13 +1552,13 @@ def confirm_user(userConfig, database = None):
 	if database == 1:
 		return True
 	elif database == 'mobility' and userConfig['verify'] == 2:
-		print ("%s not found in Mobility" % userConfig['name'])
+		print ("'%s' not found in Mobility" % userConfig['name'])
 		return False
 	elif database == 'datasync' and userConfig['verify'] == 1:
-		print ("%s not found in Mobility" % userConfig['name'])
+		print ("'%s' not found in Mobility" % userConfig['name'])
 		return False
 	if userConfig['verify'] == 0:
-		print ("%s not found in Mobility" % userConfig['name'])
+		print ("'%s' not found in Mobility" % userConfig['name'])
 		return False
 	return True
 
@@ -1576,9 +1598,14 @@ def monitorUser(dbConfig, userConfig = None, refresh = 1):
 		command = "SELECT state,userID FROM users WHERE userid ilike '%%%s%%'" % userConfig['mName']
 		monitor_command(dbConfig, command, refresh)
 
+	print(); eContinue()
+
 def setUserState(dbConfig, state):
 	# verifyUser sets vuid variable used in setUserState and removeAUser functions
 	userConfig = verifyUser(dbConfig)
+	if userConfig['name'] is None:
+		return
+
 	if confirm_user(userConfig, 'mobility'):
 		conn = getConn(dbConfig, 'mobility')
 		cur = conn.cursor()
@@ -1588,6 +1615,8 @@ def setUserState(dbConfig, state):
 		conn.close()
 
 		monitorUser(dbConfig, userConfig)
+
+	print(); eContinue()
 
 def file_mCleanup(filePath, fileCount):
 	date = datetime.datetime.now().strftime("%H:%M:%S on %b %d, %Y")
@@ -1775,6 +1804,9 @@ def dCleanup(dbConfig, userConfig):
 def remove_user(dbConfig, op = None):
 	# Pass in 1 for op to skip user database check in confirm_user()
 	userConfig = verifyUser(dbConfig)
+	if userConfig['name'] is None:
+		return
+
 	datasyncBanner(dsappversion)
 	if op == 1:
 		logger.debug("Skipping user database check")
@@ -1824,6 +1856,8 @@ def remove_user(dbConfig, op = None):
 			dCleanup(dbConfig, userConfig)
 			print()
 			mCleanup(dbConfig, userConfig)
+
+	print(); eContinue()
 
 def addGroup(dbConfig, ldapConfig):
 	conn = getConn(dbConfig, 'datasync')
@@ -2042,9 +2076,20 @@ def checkNightlyMaintenance(config_files, mobilityConfig, healthCheck=False):
 			pass
 
 		for file in files[-previousLogs:]:
-			with contextlib.closing(gzip.open('%s' % file, 'r')) as f:
-				for line in f:
-					if 'Nightly maintenance' in line: logReport.append(line.strip())
+			extension = os.path.splitext(file)[1]
+
+			# Check if extension is gzip or bzip2
+			if extension == '.gz':
+				logger.debug("Opening %s with gzip" % file)
+				with contextlib.closing(gzip.open('%s' % file, 'r')) as f:
+					for line in f:
+						if 'Nightly maintenance' in line: logReport.append(line.strip())
+			elif extension == '.bz2':
+				logger.debug("Opening %s with bzip2" % file)
+				with contextlib.closing(bz2.BZ2File('%s' % file, 'r')) as f:
+					for line in f:
+						if 'Nightly maintenance' in line: logReport.append(line.strip())
+
 			if len(logReport) != 0:
 				fileName = file
 				break
@@ -2222,6 +2267,9 @@ def changeDBPass(config_files, XMLconfig):
 def changeAppName(dbConfig):
 	datasyncBanner(dsappversion)
 	userConfig = verifyUser(dbConfig)
+	if userConfig['name'] is None:
+		return
+
 	if confirm_user(userConfig, 'datasync'):
 
 		defaultMAppName = userConfig['mAppName']
@@ -2266,11 +2314,11 @@ def changeAppName(dbConfig):
 			print ("Unable to find application names")
 			logger.warning("Unalbe to find all application names")
 
-		
+	print(); eContinue()
 
 def reinitAllUsers(dbConfig):
 	datasyncBanner(dsappversion)
-	print (textwrap.fill("Note: During the reinitialize, users will not be able to log in. This may take some time.", 80))
+	print (textwrap.fill("Note: During the reinitialize, users will not be able to log in. This may take some time.", int(WINDOW_SIZE[1])))
 	if askYesOrNo("Are you sure you want to reinitialize all the users"):
 		conn = getConn(dbConfig, 'mobility')
 		cur = conn.cursor()
@@ -2675,8 +2723,11 @@ def userLdapOrGw(userConfig, pro_type):
 
 def updateFDN(dbConfig, XMLconfig, ldapConfig):
 	datasyncBanner(dsappversion)
+	userConfig = verifyUser(dbConfig)
+	if userConfig['name'] is None:
+		return
+
 	if checkLDAP(XMLconfig, ldapConfig):
-		userConfig = verifyUser(dbConfig)
 		if userConfig['verify'] != 0 and userConfig['verify'] is not None:
 			if userLdapOrGw(userConfig, 'ldap'):
 				multiple = False
@@ -2776,6 +2827,7 @@ def updateFDN(dbConfig, XMLconfig, ldapConfig):
 			if userConfig['verify'] is not None:
 				print ("No such user '%s'" % userConfig['name'])
 				logger.warning("User '%s' not found in databases" % userConfig['name'])
+	print(); eContinue()
 
 def getApplicationNames(userConfig, dbConfig):
 	conn = getConn(dbConfig, 'datasync')
@@ -2918,9 +2970,11 @@ def buildFTFPatchList(filePath):
 	return patches
 
 def printFTFPatchList(patch_list):
+	wrapper = textwrap.TextWrapper(subsequent_indent='        ', width=int(WINDOW_SIZE[1])-8)
+
 	if len(patch_list) != 0:
 		for x in range(len(patch_list)):
-			print ("     %s. %s" % (x, patch_list[x]['detail']))
+			print(wrapper.fill("     %s. %s" % (x, patch_list[x]['detail'])))
 		print ("\n     q. Back")
 	else:
 		print ("No patches available")
@@ -2963,7 +3017,7 @@ def appyFTF(fileList, patch_file):
 	for files in patch_file['location']:
 		file = os.path.basename(files)
 		if file in fileList:
-			print (files)
+			# print (files)
 			os.rename(files, files + '.bak_%s' % date_fmt)
 			print ("Applying %s at %s" % (file, files))
 			shutil.copy(file, files)
@@ -3011,6 +3065,8 @@ def selectFTFPatch(patch_list):
 	print ();eContinue()
 
 def showAppliedPatches():
+	wrapper = textwrap.TextWrapper(subsequent_indent='             ', width=int(WINDOW_SIZE[1])-8)
+
 	datasyncBanner(dsappversion)
 	print ("Listing applied fixes..\n")
 	patchFile = dsappConf + '/patch-file.conf'
@@ -3030,19 +3086,19 @@ def showAppliedPatches():
 					printNext = True
 					patchFound = True
 
-					# Find and print the description
+					# Find and print the description # DEV: Maybe use next() ?
 					patch = (line.strip().split(' ')[2].strip())
 					if os.path.isfile(ftfList) and patch is not None:
 						with open(ftfList) as f2:
 							for line2 in f2:
-								if patch in line2:
+								if patch == line2.strip():
 									skipNext = True
 								elif skipNext:
 									skipNext = False
 									printNextFTF = True
 								elif printNextFTF:
 									printNextFTF = False
-									print ("Description: " + line2.strip())
+									print(wrapper.fill("Description: " + line2.strip()))
 				elif printNext:
 					print ("File(s): " + line)
 					printNext = False
@@ -3321,6 +3377,9 @@ def fix_gal(dbConfig):
 def monitor_Sync_validate(dbConfig):
 	datasyncBanner(dsappversion)
 	userConfig = verifyUser(dbConfig)
+	if userConfig['name'] is None:
+		return
+
 	if userConfig['verify'] != 0:
 		results_found = False
 		print ("\nScanning log for sync validate..\n")
@@ -3335,8 +3394,10 @@ def monitor_Sync_validate(dbConfig):
 			print ("No results found")
 			logger.info("No results found")
 	else:
-		print ("No such user: %s" % userConfig['name'])
-		logger.warning("No such user: %s" % userConfig['name'])
+		print ("No such user '%s'" % userConfig['name'])
+		logger.warning("No such user '%s'" % userConfig['name'])
+
+	print(); eContinue()
 
 def removed_disabled(dbConfig):
 	# datasyncBanner(dsappversion)
@@ -3481,13 +3542,17 @@ def check_userAuth(dbConfig, authConfig):
 	# User Authentication
 	datasyncBanner(dsappversion)
 	userConfig = verifyUser(dbConfig)
-	setVariables()
+	if userConfig['name'] is None:
+		return
 
 	# Confirm user exists in database
 	if userConfig['verify'] == 0:
 		print ("User '%s' not found" % userConfig['name'])
+		logger.warning("User '%s' not found" % userConfig['name'])
+		print(); eContinue()
 		return
 
+	setVariables()
 	print ("\nCheck for User Authentication Problems:")
 	print ("Checking log files..\n")
 	logger.info("Checking log files for '%s'" % userConfig['mAppName'])
@@ -3566,6 +3631,8 @@ def check_userAuth(dbConfig, authConfig):
 		logger.info("No problems detected")
 		print ("\nNo problems detected")
 
+	eContinue()
+
 def whereDidIComeFromAndWhereAmIGoingOrWhatHappenedToMe(dbConfig):
 	datasyncBanner(dsappversion)
 	displayName = raw_input("Item name (subject, folder, contact, calendar): ")
@@ -3607,6 +3674,15 @@ def getUsers_and_Devices(dbConfig, showUsers=False, showDevices=False, showBoth=
 
 def getUserPAB(dbConfig):
 	userConfig = verifyUser(dbConfig)
+	if userConfig['name'] is None:
+		return
+
+	if userConfig['type'] is None:
+		print("Unable to find object type for '%s'" % userConfig['name'])
+		logger.warning("Unable to find object type for '%s'" % userConfig['name'])
+		eContinue()
+		return
+
 	conn = getConn(dbConfig, 'mobility')
 	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
 	logger.info("Getting PABs for '%s'.." % userConfig['name'])
@@ -3739,23 +3815,3 @@ def clearTextEncryption(config_files, XMLconfig, ldapConfig, authConfig):
 
 	print ("\nRun %s/update.sh to re-encrypt XMLs" % dirOptMobility)
 
-
-# TODO : Finish this - Is it needed???
-# def whatDeviceDeleted(dbConfig):
-# datasyncBanner(dsappversion)
-# userConfig = verifyUser(dbConfig)
-# if userConfig['verify'] != 0:
-# 	setVariables()
-# 	with open(mAlog, 'r') as open_file:
-# 		for line in open_file:
-# 			if '<origSourceName>%s</origSourceName>' in line and ''
-
-# 	deletions=`cat $mAlog* | grep -i -A 8 "<origSourceName>$vuid</origSourceName>" | grep -i -A 2 "<type>delete</type>" | grep -i "<creationEventID>" | cut -d '.' -f4- | sed 's|<\/creationEventID>||g'`
-
-# 	echo "$deletions" | sed 's| |\\n|g' | while read -r line
-# 	do
-# 		grep -A 20 $line $mAlog* | grep -i subject
-# 	done
-
-# 	if [ -z "$deletions" ]; then
-# 		echo "Nothing found."

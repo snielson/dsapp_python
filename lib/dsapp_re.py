@@ -1,6 +1,12 @@
+#!/usr/bin/env python
 # Written by Shane Nielson <snielson@projectuminfinitas.com>
-
 from __future__ import print_function
+
+__author__ = "Shane Nielson"
+__credits__ = "Tyler Harris"
+__maintainer__ = "Shane Nielson"
+__email__ = "snielson@projectuminfinitas.com"
+
 import os
 import sys
 import datetime
@@ -443,7 +449,8 @@ def install_settings():
 	if ds.askYesOrNo("Restore users and groups"):
 		pass # TODO
 
-	# TODO : Check current hostname, and validate with backup certificates
+	# TODO : Check current hostname, and validate if backup certificates common name will work on new server
+	# Pass warning if common name != install hostname
 
 	# Prompt for backup certs to be applied
 	if ds.askYesOrNo("Restore backup certificates"):

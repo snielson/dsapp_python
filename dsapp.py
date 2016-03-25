@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 ##################################################################################################
 #
 #	<Python 2.6>
@@ -8,8 +9,12 @@
 #	Original dsapp by: Shane Nielson & Tyler Harris
 #
 ##################################################################################################
+__author__ = "Shane Nielson"
+__credits__ = "Tyler Harris"
+__maintainer__ = "Shane Nielson"
+__email__ = "snielson@projectuminfinitas.com"
 
-dsappversion='232'
+dsappversion='233'
 
 ##################################################################################################
 #	Imports
@@ -164,8 +169,6 @@ def exit_cleanup():
 	# Clear dsapp/tmp
 	ds.removeAllFolders("/opt/novell/datasync/tools/dsapp/tmp/")
 	ds.removeAllFiles("/opt/novell/datasync/tools/dsapp/tmp/")
-	ds.removeLine(dsappConf + '/dsapp.pid', str(os.getpid()))
-
 	logger.info('------------- Successfully shutdown dsapp -------------')
 
 def signal_handler_SIGINT(signal, frame):
@@ -195,19 +198,6 @@ def set_spinner():
 
 # Register exit_cleanup with atexit
 atexit.register(exit_cleanup)
-
-# SIG trap dsapp
-# signal.signal(signal.SIGINT, signal_handler_SIGINT)
-
-# Get dsapp PID
-with open(dsappConf + '/dsapp.pid', 'a') as pidFile:
-	pidFile.write(str(os.getpid()) + '\n')
-	
-# Clean up previous PIDs if not found
-with open(dsappConf + '/dsapp.pid', 'r') as pidFile:
-	for line in pidFile:
-		if not ds.check_pid(int(line)):
-			ds.removeLine(dsappConf + '/dsapp.pid', line)
 
 # Get Console Size
 if sys.stdout.isatty():
@@ -251,9 +241,9 @@ if args.re == 'restore':
 
 if args.bug:
 	ds.datasyncBanner(dsappversion)
-	print "Report issues to: https://github.com/snielson/dsapp_python/issues"
-	print "Please describe the issue in detail.\n\nInclude logs from ../dsapp/logs/ directory possible."
-	print "\nThanks you,\n\nShane Nielson\nTyler Harris\n"
+	print "Report issues to: https://github.com/snielson/dsapp_python/issues\n"
+	print "Useful logs can be located at:\n/opt/novell/datasync/tools/dsapp/logs/\n"
+	print "Feel free to email %s directly at <%s>" % (__author__, __email__)
 	ds.eContinue()
 	sys.exit(0)
 

@@ -28,3 +28,7 @@ Fix 'None Folder' in dashboard
 Fix devices not getting notifications
 /opt/novell/datasync/syncengine/connectors/mobility/lib/device/sync.pyc
 
+961058-962848.tar
+1420279
+Fix devices not getting notifications & Email deleted or moved on iOS device still showing in Inbox folder of device
+/opt/novell/datasync/syncengine/connectors/mobility/lib/device/sync.pyc
