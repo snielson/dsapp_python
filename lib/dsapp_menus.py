@@ -1,4 +1,9 @@
+#!/usr/bin/env python
 # Written by Shane Nielson <snielson@projectuminfinitas.com>
+__author__ = "Shane Nielson"
+__credits__ = "Tyler Harris"
+__maintainer__ = "Shane Nielson"
+__email__ = "snielson@projectuminfinitas.com"
 
 import sys
 import os

@@ -1,9 +1,15 @@
+#!/usr/bin/env python
 # Written by Shane Nielson <snielson@projectuminfinitas.com>
-
 from __future__ import print_function
+
+__author__ = "Shane Nielson"
+__credits__ = "Tyler Harris"
+__maintainer__ = "Shane Nielson"
+__email__ = "snielson@projectuminfinitas.com"
+
 import os,base64,binascii,sys,signal,select,getpass,shutil,fileinput,glob,atexit,time,datetime,itertools,pprint,textwrap
 import subprocess,socket,re,rpm,contextlib
-import tarfile, zipfile
+import tarfile, zipfile, bz2
 import thread, threading
 from pipes import quote
 import io
@@ -428,6 +434,7 @@ def untar_file(fileName, extractPath="."):
 def uncompressIt(fileName):
 	extension = os.path.splitext(fileName)[1]
 	options = {'.tar': untar_file,'.zip': unzip_file, '.tgz': untar_file}
+	logger.debug("Uncompressing %s with %s extension" % (fileName, extension))
 	options[extension](fileName)
 
 def zip_content(fileName):
@@ -441,6 +448,7 @@ def tar_content(fileName):
 def file_content(fileName):
 	extension = os.path.splitext(fileName)[1]
 	options = {'.tar': tar_content,'.zip': zip_content, '.tgz': tar_content}
+	logger.debug("Getting %s content with %s extension" % (fileName, extension))
 	return options[extension](fileName)
 
 def DoesServiceExist(host, port):
@@ -2068,9 +2076,20 @@ def checkNightlyMaintenance(config_files, mobilityConfig, healthCheck=False):
 			pass
 
 		for file in files[-previousLogs:]:
-			with contextlib.closing(gzip.open('%s' % file, 'r')) as f:
-				for line in f:
-					if 'Nightly maintenance' in line: logReport.append(line.strip())
+			extension = os.path.splitext(file)[1]
+
+			# Check if extension is gzip or bzip2
+			if extension == '.gz':
+				logger.debug("Opening %s with gzip" % file)
+				with contextlib.closing(gzip.open('%s' % file, 'r')) as f:
+					for line in f:
+						if 'Nightly maintenance' in line: logReport.append(line.strip())
+			elif extension == '.bz2':
+				logger.debug("Opening %s with bzip2" % file)
+				with contextlib.closing(bz2.BZ2File('%s' % file, 'r')) as f:
+					for line in f:
+						if 'Nightly maintenance' in line: logReport.append(line.strip())
+
 			if len(logReport) != 0:
 				fileName = file
 				break
@@ -3796,23 +3815,3 @@ def clearTextEncryption(config_files, XMLconfig, ldapConfig, authConfig):
 
 	print ("\nRun %s/update.sh to re-encrypt XMLs" % dirOptMobility)
 
-
-# TODO : Finish this - Is it needed???
-# def whatDeviceDeleted(dbConfig):
-# datasyncBanner(dsappversion)
-# userConfig = verifyUser(dbConfig)
-# if userConfig['verify'] != 0:
-# 	setVariables()
-# 	with open(mAlog, 'r') as open_file:
-# 		for line in open_file:
-# 			if '<origSourceName>%s</origSourceName>' in line and ''
-
-# 	deletions=`cat $mAlog* | grep -i -A 8 "<origSourceName>$vuid</origSourceName>" | grep -i -A 2 "<type>delete</type>" | grep -i "<creationEventID>" | cut -d '.' -f4- | sed 's|<\/creationEventID>||g'`
-
-# 	echo "$deletions" | sed 's| |\\n|g' | while read -r line
-# 	do
-# 		grep -A 20 $line $mAlog* | grep -i subject
-# 	done
-
-# 	if [ -z "$deletions" ]; then
-# 		echo "Nothing found."

@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 ##################################################################################################
 #
 #	<Python 2.6>
@@ -8,6 +9,10 @@
 #	Original dsapp by: Shane Nielson & Tyler Harris
 #
 ##################################################################################################
+__author__ = "Shane Nielson"
+__credits__ = "Tyler Harris"
+__maintainer__ = "Shane Nielson"
+__email__ = "snielson@projectuminfinitas.com"
 
 dsappversion='233'
 
@@ -236,9 +241,9 @@ if args.re == 'restore':
 
 if args.bug:
 	ds.datasyncBanner(dsappversion)
-	print "Report issues to: https://github.com/snielson/dsapp_python/issues"
-	print "Please describe the issue in detail.\n\nInclude logs from ../dsapp/logs/ directory possible."
-	print "\nThanks you,\n\nShane Nielson\nTyler Harris\n"
+	print "Report issues to: https://github.com/snielson/dsapp_python/issues\n"
+	print "Useful logs can be located at:\n/opt/novell/datasync/tools/dsapp/logs/\n"
+	print "Feel free to email %s directly at <%s>" % (__author__, __email__)
 	ds.eContinue()
 	sys.exit(0)
 
