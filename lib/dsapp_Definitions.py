@@ -9,7 +9,7 @@ __email__ = "snielson@projectuminfinitas.com"
 
 import os,base64,binascii,sys,signal,select,getpass,shutil,fileinput,glob,atexit,time,datetime,itertools,pprint,textwrap
 import subprocess,socket,re,rpm,contextlib
-import tarfile, zipfile
+import tarfile, zipfile, bz2
 import thread, threading
 from pipes import quote
 import io
@@ -434,6 +434,7 @@ def untar_file(fileName, extractPath="."):
 def uncompressIt(fileName):
 	extension = os.path.splitext(fileName)[1]
 	options = {'.tar': untar_file,'.zip': unzip_file, '.tgz': untar_file}
+	logger.debug("Uncompressing %s with %s extension" % (fileName, extension))
 	options[extension](fileName)
 
 def zip_content(fileName):
@@ -447,6 +448,7 @@ def tar_content(fileName):
 def file_content(fileName):
 	extension = os.path.splitext(fileName)[1]
 	options = {'.tar': tar_content,'.zip': zip_content, '.tgz': tar_content}
+	logger.debug("Getting %s content with %s extension" % (fileName, extension))
 	return options[extension](fileName)
 
 def DoesServiceExist(host, port):
@@ -2099,9 +2101,19 @@ def checkNightlyMaintenance(config_files, mobilityConfig, healthCheck=False):
 			pass
 
 		for file in files[-previousLogs:]:
-			with contextlib.closing(gzip.open('%s' % file, 'r')) as f: # TODO : Check for file extension (gzip or bzip2)
-				for line in f:
-					if 'Nightly maintenance' in line: logReport.append(line.strip())
+			extension = os.path.splitext(file)[1]
+
+			# Check if extension is gzip or bzip2
+			if extension == '.gz':
+				logger.debug("Opening %s with gzip" % file)
+				with contextlib.closing(gzip.open('%s' % file, 'r')) as f:
+					for line in f:
+						if 'Nightly maintenance' in line: logReport.append(line.strip())
+			elif extension == '.bz2':
+				logger.debug("Opening %s with bzip2" % file)
+				with contextlib.closing(bz2.BZ2File('%s' % file, 'r')) as f:
+					for line in f:
+						if 'Nightly maintenance' in line: logReport.append(line.strip())
 			if len(logReport) != 0:
 				fileName = file
 				break
