@@ -3,7 +3,7 @@
 from __future__ import print_function
 
 __author__ = "Shane Nielson"
-__credits__ = "Tyler Harris"
+__credits__ = "Bruce Getter"
 __maintainer__ = "Shane Nielson"
 __email__ = "snielson@projectuminfinitas.com"
 
@@ -428,6 +428,9 @@ def install_settings():
 	logger.info("Enabling and Starting GroupWise Mobility Service..")
 	out = ds.util_subprocess(setup_four, True)
 
+	# Manually start mobility as the init script will detect a running [p]ython pid, and fail to start
+	ds.rcDS('start', op='nocron', show_spinner=False, show_print=False)
+
 	print ("Configuring Device Sync Agent..")
 	logger.info("Configuring Device Sync Agent..")
 	out = ds.util_subprocess(setup_five, True)
@@ -443,15 +446,15 @@ def install_settings():
 	# Prompt to match backup ldap settings
 	if ldapConfig['enabled'] == 'true':
 		if ds.askYesOrNo("Restore LDAP settings"):
-			pass # TODO
+			print ("No settings restored - Work in progress") # TODO
 
 	# Prompt for users and group to be imported
 	if ds.askYesOrNo("Restore users and groups"):
-		pass # TODO
+		print ("No settings restored - Work in progress") # TODO
 
 	# TODO : Check current hostname, and validate if backup certificates common name will work on new server
 	# Pass warning if common name != install hostname
 
 	# Prompt for backup certs to be applied
 	if ds.askYesOrNo("Restore backup certificates"):
-		pass # TODO
+		print ("No settings restored - Work in progress") # TODO

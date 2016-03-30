@@ -9,7 +9,7 @@ __email__ = "snielson@projectuminfinitas.com"
 
 import os,base64,binascii,sys,signal,select,getpass,shutil,fileinput,glob,atexit,time,datetime,itertools,pprint,textwrap
 import subprocess,socket,re,rpm,contextlib
-import tarfile, zipfile, bz2
+import tarfile, zipfile
 import thread, threading
 from pipes import quote
 import io
@@ -434,7 +434,6 @@ def untar_file(fileName, extractPath="."):
 def uncompressIt(fileName):
 	extension = os.path.splitext(fileName)[1]
 	options = {'.tar': untar_file,'.zip': unzip_file, '.tgz': untar_file}
-	logger.debug("Uncompressing %s with %s extension" % (fileName, extension))
 	options[extension](fileName)
 
 def zip_content(fileName):
@@ -448,7 +447,6 @@ def tar_content(fileName):
 def file_content(fileName):
 	extension = os.path.splitext(fileName)[1]
 	options = {'.tar': tar_content,'.zip': zip_content, '.tgz': tar_content}
-	logger.debug("Getting %s content with %s extension" % (fileName, extension))
 	return options[extension](fileName)
 
 def DoesServiceExist(host, port):
@@ -619,9 +617,6 @@ def setVariables():
 
 def dsUpdate(repo):
 	spinner = set_spinner()
-	if '%s/common/lib' % dirOptMobility not in sys.path:
-		sys.path.append(dirOptMobility + '/common/lib/')
-	import upgrade
 
 	ref = subprocess.Popen(['zypper', 'ref', '-f', repo], stdout=subprocess.PIPE)
 	ref.wait()
@@ -664,19 +659,24 @@ def dsUpdate(repo):
 		Config.set('Misc', 'mobility.version', dsVersion)
 		with open(dsappSettings, 'wb') as cfgfile:
 			Config.write(cfgfile)
-		# setVariables()
 
-		logger.info('Updating Mobility schema started')
-		time1 = time.time()
+		# Update postgres settings
+		print ("Updating postgres settings..")
+		logger.info("Updating postgres settings..")
+		cmd = "sed -i 's/shared_buffers = 32MB/shared_buffers = 512MB/g; s/#work_mem = 1MB/work_mem = 10MB/g; s/#log_temp_files = -1/log_temp_files = 0/g; s/max_fsm_pages = 204800/max_fsm_pages = 819200/g; s/#checkpoint_segments = 3/checkpoint_segments = 40/g' /var/lib/pgsql/data/postgresql.conf"
+		out = util_subprocess(cmd)
+
+		# Setting variables after upgrade (If going from 1.x to 2.x)
+		setVariables()
+		
 		rcDS('stop')
 		os.environ["FEEDBACK"] = ""
 		os.environ["LOGGER"] = ""
 
-		pre = upgrade.Pre_Update()
-		if pre.get_it_done():
-			update = upgrade.connectorUpgrade(pre.version)
-			update.install_monitor()
-			update.service_upgrade()
+		logger.info('Updating Mobility schema started')
+		time1 = time.time()
+		cmd = "python %s/common/lib/upgrade.pyc" % dirOptMobility
+		out = util_subprocess(cmd)
 		time2 = time.time()
 		logger.info("Updating Mobility schema complete")
 		logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
@@ -686,16 +686,14 @@ def dsUpdate(repo):
 		pids = get_pid(python_Directory)
 		for pid in pids:
 			kill_pid(int(pid), 9)
-		
+
 		# Update config file
 		dsVersion = getDSVersion()
 		Config.read(dsappSettings)
 		Config.set('Misc', 'mobility.version', dsVersion)
 		with open(dsappSettings, 'wb') as cfgfile:
 			Config.write(cfgfile)
-		# setVariables()
 
-		# getExactMobilityVersion
 		p = subprocess.Popen(['rcpostgresql', 'start'], stdout=subprocess.PIPE)
 		p.wait()
 		rcDS('start')
@@ -1368,7 +1366,7 @@ def cleanLog():
 			os.popen("sed -i 's|maxage.*|maxage %s|g' /etc/logrotate.d/dsapp" % dsappLogMaxage).read()
 			print('Completed setting log maxage to %s' % logMaxage)
 
-def rcDS(status, op = None):
+def rcDS(status, op=None, show_spinner=True, show_print =True):
 	setVariables()
 	spinner = set_spinner()
 
@@ -1379,30 +1377,43 @@ def rcDS(status, op = None):
 			datasync_scripts.append(file)
 
 	if status == "start" and op == None:
-		print('Starting Mobility.. ', end='')
+		if show_print:
+			print('Starting Mobility.. ', end='')
 		logger.info("Starting Mobility agents..")
-		spinner.start(); time.sleep(.000001)
+		if show_spinner:
+			spinner.start()
+			time.sleep(.000001)
 		for agent in datasync_scripts:
 			cmd = '%s%s start' % (initScripts, agent)
 			out = util_subprocess(cmd)
 		cmd = 'rccron start'
 		out = util_subprocess(cmd)
-		spinner.stop(); print()
+		if show_spinner:
+			spinner.stop()
+			print()
 
 	elif status == "start" and op == "nocron":
-		print('Starting Mobility.. ', end='')
+		if show_print:
+			print('Starting Mobility.. ', end='')
 		logger.info("Starting Mobility agents..")
-		spinner.start(); time.sleep(.000001)
+		if show_spinner:
+			spinner.start()
+			time.sleep(.000001)
 		for agent in datasync_scripts:
 			cmd = '%s%s start' % (initScripts, agent)
 			out = util_subprocess(cmd)
-		spinner.stop(); print()
+		if show_spinner:
+			spinner.stop()
+			print()
 
 	elif status == "stop" and op == None:
 		pids = get_pid(python_Directory)
-		print('Stopping Mobility.. ', end='')
+		if show_print:
+			print('Stopping Mobility.. ', end='')
 		logger.info("Stopping Mobility agents..")
-		spinner.start(); time.sleep(.000001)
+		if show_spinner:
+			spinner.start()
+			time.sleep(.000001)
 		for agent in datasync_scripts:
 			cmd = '%s%s stop' % (initScripts, agent)
 			out = util_subprocess(cmd)
@@ -1414,24 +1425,34 @@ def rcDS(status, op = None):
 			kill_pid(int(pid), 9)
 		for pid in cpids:
 			kill_pid(int(pid))
-		spinner.stop(); print()
+		if show_spinner:
+			spinner.stop()
+			print()
 
 	elif status == "stop" and op == "nocron":
-		print('Stopping Mobility.. ', end='')
+		if show_print:
+			print('Stopping Mobility.. ', end='')
 		logger.info("Stopping Mobility agents..")
-		spinner.start(); time.sleep(.000001)
+		if show_spinner:
+			spinner.start()
+			time.sleep(.000001)
 		for agent in datasync_scripts:
 			cmd = '%s%s stop' % (initScripts, agent)
 			out = util_subprocess(cmd)
 		pids = get_pid(python_Directory)
 		for pid in pids:
 			kill_pid(int(pid), 9)
-		spinner.stop(); print()
+		if show_spinner:
+			spinner.stop()
+			print()
 
 	elif status == "restart" and op == None:
-		print('Restarting Mobility.. ', end='')
+		if show_print:
+			print('Restarting Mobility.. ', end='')
 		logger.info("Stopping Mobility agents..")
-		spinner.start(); time.sleep(.000001)
+		if show_spinner:
+			spinner.start()
+			time.sleep(.000001)
 		for agent in datasync_scripts:
 			cmd = '%s%s stop' % (initScripts, agent)
 			out = util_subprocess(cmd)
@@ -1450,7 +1471,9 @@ def rcDS(status, op = None):
 			cmd = '%s%s start' % (initScripts, agent)
 			out = util_subprocess(cmd)
 		cmd = 'rccron start'
-		spinner.stop(); print()
+		if show_spinner:
+			spinner.stop()
+			print()
 
 def verifyUserMobilityDB(dbConfig, userConfig):
 	# Check if user exists in mobility database
@@ -2076,20 +2099,9 @@ def checkNightlyMaintenance(config_files, mobilityConfig, healthCheck=False):
 			pass
 
 		for file in files[-previousLogs:]:
-			extension = os.path.splitext(file)[1]
-
-			# Check if extension is gzip or bzip2
-			if extension == '.gz':
-				logger.debug("Opening %s with gzip" % file)
-				with contextlib.closing(gzip.open('%s' % file, 'r')) as f:
-					for line in f:
-						if 'Nightly maintenance' in line: logReport.append(line.strip())
-			elif extension == '.bz2':
-				logger.debug("Opening %s with bzip2" % file)
-				with contextlib.closing(bz2.BZ2File('%s' % file, 'r')) as f:
-					for line in f:
-						if 'Nightly maintenance' in line: logReport.append(line.strip())
-
+			with contextlib.closing(gzip.open('%s' % file, 'r')) as f: # TODO : Check for file extension (gzip or bzip2)
+				for line in f:
+					if 'Nightly maintenance' in line: logReport.append(line.strip())
 			if len(logReport) != 0:
 				fileName = file
 				break
