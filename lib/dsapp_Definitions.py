@@ -702,8 +702,8 @@ def dsUpdate(repo):
 
 		with open(dirOptMobility + '/version') as v:
 			version = v.read()
-		print ("\nYour Mobility product has been successfully updated to %s" % version)
-		logger.info('Mobility product successfully updated to %s' % version)
+		print ("\nMobility successfully updated to %s" % version)
+		logger.info('Mobility successfully updated to %s' % version)
 
 
 ##################################################################################################
@@ -1368,15 +1368,21 @@ def cleanLog():
 			os.popen("sed -i 's|maxage.*|maxage %s|g' /etc/logrotate.d/dsapp" % dsappLogMaxage).read()
 			print('Completed setting log maxage to %s' % logMaxage)
 
-def rcDS(status, op=None, show_spinner=True, show_print =True):
+def rcDS(status, op=None, show_spinner=True, show_print=True):
 	setVariables()
+	dsVersion = getDSVersion()
 	spinner = set_spinner()
 
-	# Get list of datasync scripts in /etc/init.d/
-	datasync_scripts = []
-	for file in os.listdir(initScripts):
-		if INIT_NAME in file:
-			datasync_scripts.append(file)
+	# # Get list of datasync scripts in /etc/init.d/ dynamically 
+	# datasync_scripts = []
+	# for file in os.listdir(initScripts):
+	# 	if INIT_NAME in file:
+	# 		datasync_scripts.append(file)
+
+	# Hard code the datasync_scripts (with the correct order)
+	datasync_scripts = ['datasync-configengine', 'datasync-syncengine', 'datasync-connectors', 'datasync-webadmin']
+	if dsVersion >= ds_1x:
+		datasync_scripts.append('datasync-monitorengine')
 
 	if status == "start" and op == None:
 		if show_print:
@@ -1387,9 +1393,15 @@ def rcDS(status, op=None, show_spinner=True, show_print =True):
 			time.sleep(.000001)
 		for agent in datasync_scripts:
 			cmd = '%s%s start' % (initScripts, agent)
-			out = util_subprocess(cmd)
+			logger.debug("Running '%s'" % cmd)
+			out = util_subprocess(cmd, True)
+			if out[1]:
+				logger.error("Problem running '%s'" % cmd)
 		cmd = 'rccron start'
-		out = util_subprocess(cmd)
+		logger.debug("Running '%s'" % cmd)
+		out = util_subprocess(cmd, True)
+		if out[1]:
+			logger.error("Problem running '%s'" % cmd)
 		if show_spinner:
 			spinner.stop()
 			print()
@@ -1403,7 +1415,10 @@ def rcDS(status, op=None, show_spinner=True, show_print =True):
 			time.sleep(.000001)
 		for agent in datasync_scripts:
 			cmd = '%s%s start' % (initScripts, agent)
-			out = util_subprocess(cmd)
+			logger.debug("Running '%s'" % cmd)
+			out = util_subprocess(cmd, True)
+			if out[1]:
+				logger.error("Problem running '%s'" % cmd)
 		if show_spinner:
 			spinner.stop()
 			print()
@@ -1418,9 +1433,15 @@ def rcDS(status, op=None, show_spinner=True, show_print =True):
 			time.sleep(.000001)
 		for agent in datasync_scripts:
 			cmd = '%s%s stop' % (initScripts, agent)
-			out = util_subprocess(cmd)
+			logger.debug("Running '%s'" % cmd)
+			out = util_subprocess(cmd, True)
+			if out[1]:
+				logger.error("Problem running '%s'" % cmd)
 		cmd = 'rccron stop'
-		out = util_subprocess(cmd)
+		logger.debug("Running '%s'" % cmd)
+		out = util_subprocess(cmd, True)
+		if out[1]:
+			logger.error("Problem running '%s'" % cmd)
 		pids = get_pid(python_Directory)
 		cpids = get_pid('cron')
 		for pid in pids:
@@ -1440,7 +1461,10 @@ def rcDS(status, op=None, show_spinner=True, show_print =True):
 			time.sleep(.000001)
 		for agent in datasync_scripts:
 			cmd = '%s%s stop' % (initScripts, agent)
-			out = util_subprocess(cmd)
+			logger.debug("Running '%s'" % cmd)
+			out = util_subprocess(cmd, True)
+			if out[1]:
+				logger.error("Problem running '%s'" % cmd)
 		pids = get_pid(python_Directory)
 		for pid in pids:
 			kill_pid(int(pid), 9)
@@ -1457,9 +1481,15 @@ def rcDS(status, op=None, show_spinner=True, show_print =True):
 			time.sleep(.000001)
 		for agent in datasync_scripts:
 			cmd = '%s%s stop' % (initScripts, agent)
-			out = util_subprocess(cmd)
+			logger.debug("Running '%s'" % cmd)
+			out = util_subprocess(cmd, True)
+			if out[1]:
+				logger.error("Problem running '%s'" % cmd)
 		cmd = 'rccron stop'
-		out = util_subprocess(cmd)
+		logger.debug("Running '%s'" % cmd)
+		out = util_subprocess(cmd, True)
+		if out[1]:
+			logger.error("Problem running '%s'" % cmd)
 
 		pids = get_pid(python_Directory)
 		cpids = get_pid('cron')
@@ -1471,8 +1501,15 @@ def rcDS(status, op=None, show_spinner=True, show_print =True):
 		logger.info("Starting Mobility agents..")
 		for agent in datasync_scripts:
 			cmd = '%s%s start' % (initScripts, agent)
-			out = util_subprocess(cmd)
+			logger.debug("Running '%s'" % cmd)
+			out = util_subprocess(cmd, True)
+			if out[1]:
+				logger.error("Problem running '%s'" % cmd)
 		cmd = 'rccron start'
+		logger.debug("Running '%s'" % cmd)
+		out = util_subprocess(cmd, True)
+		if out[1]:
+			logger.error("Problem running '%s'" % cmd)
 		if show_spinner:
 			spinner.stop()
 			print()
@@ -2406,7 +2443,7 @@ def signCert(path, csr, key, keyPass, commonName, sign = False):
 			certDays = '730'
 
 		crt = "%s.crt" % commonName
-		cmd = "openssl x509 -req -days %s -in %s/%s -signkey %s/%s -out %s/%s -passin pass:%s &>/dev/null" % (certDays, path, csr, path, key, path, crt, keyPass)
+		cmd = "openssl x509 -req -sha256 -days %s -in %s/%s -signkey %s/%s -out %s/%s -passin pass:%s &>/dev/null" % (certDays, path, csr, path, key, path, crt, keyPass)
 		logger.debug("Signing %s" % csr)
 		signed = subprocess.call(cmd, shell=True)
 
