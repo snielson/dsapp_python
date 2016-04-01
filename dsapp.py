@@ -14,7 +14,7 @@ __credits__ = "Tyler Harris"
 __maintainer__ = "Shane Nielson"
 __email__ = "snielson@projectuminfinitas.com"
 
-dsappversion='234'
+dsappversion='235'
 
 ##################################################################################################
 #	Imports
@@ -152,6 +152,8 @@ logging.config.fileConfig(dsappLogSettings)
 excep_logger = logging.getLogger('exceptions_log')
 logger = logging.getLogger(__name__)
 logger.info('------------- Starting dsapp -------------')
+if not sys.stdout.isatty():
+	logger.info('Running in CRON')
 
 ##################################################################################################
 #	Setup local definitions
@@ -167,8 +169,8 @@ def exit_cleanup():
 		pass
 
 	# Clear dsapp/tmp
-	ds.removeAllFolders("/opt/novell/datasync/tools/dsapp/tmp/")
-	ds.removeAllFiles("/opt/novell/datasync/tools/dsapp/tmp/")
+	ds.removeAllFolders(dsapptmp)
+	ds.removeAllFiles(dsapptmp)
 	logger.info('------------- Successfully shutdown dsapp -------------')
 
 def signal_handler_SIGINT(signal, frame):
@@ -232,6 +234,7 @@ parser.add_argument('-cl', '--clear', action='store_true', dest='clear', help='R
 parser.add_argument('--config', dest='re', choices=['backup', 'restore'], help='Backup settings or install Mobility with backup')
 parser.add_argument('--setlog', dest='loglevel', choices=['debug','info','warning'], help='Set the logging level')
 args = parser.parse_args()
+logger.debug("Switches: %s" % args)
 
 if args.re == 'restore':
 	import dsapp_re
