@@ -14,7 +14,7 @@ __credits__ = "Tyler Harris"
 __maintainer__ = "Shane Nielson"
 __email__ = "snielson@projectuminfinitas.com"
 
-dsappversion='235'
+dsappversion='236'
 
 ##################################################################################################
 #	Imports
@@ -233,6 +233,7 @@ parser.add_argument('-db', '--database', action='store_true', dest='db', help='C
 parser.add_argument('-cl', '--clear', action='store_true', dest='clear', help='Remove encryption from XMLs')
 parser.add_argument('--config', dest='re', choices=['backup', 'restore'], help='Backup settings or install Mobility with backup')
 parser.add_argument('--setlog', dest='loglevel', choices=['debug','info','warning'], help='Set the logging level')
+parser.add_argument('--debugMenu', action='store_true', dest='debugMenu', help=argparse.SUPPRESS)
 args = parser.parse_args()
 logger.debug("Switches: %s" % args)
 
@@ -245,9 +246,8 @@ if args.re == 'restore':
 if args.bug:
 	ds.datasyncBanner(dsappversion)
 	print "Report issues to: https://github.com/snielson/dsapp_python/issues\n"
-	print "Useful logs can be located at:\n/opt/novell/datasync/tools/dsapp/logs/\n"
+	print "Useful logs can be located at:\n/opt/novell/datasync/tools/dsapp/logs/\nSet dsapp logs into debug for more information `dsapp --setlog debug`\n"
 	print "Feel free to email %s directly at <%s>" % (__author__, __email__)
-	ds.eContinue()
 	sys.exit(0)
 
 if args.dsUpdate:
@@ -272,6 +272,7 @@ if args.autoUpdate:
 	temp = not temp
 	Config.set('Settings', 'auto.update', temp)
 	with open(dsappSettings, 'wb') as cfgfile:
+		logger.debug("Writing: [Settings] auto.update = %s" % temp)
 		Config.write(cfgfile)
 	print ("Set auto update to '%s'" % temp)
 	logger.info("Set auto update to '%s'" % temp)
@@ -311,6 +312,8 @@ Config.read(dsappSettings)
 Config.set('Misc', 'mobility.version', dsVersion)
 Config.set('Misc', 'dsapp.version', dsappversion)
 with open(dsappSettings, 'wb') as cfgfile:
+	logger.debug("Writing: [Misc] mobility.version = %s" % dsVersion)
+	logger.debug("Writing: [Misc] dsapp.version = %s" % dsappversion)
 	Config.write(cfgfile)
 
 # Assign variables based on settings.cfg
@@ -498,6 +501,13 @@ if not forceMode:
 ##################################################################################################
 #	Run later Switches
 ##################################################################################################
+# Debug menu
+if args.debugMenu:
+	import dsapp_menus as dsMenu
+	dsMenu.getConfigs(dbConfig, ldapConfig, mobilityConfig, gwConfig, trustedConfig, XMLconfig, config_files, webConfig, authConfig)
+	dsMenu.debug_menu()
+	sys.exit(0)
+
 # Change db pass
 if args.db:
 	ds.changeDBPass(config_files, XMLconfig)

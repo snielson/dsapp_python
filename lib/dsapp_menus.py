@@ -16,6 +16,7 @@ import getch
 getch = getch._Getch()
 import textwrap
 import subprocess
+import pydoc
 
 import dsapp_ghc as ghc
 import dsapp_Soap as dsSOAP
@@ -381,7 +382,7 @@ def userIssue_menu():
 
 ### Start ### Sub menus userIssue_menu ###
 def monitorUser_menu():
-	menu = ['1. Monitor user sync state (Mobility)', '2. Monitor user sync GW/MC count (Sync-Validate)', '3. Monitor active users sync state', '\n     0. Back']
+	menu = ['1. Monitor user(s) sync state (Mobility)', '2. Monitor user sync GW/MC count (Sync-Validate)', '3. Monitor active users sync state', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -407,7 +408,7 @@ def groupwiseChecks_menu():
 		show_menu(menu)
 		choice = get_choice(available)
 		if choice == '1':
-			userConfig = ds.verifyUser(dbConfig)
+			userConfig = ds.verifyUser(dbConfig)[0]
 			if userConfig['name'] != None:
 				if userConfig['type'] != 'group':
 					dsSOAP.soap_printUser(trustedConfig, gwConfig, userConfig)
@@ -415,13 +416,13 @@ def groupwiseChecks_menu():
 					print ("Input '%(name)s' is not a user. Type='%(type)s'" % userConfig)
 				print; ds.eContinue()
 		elif choice == '2':
-			dsSOAP.soap_checkFolderList(trustedConfig, gwConfig, ds.verifyUser(dbConfig))
+			dsSOAP.soap_checkFolderList(trustedConfig, gwConfig, ds.verifyUser(dbConfig)[0])
 		elif choice == '0':
 			loop = False
 			return
 
 def removeUser_menu():
-	menu = ['1. Force remove user/group db references', '2. Remove user/group (restarts configengine)', '3. Remove disabled users & fix referenceCount', '\n     4. Reinitialize user', '5. Reinitialize all failed users', '6. Reinitialize all users', '\n     0. Back']
+	menu = ['1. Force remove user(s)/group(s) db references', '2. Remove user/group (restarts configengine)', '3. Remove disabled users & fix referenceCount', '\n     4. Reinitialize user(s)', '5. Reinitialize all failed users', '6. Reinitialize all users', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -503,7 +504,7 @@ def checksQueries_menu():
 
 ### Start ### Sub menus checkQueries_menu ###
 def viewAttachments_menu():
-	menu = ['1. View attachments by user', '2. Check Mobility attachments count', '\n     0. Back']
+	menu = ['1. View user attachments','2. View total attachment size by users', '3. Check Mobility attachments count', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -511,12 +512,49 @@ def viewAttachments_menu():
 		show_menu(menu)
 		choice = get_choice(available)
 		if choice == '1':
-			ds.view_attach_byUser(dbConfig)
-			ds.eContinue()
+			ds.view_users_attach(dbConfig)
 		elif choice == '2':
-			ds.check_mob_attachments(dbConfig)
-			print; ds.eContinue()
+			ds.view_attach_byUser(dbConfig)
+		elif choice == '3':
+			ds.datasyncBanner(dsappversion)
+			print ("Compare the mobility database ID count, with the mobility filestore ID count")
+			if ds.askYesOrNo("This may take some time to complete, continue"):
+				ds.check_mob_attachments(dbConfig)
+				print; ds.eContinue()
 		elif choice == '0':
 			loop = False
 			return
 ### End ### Sub menus checkQueries_menu ###
+
+
+# DEBUG MENU
+def debug_menu():
+	menu = ['DEBUG MENU\n','1. SOAP - View user folder list','2. View verifyUser data', '3. View variables', '\n     0. Back']
+
+	available = build_avaialbe(menu)
+	loop = True
+	while loop:
+		show_menu(menu)
+		choice = get_choice(available)
+		if choice == '1':
+			userConfig = ds.verifyUser(dbConfig)[0]
+			if userConfig['name'] is not None:
+				pydoc.pager(str(dsSOAP.soap_checkFolderListTEST(trustedConfig, gwConfig, userConfig)))
+		elif choice == '2':
+			for user in ds.verifyUser(dbConfig):
+				print user
+				print
+			ds.eContinue()
+		elif choice == '3':
+			print("Database Config:\n%s\n" % dbConfig)
+			print("LDAP Config:\n%s\n" % ldapConfig)
+			print("Mobility Config:\n%s\n" % mobilityConfig)
+			print("GroupWise Config:\n%s\n" % gwConfig)
+			print("Trusted App Config:\n%s\n" % trustedConfig)
+			print("Config Files:\n%s\n" % config_files)
+			print("Web Config:\n%s\n" % webConfig)
+			print("Auth Config:\n%s\n" % authConfig)
+			ds.eContinue()
+		elif choice == '0':
+			loop = False
+			return
