@@ -199,6 +199,7 @@ def announceNewFeature():
 	Config.read(dsappSettings)
 	Config.set('Settings', 'new.feature', False)
 	with open(dsappSettings, 'wb') as cfgfile:
+		logger.debug("Writing: [Settings] new.feature = %s" % 'False')
 		Config.write(cfgfile)
 
 def check_pid(pid):        
@@ -538,6 +539,7 @@ def updateDsapp(publicVersion):
 		Config.read(dsappSettings)
 		Config.set('Misc', 'dsapp.version', publicVersion)
 		with open(dsappSettings, 'wb') as cfgfile:
+			logger.debug("Writing: [Misc] dsapp.version = %s" % publicVersion)
 			Config.write(cfgfile)
 		print ("Exiting dsapp..")
 	elif check_rpm == None:
@@ -593,6 +595,8 @@ def autoUpdateDsapp(skip=False):
 			elif dsappversion >= publicVersion and publicVersion is not None:
 				print ('dsapp is current at v%s' % dsappversion)
 				logger.info('dsapp is current at v%s' % dsappversion)
+		else:
+			logger.warning("Unable to check for update")
 
 def getDSVersion(forceMode=False):
 	if checkInstall(forceMode, installedConnector):
@@ -660,6 +664,7 @@ def dsUpdate(repo):
 		Config.read(dsappSettings)
 		Config.set('Misc', 'mobility.version', dsVersion)
 		with open(dsappSettings, 'wb') as cfgfile:
+			logger.debug("Writing: [Misc] mobility.version = %s" % dsVersion)
 			Config.write(cfgfile)
 
 		# Update postgres settings
@@ -694,6 +699,7 @@ def dsUpdate(repo):
 		Config.read(dsappSettings)
 		Config.set('Misc', 'mobility.version', dsVersion)
 		with open(dsappSettings, 'wb') as cfgfile:
+			logger.debug("Writing: [Misc] mobility.version = %s" % dsVersion)
 			Config.write(cfgfile)
 
 		p = subprocess.Popen(['rcpostgresql', 'start'], stdout=subprocess.PIPE)
@@ -976,6 +982,7 @@ def check_hostname(old_host, XMLconfig, config_files, forceFix=False):
 			Config.read(dsappSettings)
 			Config.set('Misc', 'hostname', new_host)
 			with open(dsappSettings, 'wb') as cfgfile:
+				logger.debug("Writing: [Misc] hostname = %s" % new_host)
 				Config.write(cfgfile)
 			return True
 		else:
@@ -1520,7 +1527,7 @@ def verifyUserMobilityDB(dbConfig, userConfig):
 	name = {'user': userConfig['name']}
 	conn = getConn(dbConfig, 'mobility')
 	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
-	cur.execute("select distinct userid from users where userid ~* '(%(user)s[.|,].*)$' OR userid ilike '%(user)s' OR name ilike '%(user)s'" % name)
+	cur.execute("select distinct userid from users where userid ~* '(\\m%(user)s[.|,].*)$' OR userid ilike '%(user)s' OR name ilike '%(user)s'" % name)
 	validUser = cur.fetchall()
 	cur.close()
 	conn.close()
@@ -1539,7 +1546,7 @@ def verifyUserDataSyncDB(dbConfig, userConfig):
 	name = {'user': userConfig['name']}
 	conn = getConn(dbConfig, 'datasync')
 	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
-	cur.execute("select distinct dn,\"targetType\" from targets where (\"dn\" ~* '(%(user)s[.|,].*)$' OR dn ilike '%(user)s' OR \"targetName\" ilike '%(user)s') AND disabled='0'" % name)
+	cur.execute("select distinct dn,\"targetType\" from targets where (\"dn\" ~* '(\\m%(user)s[.|,].*)$' OR dn ilike '%(user)s' OR \"targetName\" ilike '%(user)s') AND disabled='0'" % name)
 	validUser = cur.fetchall()
 	cur.close()
 	conn.close()
@@ -1554,7 +1561,7 @@ def verifyUserDataSyncDB(dbConfig, userConfig):
 	userConfig['type'] = None
 	return False
 
-def get_username(userConfig):
+def get_username(userConfig_List):
 	with open(dsappConf + '/special_char.cfg', 'r') as f:
 		invalid = f.read().splitlines()
 	del invalid[0] # Removes comment from list
@@ -1565,48 +1572,64 @@ def get_username(userConfig):
 	while username == "":
 		username = raw_input("User/Group ID: ")
 		if username == 'q' or username == 'Q':
-			userConfig['name'] = None
+			userConfig = {'name': None}
+			userConfig_List.append(userConfig)
 			return False
 		elif username in invalid:
 			if not askYesOrNo("Invalid input. Try again"):
-				userConfig['name'] = None
+				userConfig = {'name': None}
+				userConfig_List.append(userConfig)
 				return False
 			else:
 				username = ""
 		elif username == "":
 			if not askYesOrNo("No input. Try again"):
-				userConfig['name'] = None
+				userConfig = {'name': None}
+				userConfig_List.append(userConfig)
 				return False
-	userConfig['name'] = username
+
+	userList = username.split(',')
+	for name in userList:
+		if name.strip() is None or len(name.strip()) == 0:
+			userConfig = {'name': None}
+			userConfig_List.append(userConfig)
+		else:
+			userConfig = {'name': name.strip()}
+			userConfig_List.append(userConfig)
+
 	return True
 
 def verifyUser(dbConfig):
-	userConfig = {}
+	userConfig_List = []
+
 	# Return a number based on conditions 
-	get_username(userConfig)
-	if userConfig['name'] is None:
-		userConfig['mName'] = None
-		userConfig['type'] = None
-		userConfig['dName'] = None
-		userConfig['verify'] = None
-		return userConfig
+	get_username(userConfig_List)
+	for userConfig in userConfig_List:
+		if userConfig['name'] is None:
+			userConfig['mName'] = None
+			userConfig['type'] = None
+			userConfig['dName'] = None
+			userConfig['verify'] = None
+		# return userConfig_List
+		else:
+
+			# Calculate verifyCount based on where user was found
+			verifyCount = 0
+			# 0 = no user found ; 2 = datasync only ; 1 = mobility only ; 3 = both database
+
+			if verifyUserDataSyncDB(dbConfig, userConfig):
+				verifyCount += 2
+			if userConfig['type'] != 'group':
+				if verifyUserMobilityDB(dbConfig, userConfig):
+					verifyCount += 1
+			else:
+				logger.debug("Skipping verifyUserMobilityDB. Type='%s'" % userConfig['type'])
+
+			userConfig['verify'] = verifyCount
+			userConfig = getApplicationNames(userConfig, dbConfig)
+
 	datasyncBanner(dsappversion)
-	# Calculate verifyCount based on where user was found
-	verifyCount = 0
-	# 0 = no user found ; 2 = datasync only ; 1 = mobility only ; 3 = both database
-
-	if verifyUserDataSyncDB(dbConfig, userConfig):
-		verifyCount += 2
-	if userConfig['type'] != 'group':
-		if verifyUserMobilityDB(dbConfig, userConfig):
-			verifyCount += 1
-	else:
-		logger.debug("Skipping verifyUserMobilityDB. Type='%s'" % userConfig['type'])
-
-	userConfig['verify'] = verifyCount
-	userConfig = getApplicationNames(userConfig, dbConfig)
-
-	return userConfig
+	return userConfig_List
 
 def confirm_user(userConfig, database = None):
 	if userConfig['name'] == None:
@@ -1631,6 +1654,7 @@ def monitor_command(dbConfig, command, refresh):
 
 	clearLine = "\033[1J" + "\033[H"
 	states = {'1': 'Initial Sync   ', '2': 'Synced         ', '3': 'Syncing-Days+  ', '5': 'Failed         ', '6':'Delete         ', '7': 'Re-Init        ', '9': 'Sync Validate  ', '11': 'Requesting Init', '12': 'Requesting More'}
+	logger.info('Starting monitor')
 	logger.debug("Starting monitor with command: '%s'" % command)
 	try:
 		while True:
@@ -1643,7 +1667,7 @@ def monitor_command(dbConfig, command, refresh):
 			time.sleep(refresh)
 			sys.stdout.write(clearLine)
 	except KeyboardInterrupt:
-		logger.debug('Ending monitor')
+		logger.info('Ending monitor')
 
 	clear()
 	cur.close()
@@ -1653,32 +1677,50 @@ def monitor_syncing_users(dbConfig, refresh = 1):
 	command = "SELECT state,userID FROM users WHERE state !='2'"
 	monitor_command(dbConfig, command, refresh)
 
-def monitorUser(dbConfig, userConfig = None, refresh = 1):
-	if userConfig is None:
-		userConfig = verifyUser(dbConfig)
-	if confirm_user(userConfig, 'mobility'):
-		command = "SELECT state,userID FROM users WHERE userid ilike '%%%s%%'" % userConfig['mName']
-		monitor_command(dbConfig, command, refresh)
+def monitorUser(dbConfig, userList=None, refresh=1):
+	if userList is None:
+		userConfig_List = verifyUser(dbConfig)
 
-	print(); eContinue()
+	if userList is None:
+		userList = []
+		for userConfig in userConfig_List:
+			if confirm_user(userConfig, 'mobility'):
+				userList.append('%%%s%%' % userConfig['mName'])
+
+	if len(userList) > 0:
+		command = "SELECT state,userID FROM users WHERE userid ilike any(array%s)" % userList
+		monitor_command(dbConfig, command, refresh)
+		return
+	else:
+		print(); eContinue()
+
 
 def setUserState(dbConfig, state):
-	# verifyUser sets vuid variable used in setUserState and removeAUser functions
-	userConfig = verifyUser(dbConfig)
-	if userConfig['name'] is None:
-		return
+	userList = []
+	userConfig_List = verifyUser(dbConfig)
+	if len(userConfig_List) == 1:
+		if userConfig_List[0]['name'] is None:
+			return
 
-	if confirm_user(userConfig, 'mobility'):
+	for userConfig in userConfig_List:
+		if confirm_user(userConfig, 'mobility'):
+			userList.append('%%%s%%' % userConfig['mName'])
+
+	if len(userList) > 0:	
+		cmd = "UPDATE users SET state = '%s' WHERE userid ilike any(array%s)" % (state, userList)
+
 		conn = getConn(dbConfig, 'mobility')
 		cur = conn.cursor()
-		cur.execute("UPDATE users SET state = '%s' WHERE userid ilike '%%%s%%'" % (state, userConfig['mName']))
-		logger.info("Set '%s' to state %s" % (userConfig['mName'], state))
+		cur.execute(cmd)
 		cur.close()
 		conn.close()
 
-		monitorUser(dbConfig, userConfig)
+		logger.info("Set '%s' to state %s" % (userList, state))
+		monitorUser(dbConfig, userList)
+		return
 
 	print(); eContinue()
+	
 
 def file_mCleanup(filePath, fileCount):
 	date = datetime.datetime.now().strftime("%H:%M:%S on %b %d, %Y")
@@ -1702,7 +1744,15 @@ def file_mCleanup(filePath, fileCount):
 		os.remove(filePath)
 		os.remove(dsappConf + '/fileIDs.dsapp')
 
-def mCleanup(dbConfig, userConfig):
+def file_mCleanup_run(count):
+	print ("Removing attachments..")
+	logger.info("Removing %s attachments in background process" % count)
+	# Clean up fileIDs in detached process
+	filePath = dsappConf + '/uniq-fileIDs.dsapp'
+	p = Process(target=file_mCleanup, args=(filePath, count,))
+	p.start()
+
+def mCleanup(dbConfig, userConfig, fileCleanupNow=True):
 	print ("Mobility database cleanup:")
 	spinner = set_spinner()
 	uGuid = ""
@@ -1784,54 +1834,40 @@ def mCleanup(dbConfig, userConfig):
 		outfile.close()
 		spinner.stop(); print()
 
-	print ("Removing attachments..")
-	logger.info("Removing %s attachments in background process" % count)
-	# Clean up fileIDs in detached process
-	filePath = dsappConf + '/uniq-fileIDs.dsapp'
-	p = Process(target=file_mCleanup, args=(filePath, count,))
-	p.start()
+	if fileCleanupNow:
+		file_mCleanup_run(count)
 
 	time2 = time.time()
 	logger.info("Removing '%s' from mobility database complete" % userConfig['name'])
 	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
+	if not fileCleanupNow:
+		return count
+
 def dCleanup(dbConfig, userConfig):
 	print ("Datasync database cleanup:")
 	spinner = set_spinner()
-	uUser, psqlAppNameM, psqlAppNameG = "", "", ""
 
-	conn = getConn(dbConfig, 'datasync')
-	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
-
-	# Get user dn from targets table;
-	cur.execute("select distinct dn from targets where (\"dn\" ~* '(%(name)s[.|,].*)$' OR dn ilike '%(name)s' OR \"targetName\" ilike '%(name)s') AND disabled='0'" % userConfig)
-	data = cur.fetchall()
-	for row in data:
-		logger.debug("Found dn user: %s" % row['dn'])
-		uUser = row['dn']
-
-	# Get targetName from each connector
-	cur.execute("select \"targetName\" from targets where (dn ~* '(%(name)s[.|,].*)$' OR dn ilike '%(name)s' OR \"targetName\" ilike '%(name)s') AND \"connectorID\"='default.pipeline1.groupwise' AND disabled='0'" % userConfig)
-	data = cur.fetchall()
-	for row in data:
-		logger.debug("Found gw appname: %s" % row['targetName'])
-		psqlAppNameG = row['targetName']
-
-	cur.execute("select \"targetName\" from targets where (dn ~* '(%(name)s[.|,].*)$' OR dn ilike '%(name)s' OR \"targetName\" ilike '%(name)s') AND \"connectorID\"='default.pipeline1.mobility' AND disabled='0'" % userConfig)
-	data = cur.fetchall()
-	for row in data:
-		logger.debug("Found mob appname: %s" % row['targetName'])
-		psqlAppNameM = row['targetName']
-
-	if uUser == '':
+	# Assign uUser from userConfig
+	if userConfig['dName'] is None:
 		logger.debug("%s not found in targets" % userConfig['name'])
 		uUser = userConfig['name']
-	if psqlAppNameG == '':
-		logger.debug("%s not found in gw appname" % userConfig['name'])
+	else:
+		uUser = userConfig['dName']
+
+	# Assign psqlAppNameG from userConfig
+	if userConfig['gAppName'] is None:
+		logger.debug("%s not found in groupwise appname" % userConfig['name'])
 		psqlAppNameG = userConfig['name']
-	if psqlAppNameM == '':
-		logger.debug("%s not found in mob appname" % userConfig['name'])
+	else:
+		psqlAppNameG = userConfig['gAppName']
+
+	# Assign psqlAppNameM from userConfig
+	if userConfig['mAppName'] is None:
+		logger.debug("%s not found in mobility appname" % userConfig['name'])
 		psqlAppNameM = userConfig['name']
+	else:
+		psqlAppNameM = userConfig['mAppName']
 
 	logger.debug("uUser assigned '%s'" % uUser)
 	logger.debug("psqlAppNameG assigned '%s'" % psqlAppNameG)
@@ -1841,6 +1877,9 @@ def dCleanup(dbConfig, userConfig):
 	logger.info("Removing '%s' from datasync database started" % userConfig['name'])
 
 	# Delete objectMappings, cache, membershipCache, folderMappings, and targets from datasync DB
+	conn = getConn(dbConfig, 'datasync')
+	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+
 	spinner.start(); time.sleep(.000001)
 	time1 = time.time()
 	cur.execute("delete FROM \"objectMappings\" WHERE \"objectID\" IN (SELECT \"objectID\" FROM \"objectMappings\" WHERE \"objectID\" ilike '%%|%s' OR \"objectID\" ilike '%%|%s' OR \"objectID\" ilike '%%|%s')" % (psqlAppNameG, psqlAppNameM, userConfig['name']))
@@ -1855,6 +1894,7 @@ def dCleanup(dbConfig, userConfig):
 	logger.debug('DELETE FROM membershipCache..')
 	cur.execute("delete FROM targets WHERE dn ~* '(%(name)s[.|,].*)$' OR dn ilike '%(name)s' OR \"targetName\" ilike '%(name)s'" % userConfig)
 	logger.debug('DELETE FROM targets..')
+	
 	time2 = time.time()
 	logger.info("Removing '%s' from datasync database complete" % userConfig['name'])
 	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
@@ -1865,20 +1905,33 @@ def dCleanup(dbConfig, userConfig):
 
 def remove_user(dbConfig, op = None):
 	# Pass in 1 for op to skip user database check in confirm_user()
-	userConfig = verifyUser(dbConfig)
-	if userConfig['name'] is None:
-		return
+	userConfig_List = verifyUser(dbConfig)
+	if len(userConfig_List) == 1:
+		if userConfig_List[0]['name'] is None:
+			return
 
 	datasyncBanner(dsappversion)
 	if op == 1:
 		logger.debug("Skipping user database check")
-		if confirm_user(userConfig, op):
-			if askYesOrNo("Remove %s from datasync database" % userConfig['name']):
-				dCleanup(dbConfig, userConfig)
+		fileClean = False
+		count = 0
+		# TODO: Work on cleaning up multiple users at once to save time - or just loop through every user?
+		for userConfig in userConfig_List:
+			if confirm_user(userConfig, op):
+				if askYesOrNo("Remove %s from datasync database" % userConfig['name']):
+					dCleanup(dbConfig, userConfig)
+				print()
+				if askYesOrNo("Remove %s from mobility database" % userConfig['name']):
+					count += mCleanup(dbConfig, userConfig, fileCleanupNow=False)
+					fileClean = True
 			print()
-			if askYesOrNo("Remove %s from mobility database" % userConfig['name']):
-				mCleanup(dbConfig, userConfig)
+
+		# Run file cleanup after ALL users have been removed
+		if fileClean:
+			file_mCleanup_run(count)
+
 	elif op == None:
+		userConfig = userConfig_List[0]
 		logger.debug("Checking user in database")
 		if confirm_user(userConfig):
 
@@ -1918,8 +1971,9 @@ def remove_user(dbConfig, op = None):
 			dCleanup(dbConfig, userConfig)
 			print()
 			mCleanup(dbConfig, userConfig)
+			print()
 
-	print(); eContinue()
+	eContinue()
 
 def addGroup(dbConfig, ldapConfig):
 	conn = getConn(dbConfig, 'datasync')
@@ -2327,7 +2381,7 @@ def changeDBPass(config_files, XMLconfig):
 
 def changeAppName(dbConfig):
 	datasyncBanner(dsappversion)
-	userConfig = verifyUser(dbConfig)
+	userConfig = verifyUser(dbConfig)[0]
 	if userConfig['name'] is None:
 		return
 
@@ -2784,7 +2838,7 @@ def userLdapOrGw(userConfig, pro_type):
 
 def updateFDN(dbConfig, XMLconfig, ldapConfig):
 	datasyncBanner(dsappversion)
-	userConfig = verifyUser(dbConfig)
+	userConfig = verifyUser(dbConfig)[0]
 	if userConfig['name'] is None:
 		return
 
@@ -2891,6 +2945,9 @@ def updateFDN(dbConfig, XMLconfig, ldapConfig):
 	print(); eContinue()
 
 def getApplicationNames(userConfig, dbConfig):
+	userConfig['mAppName'] = None
+	userConfig['gAppName'] = None
+
 	conn = getConn(dbConfig, 'datasync')
 	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
 
@@ -3130,6 +3187,7 @@ def showAppliedPatches():
 
 	datasyncBanner(dsappversion)
 	print ("Listing applied fixes..\n")
+	logger.info("Listing applied fixes..")
 	patchFile = dsappConf + '/patch-file.conf'
 	ftfList = dsappConf + '/dsapp_FTFlist.txt'
 	currentVersion = getExactMobilityVersion()
@@ -3160,11 +3218,13 @@ def showAppliedPatches():
 								elif printNextFTF:
 									printNextFTF = False
 									print(wrapper.fill("Description: " + line2.strip()))
+									logger.info("Applied FTF: %s" %line2.strip())
 				elif printNext:
 					print ("File(s): " + line)
 					printNext = False
 	if not patchFound:
 		print ("No FTFs have been applied via dsapp\n")
+		logger.info("No FTFs have been applied via dsapp")
 	
 
 ##################################################################################################
@@ -3437,7 +3497,7 @@ def fix_gal(dbConfig):
 
 def monitor_Sync_validate(dbConfig):
 	datasyncBanner(dsappversion)
-	userConfig = verifyUser(dbConfig)
+	userConfig = verifyUser(dbConfig)[0]
 	if userConfig['name'] is None:
 		return
 
@@ -3501,12 +3561,14 @@ def list_deviceInfo(dbConfig):
 	# print (textwrap.fill("Below is a list of users and devices. For more details about each device (i.e. OS version), look up what is in the description column. For an iOS device, there could be a listing of Apple-iPhone3C1/902.176. Use the following website, http://enterpriseios.com/wiki/UserAgent to convert to an Apple product, iOS Version and Build.", 80))
 	# print ()
 	cmd = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"select u.userid, description, identifierstring, devicetype from devices d INNER JOIN users u ON d.userid = u.guid;\"" % dbConfig
+	logger.info("Listing all devices from the database")
 	out = util_subprocess(cmd)
 	print (out[0].rstrip('\n')); print ()
 
 def list_usersAndEmails(dbConfig):
 	datasyncBanner(dsappversion)
 	cmd = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"select g.displayname, g.firstname, g.lastname, u.userid, g.emailaddress from gal g INNER JOIN users u ON (g.alias = u.name);\"" % dbConfig
+	logger.info("Listing all users and emails")
 	out = util_subprocess(cmd)
 	print (out[0].rstrip('\n')); print ()
 
@@ -3522,13 +3584,17 @@ def show_GW_syncEvents(dbConfig):
 		cur.execute("select edata from consumerevents")
 		data = cur.fetchall()
 		userCount = dict()
-		logger.debug("Sorting consumerevents by user")
+		logger.debug("Sorting consumerevents by user..")
 		for row in data:
-			if '<sourceName>' in row['edata']:
-				if row['edata'].split('>')[1].split('<')[0] in userCount:
-					userCount[row['edata'].split('>')[1].split('<')[0]] += 1
+			if '<sourceName>' in row['edata'] or '<sourceDN>' in row['edata']: # Added sourceDN for GMS 14.2.0. Left sourceName for backwards compat.
+				userSourceName = row['edata'].split('>')[1].split('<')[0]
+				if userSourceName in userCount:
+					logger.debug("Updating key [%s]:[%s]" % (userSourceName, userCount[userSourceName] + 1))
+					userCount[userSourceName] += 1
 				else:
-					userCount[row['edata'].split('>')[1].split('<')[0]] = 1
+					logger.debug("Found souce '%s'. Creating key" % userSourceName)
+					userCount[userSourceName] = 1
+		logger.debug("Sorting keys on on values..")
 		sorted_users = sorted(userCount.items(), key=operator.itemgetter(1),reverse=True)
 
 		header = ['User', 'Events']
@@ -3542,15 +3608,25 @@ def show_GW_syncEvents(dbConfig):
 
 def show_Mob_syncEvents(dbConfig):
 	datasyncBanner(dsappversion)
-	cmd = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"select DISTINCT  u.userid AS \"FDN\", count(eventid) as \"events\", se.userid FROM syncevents se INNER JOIN users u ON se.userid = u.guid GROUP BY u.userid, se.userid ORDER BY events DESC;\"" % dbConfig
+	cmd = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"select DISTINCT  u.userid AS \\\"FDN\\\", count(eventid) as \\\"Events\\\", se.userid FROM syncevents se INNER JOIN users u ON se.userid = u.guid GROUP BY u.userid, se.userid ORDER BY \\\"Events\\\" DESC;\"" % dbConfig
 	out = util_subprocess(cmd)
 	print (out[0].rstrip('\n')); print ()
 
 def view_attach_byUser(dbConfig):
 	datasyncBanner(dsappversion)
-	cmd = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"select DISTINCT u.userid AS fdn, ROUND(SUM(filesize)/1024/1024::numeric,4) AS \"MB\",  am.userid from attachments a INNER JOIN attachmentmaps am ON a.attachmentid = am.attachmentid INNER JOIN users u ON am.userid = u.guid WHERE a.filestoreid != '0' GROUP BY u.userid, am.userid ORDER BY \"MB\" DESC;\"" % dbConfig
+	cmd = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"select DISTINCT u.name AS \\\"Name\\\", u.userid AS \\\"FDN\\\", ROUND(a.filesize/1024/1024::numeric,4) AS \\\"MB\\\" from attachments a INNER JOIN attachmentmaps am ON a.attachmentid = am.attachmentid INNER JOIN users u ON am.userid = u.guid WHERE a.filestoreid != '0' GROUP BY u.userid, u.name, a.filesize ORDER BY \\\"MB\\\" DESC;\"" % dbConfig
 	out = util_subprocess(cmd)
-	print (out[0].rstrip('\n')); print ()
+	pydoc.pager(out[0].rstrip('\n'))
+
+def view_users_attach(dbConfig):
+	userConfig = verifyUser(dbConfig)[0]
+	if userConfig['name'] is None:
+		return
+
+	if confirm_user(userConfig, 'mobility'):
+		cmd = "PGPASSWORD=%s psql -U %s mobility -c \"select a.filename AS \\\"File Name\\\", ROUND(a.filesize/1024/2024::numeric,4) AS \\\"MB\\\", a.tstamp AS \\\"Time Stamp\\\", a.filestoreid from attachments a INNER JOIN attachmentmaps am ON a.attachmentid = am.attachmentid INNER JOIN users u ON am.userid = u.guid WHERE u.userid='%s' GROUP BY a.filename, a.tstamp, a.filestoreid, a.filesize ORDER BY \\\"MB\\\" DESC;\"" % (dbConfig['pass'], dbConfig['user'], userConfig['mName'])
+	out = util_subprocess(cmd)
+	pydoc.pager(out[0].rstrip('\n'))
 
 def check_mob_attachments(dbConfig):
 	datasyncBanner(dsappversion)
@@ -3602,7 +3678,7 @@ def check_mob_attachments(dbConfig):
 def check_userAuth(dbConfig, authConfig):
 	# User Authentication
 	datasyncBanner(dsappversion)
-	userConfig = verifyUser(dbConfig)
+	userConfig = verifyUser(dbConfig)[0]
 	if userConfig['name'] is None:
 		return
 
@@ -3667,13 +3743,15 @@ def check_userAuth(dbConfig, authConfig):
 				errDate, errTime = line.split(' ')[0:2]
 				# authErrors['failed'] = "%s had a sync problem %s %s\nUser initial sync failed\n" % (userConfig['name'].lower(), errDate, errTime)
 				authErrors = "%s had a sync problem %s %s\nUser initial sync failed\n" % (userConfig['name'].lower(), errDate, errTime)
-
-			if userConfig['mAppName'] in line and 'Connection Blocked' in line and 'currently blocked from accessing the server':
-				logger.debug("Line found: Quarantined")
-				error = True
-				errDate, errTime = line.split(' ')[0:2]
-				# authErrors['failed'] = "%s had a connection problem %s %s\nDevice has been quarantined\n" % (userConfig['name'].lower(), errDate, errTime)
-				authErrors = "%s had a connection problem %s %s\nDevice has been quarantined\n" % (userConfig['name'].lower(), errDate, errTime)
+			try:
+				if userConfig['mAppName'] in line and 'Connection Blocked' in line and 'currently blocked from accessing the server':
+					logger.debug("Line found: Quarantined")
+					error = True
+					errDate, errTime = line.split(' ')[0:2]
+					# authErrors['failed'] = "%s had a connection problem %s %s\nDevice has been quarantined\n" % (userConfig['name'].lower(), errDate, errTime)
+					authErrors = "%s had a connection problem %s %s\nDevice has been quarantined\n" % (userConfig['name'].lower(), errDate, errTime)
+			except:
+				pass
 
 			# TODO : Test LDAP communication
 				# # Communication - "Can't contact LDAP server"
@@ -3690,7 +3768,7 @@ def check_userAuth(dbConfig, authConfig):
 		print (authErrors)
 	if not error:
 		logger.info("No problems detected")
-		print ("\nNo problems detected")
+		print ("No problems detected\n")
 
 	eContinue()
 
@@ -3698,7 +3776,7 @@ def whereDidIComeFromAndWhereAmIGoingOrWhatHappenedToMe(dbConfig):
 	datasyncBanner(dsappversion)
 	displayName = raw_input("Item name (subject, folder, contact, calendar): ")
 	if displayName:
-		cmd = ("PGPASSWORD=%s psql -U %s mobility -t -c \"drop table if exists tmp; select (xpath('./DisplayName/text()', di.edata::xml)) AS displayname,di.eclass,di.eaction,di.statedata,d.identifierstring,d.devicetype,d.description,di.creationtime INTO tmp from deviceimages di INNER JOIN devices d ON (di.deviceid = d.deviceid) INNER JOIN users u ON di.userid = u.guid WHERE di.edata ilike '%%%s%%' ORDER BY di.creationtime ASC, di.eaction ASC; select * from tmp;\"" % (dbConfig['pass'], dbConfig['user'], displayName))
+		cmd = ("PGPASSWORD=%s psql -U %s mobility -t -c \"drop table if exists tmp; select (xpath('./DisplayName/text()', di.edata::xml)) AS displayname,di.eclass,di.eaction,di.statedata,d.identifierstring,d.devicetype,d.description, d.deviceid, di.creationtime INTO tmp from deviceimages di INNER JOIN devices d ON (di.deviceid = d.deviceid) INNER JOIN users u ON di.userid = u.guid WHERE di.edata ilike '%%%s%%' ORDER BY di.creationtime ASC, di.eaction ASC; select * from tmp;\"" % (dbConfig['pass'], dbConfig['user'], displayName))
 		out = util_subprocess(cmd,True)
 		pydoc.pager(out[0])
 
@@ -3734,7 +3812,7 @@ def getUsers_and_Devices(dbConfig, showUsers=False, showDevices=False, showBoth=
 	return returns
 
 def getUserPAB(dbConfig):
-	userConfig = verifyUser(dbConfig)
+	userConfig = verifyUser(dbConfig)[0]
 	if userConfig['name'] is None:
 		return
 

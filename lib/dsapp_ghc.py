@@ -250,6 +250,7 @@ def ghc_util_NewHeader(header):
 	global silent
 	if not silent:
 		print (COL1.format("\n%s  " % header), end='')
+		sys.stdout.flush()
 	logger.info("GHC : %s" % header)
 	with open(ghcLog, 'a') as log:
 		log.write("==========================================================\n%s\n==========================================================\n" % header)
@@ -526,6 +527,7 @@ def ghc_util_subprocess(cmd, error=False):
 
 def ghc_checkServices(mobilityConfig, gwConfig, webConfig):
 	ghc_util_NewHeader("Checking Mobility Services..")
+	time1 = time.time()
 	problem = False
 	global mobile_serviceCheck
 	global web_serviceCheck
@@ -565,8 +567,12 @@ def ghc_checkServices(mobilityConfig, gwConfig, webConfig):
 	elif not problem:
 		ghc_util_passFail('passed')
 
+	time2 = time.time()
+	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
 def ghc_checkLDAP(XMLconfig ,ldapConfig):
 	ghc_util_NewHeader("Checking LDAP Connectivity..")
+	time1 = time.time()
 	problem = False
 
 	if ldapConfig['enabled'] != 'true':
@@ -587,6 +593,7 @@ def ghc_checkLDAP(XMLconfig ,ldapConfig):
 
 def ghc_checkRPMs(system_rpms):
 	ghc_util_NewHeader("Checking RPMs..")
+	time1 = time.time()
 	problem = False
 	ghc_file = dsappConf + '/ghc_RPMs.txt'
 
@@ -621,8 +628,12 @@ def ghc_checkRPMs(system_rpms):
 		msg = "All required RPMs found\n"
 		ghc_util_passFail('passed', msg)
 
+	time2 = time.time()
+	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
 def ghc_checkProxy():
 	ghc_util_NewHeader("Checking Proxy Configuration..")
+	time1 = time.time()
 	problem = False
 	global proxy_enabled
 
@@ -676,9 +687,13 @@ def ghc_checkProxy():
 		msg = "No proxy detected\n"
 		ghc_util_passFail('passed', msg)
 
+	time2 = time.time()
+	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
 def ghc_checkMemory(dbConfig):
 	# Display HealthCheck name to user and create section in logs
 	ghc_util_NewHeader("Checking Memory..")
+	time1 = time.time()
 	problem = False
 	ghc_file = '/proc/meminfo'
 
@@ -737,8 +752,12 @@ def ghc_checkMemory(dbConfig):
 		msg = "Server meets recommended memory\n"
 		ghc_util_passFail('passed', msg)
 
+	time2 = time.time()
+	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
 def ghc_checkRPMSave():
 	ghc_util_NewHeader("Checking XML rpmsave..")
+	time1 = time.time()
 	problem = False
 
 	rpmSaves = []
@@ -761,8 +780,12 @@ def ghc_checkRPMSave():
 		msg = "No rpmsave files found\n"
 		ghc_util_passFail('passed', msg)
 
+	time2 = time.time()
+	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
 def ghc_checkReqXMLs():
 	ghc_util_NewHeader("Checking Required XMLs..")
+	time1 = time.time()
 	problem = False
 	ghc_file = dsappConf + '/ghc_XMLs.txt'
 
@@ -789,8 +812,12 @@ def ghc_checkReqXMLs():
 		msg = "All required XMLs found\n"
 		ghc_util_passFail('passed', msg)
 
+	time2 = time.time()
+	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
 def ghc_checkTrustedApp(trustedConfig, gwConfig):
 	ghc_util_NewHeader("Checking Trusted Application..")
+	time1 = time.time()
 	problem = False
 
 	results = dsSoap.soap_getUserList(trustedConfig, gwConfig)
@@ -815,8 +842,12 @@ def ghc_checkTrustedApp(trustedConfig, gwConfig):
 		msg = "Trusted Application is valid\n"
 		ghc_util_passFail('passed', msg)
 
+	time2 = time.time()
+	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
 def ghc_verifyNightlyMaintenance(config_files, mobilityConfig):
 	ghc_util_NewHeader("Checking Nightly Maintenance..")
+	time1 = time.time()
 	problem = False
 
 	results = ds.checkNightlyMaintenance(config_files, mobilityConfig, True)
@@ -834,8 +865,12 @@ def ghc_verifyNightlyMaintenance(config_files, mobilityConfig):
 	elif not problem:
 		ghc_util_passFail('passed')
 
+	time2 = time.time()
+	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
 def ghc_checkDBSchema(dbConfig):
 	ghc_util_NewHeader("Checking Database Schema..")
+	time1 = time.time()
 	problem = False
 
 	with open(version, 'r') as file:
@@ -874,8 +909,12 @@ def ghc_checkDBSchema(dbConfig):
 	elif not problem:
 		ghc_util_passFail('passed')
 
+	time2 = time.time()
+	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
 def ghc_checkXML():
 	ghc_util_NewHeader("Checking XMLs..")
+	time1 = time.time()
 	problem = False
 
 	xmlFiles = []
@@ -900,8 +939,12 @@ def ghc_checkXML():
 		msg = "All found XMLs are valid\n"
 		ghc_util_passFail('passed', msg)
 
+	time2 = time.time()
+	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
 def ghc_checkDiskSpace():
 	ghc_util_NewHeader("Checking Disk Space..")
+	time1 = time.time()
 	problem = False
 
 	cmd = "df -H"
@@ -924,8 +967,12 @@ def ghc_checkDiskSpace():
 	elif not problem:
 		ghc_util_passFail('passed')
 
+	time2 = time.time()
+	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
 def ghc_checkManualMaintenance(dbConfig):
 	ghc_util_NewHeader("Checking Database Maintenance..")
+	time1 = time.time()
 	dbMaintTolerance = 180
 	problem = False
 
@@ -977,8 +1024,12 @@ def ghc_checkManualMaintenance(dbConfig):
 	elif not problem:
 		ghc_util_passFail('passed')
 
+	time2 = time.time()
+	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
 def ghc_checkConfig():
 	ghc_util_NewHeader("Checking Automatic Startup..")
+	time1 = time.time()
 	problem = False
 
 	cmd1 = "chkconfig | grep -i datasync"
@@ -999,8 +1050,12 @@ def ghc_checkConfig():
 	elif not problem:
 		ghc_util_passFail('passed')
 
+	time2 = time.time()
+	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
 def ghc_checkPSQLConfig():
 	ghc_util_NewHeader("Checking PSQL Configuration..")
+	time1 = time.time()
 	pghba = "/var/lib/pgsql/data/pg_hba.conf"
 	problem = False
 
@@ -1042,8 +1097,12 @@ def ghc_checkPSQLConfig():
 		msg = "All required lines found\n"
 		ghc_util_passFail('passed', msg)
 
+	time2 = time.time()
+	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
 def ghc_checkVMWare():
 	ghc_util_NewHeader("Checking VMware-tools..")
+	time1 = time.time()
 	problem = False
 
 	cmd = "lspci | grep VMware"
@@ -1074,8 +1133,12 @@ def ghc_checkVMWare():
 		msg = "VMware-tools is running\n"
 		ghc_util_passFail('passed', msg)
 
+	time2 = time.time()
+	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
 def ghc_checkDiskIO():
 	ghc_util_NewHeader("Checking Disk IO..")
+	time1 = time.time()
 	problem = False
 
 	cmd = "hdparm -t `df -P /var | tail -1 | cut -d ' ' -f1`"
@@ -1092,8 +1155,12 @@ def ghc_checkDiskIO():
 		msg = "Disk IO meets recommended MB/sec\n"
 		ghc_util_passFail('passed', msg)
 
+	time2 = time.time()
+	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
 def ghc_checkUserFDN(dbConfig, XMLconfig ,ldapConfig):
-	ghc_util_NewHeader("Checking users FDN..")
+	ghc_util_NewHeader("Checking Users FDN..")
+	time1 = time.time()
 	problem = False
 
 	if ds.checkLDAP(XMLconfig ,ldapConfig, ghc=True):
@@ -1105,13 +1172,23 @@ def ghc_checkUserFDN(dbConfig, XMLconfig ,ldapConfig):
 		conn.close()
 
 		if len(data) != 0:
+			logger.debug("Found %s users" % len(data))
+			ldap_count = 1
 			for row in data:
 				if ldapConfig['secure'] == 'false':
-					cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D %s -w %s -b '%s' -s base" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], row['dn'])
+					cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D %s -w %s -b '%s' -s base cn" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], row['dn'])
 				if ldapConfig['secure'] == 'true':
-					cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D %s -w %s -b '%s' -s base" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], row['dn'])
+					cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D %s -w %s -b '%s' -s base cn" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], row['dn'])
 
+				log_cmd = cmd.replace("-w " + ldapConfig['pass'],"-w *******")
+				logger.debug("LDAP search %s: %s" % (ldap_count, log_cmd))
 				out = ghc_util_subprocess(cmd, True)
+				if out[1]:
+					logger.debug("LDAP error %s: %s" % (ldap_count, out[1]))
+				else:
+					logger.debug("LDAP results %s: Found %s" % (ldap_count, row['dn']))
+				# 	logger.debug("LDAP results: %s" % out[0])
+				ldap_count += 1
 
 				with open(ghcLog, 'a') as log:
 					if 'dn:' not in out[0]:
@@ -1129,8 +1206,12 @@ def ghc_checkUserFDN(dbConfig, XMLconfig ,ldapConfig):
 		msg = "All users LDAP FDNs are valid\n"
 		ghc_util_passFail('passed', msg)
 
+	time2 = time.time()
+	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
 def ghc_verifyDatabaseIntegrity(dbConfig):
 	ghc_util_NewHeader("Checking Databases Integrity..")
+	time1 = time.time()
 	problem = False
 
 	found = None
@@ -1183,8 +1264,12 @@ def ghc_verifyDatabaseIntegrity(dbConfig):
 		msg = "All detected users found in both databases\n"
 		ghc_util_passFail('passed', msg)
 
+	time2 = time.time()
+	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
 def ghc_verifyTargetsIntegrity(dbConfig):
 	ghc_util_NewHeader("Checking Targets Table..")
+	time1 = time.time()
 	problem = False
 
 	conn = ds.getConn(dbConfig, 'datasync')
@@ -1216,8 +1301,12 @@ def ghc_verifyTargetsIntegrity(dbConfig):
 		msg = "All targets on both connectors\n"
 		ghc_util_passFail('passed', msg)
 
+	time2 = time.time()
+	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
 def ghc_checkReferenceCount(dbConfig):
 	ghc_util_NewHeader("Checking Reference Count..")
+	time1 = time.time()
 	problem = False
 
 	conn = ds.getConn(dbConfig, 'datasync')
@@ -1250,8 +1339,12 @@ def ghc_checkReferenceCount(dbConfig):
 		msg = "All reference counts are correct\n"
 		ghc_util_passFail('passed', msg)
 
+	time2 = time.time()
+	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
 def ghc_verifyCertificates(mobilityConfig, webConfig):
 	ghc_util_NewHeader("Checking Certificates..")
+	time1 = time.time()
 	problem = False
 	global web_serviceCheck
 	global mobile_serviceCheck
@@ -1393,8 +1486,12 @@ def ghc_verifyCertificates(mobilityConfig, webConfig):
 		# msg = "No problems found with certificates\n"
 		ghc_util_passFail('passed')
 
+	time2 = time.time()
+	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
 def ghc_verifyServerDate():
-	ghc_util_NewHeader("Checking Sever Date..")
+	ghc_util_NewHeader("Checking Server Date..")
+	time1 = time.time()
 	problem = True
 	extra_pass = False
 	global serverDateCheck
@@ -1416,7 +1513,8 @@ def ghc_verifyServerDate():
 
 	# Get date from www.google.com
 	try:
-		google_data = datetime.datetime.strptime(urllib2.urlopen('https://www.google.com').info().dict['date'], '%a, %d %b %Y %H:%M:%S GMT').strftime('%y %m %d').split(' ')
+		google_data = datetime.datetime.strptime(urllib2.urlopen('https://www.google.com', timeout=2).info().dict['date'], '%a, %d %b %Y %H:%M:%S GMT').strftime('%y %m %d').split(' ')
+		logger.debug("Checking https://www.google.com")
 	except:
 		google_data = []
 	if len(google_data) == 3:
@@ -1443,7 +1541,7 @@ def ghc_verifyServerDate():
 			data = []
 			logger.debug("Checking NTP server '%s'" % ntpServer)
 			try:
-				data = datetime.datetime.utcfromtimestamp(c.request(ntpServer, timeout=1).tx_time).strftime('%y %m %d').split(' ')
+				data = datetime.datetime.utcfromtimestamp(c.request(ntpServer, timeout=2).tx_time).strftime('%y %m %d').split(' ')
 			except ntplib.NTPException:
 				if not proxy_enabled:
 					log.write("%s - No response\n" % ntpServer)
@@ -1477,4 +1575,7 @@ def ghc_verifyServerDate():
 		serverDateCheck = False
 		ghc_util_passFail('failed')
 	elif not problem:
-		ghc_util_passFail('passed')	
+		ghc_util_passFail('passed')
+
+	time2 = time.time()
+	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))

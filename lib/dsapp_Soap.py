@@ -236,6 +236,7 @@ def soap_getUserList(trustedConfig, gwConfig, noout='true'):
 	params['noop'] = noout
 
 	gw_location = "%(sSecure)s://%(gListenAddress)s:%(sPort)s/soap" % gwConfig
+	logger.debug("GroupWise address: %s" % gw_location)
 	soapClient = suds.client.Client(WSDL, location=gw_location)
 	try:
 		results = soapClient.service.getUserListRequest(**params)
@@ -273,6 +274,7 @@ def check_subContacts(folderList, parent_id):
 
 	return problem
 
+# This function is for developement / troubleshooting
 def soap_checkFolderListTEST(trustedConfig, gwConfig, userConfig):
 	problem = False
 	print ("Getting folder list..")
@@ -281,6 +283,6 @@ def soap_checkFolderListTEST(trustedConfig, gwConfig, userConfig):
 	if soap_folderList == None:
 		return
 
-	print soap_folderList
+	return soap_folderList
 
 	
