@@ -50,6 +50,7 @@ excep_logger = logging.getLogger('exceptions_log')
 
 def my_handler(type, value, tb):
 	tmp = traceback.format_exception(type, value, tb)
+	logger.error("EXCEPTION: See exception.log")
 	excep_logger.error("Uncaught exception:\n%s" % ''.join(tmp).strip())
 	print (''.join(tmp).strip())
 

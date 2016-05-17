@@ -17,12 +17,12 @@ getch = getch._Getch()
 import textwrap
 import subprocess
 import pydoc
+import subprocess
 
 import dsapp_ghc as ghc
 import dsapp_Soap as dsSOAP
 
 COMPANY_BU = 'Micro Focus'
-# DISCLAIMER = "Use at your own discretion. dsapp is not supported by %s\n     See [dsapp --bug] to report issues" % COMPANY_BU
 DISCLAIMER = "%s accepts no liability for the consequences of any actions taken\n     by the use of this application. Use at your own discretion" % COMPANY_BU
 
 # Folder variables
@@ -44,6 +44,7 @@ excep_logger = logging.getLogger('exceptions_log')
 
 def my_handler(type, value, tb):
 	tmp = traceback.format_exception(type, value, tb)
+	logger.error("EXCEPTION: See exception.log")
 	excep_logger.error("Uncaught exception:\n%s" % ''.join(tmp).strip())
 	print ''.join(tmp).strip()
 
@@ -530,6 +531,7 @@ def viewAttachments_menu():
 # DEBUG MENU
 def debug_menu():
 	menu = ['DEBUG MENU\n','1. SOAP - View user folder list','2. View verifyUser data', '3. View variables', '\n     0. Back']
+	logger.info("Running DEBUG menu!")
 
 	available = build_avaialbe(menu)
 	loop = True

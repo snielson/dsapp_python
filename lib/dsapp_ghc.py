@@ -78,6 +78,7 @@ excep_logger = logging.getLogger('exceptions_log')
 
 def my_handler(type, value, tb):
 	tmp = traceback.format_exception(type, value, tb)
+	logger.error("EXCEPTION: See exception.log")
 	excep_logger.error("Uncaught exception:\n%s" % ''.join(tmp).strip())
 	print (''.join(tmp).strip())
 
@@ -872,6 +873,7 @@ def ghc_checkDBSchema(dbConfig):
 	ghc_util_NewHeader("Checking Database Schema..")
 	time1 = time.time()
 	problem = False
+	ghc_dbVersion = None
 
 	with open(version, 'r') as file:
 		mobilityVersion = file.read().strip()
@@ -882,12 +884,10 @@ def ghc_checkDBSchema(dbConfig):
 	data = cur.fetchall()
 	cur.close()
 	conn.close()
-
-	for row in data:
-		try:
-			ghc_dbVersion = row['service_version'].strip()
-		except:
-			ghc_dbVersion = None
+	try:
+		ghc_dbVersion = data[0]['service_version'].strip()
+	except:
+		pass
 
 	with open(ghcLog, 'a') as log:
 		if ghc_dbVersion is not None and ghc_dbVersion == mobilityVersion:

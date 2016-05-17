@@ -180,6 +180,7 @@ def signal_handler_SIGINT(signal, frame):
 
 def my_handler(type, value, tb):
 	tmp = traceback.format_exception(type, value, tb)
+	logger.error("EXCEPTION: See exception.log")
 	excep_logger.error("Uncaught exception:\n%s" % ''.join(tmp).strip())
 	print ''.join(tmp).strip()
 
@@ -194,9 +195,6 @@ def set_spinner():
 ##################################################################################################
 #	Set up script
 ##################################################################################################
-
-# Disclaimer
-## see dsapp_menu.py - Main menu
 
 # Register exit_cleanup with atexit
 atexit.register(exit_cleanup)

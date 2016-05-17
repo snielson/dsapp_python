@@ -7,6 +7,7 @@ __email__ = "snielson@projectuminfinitas.com"
 
 import os, sys
 import suds.client
+import traceback
 import logging, logging.config
 sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 import dsapp_Definitions as ds
@@ -20,6 +21,17 @@ WSDL = 'file://%s/wsdl/GW2012/groupwise.wsdl' % os.path.dirname(os.path.realpath
 # Log Settings
 logging.config.fileConfig('%s/logging.cfg' % (dsappConf))
 logger = logging.getLogger('dsapp_Definitions')
+excep_logger = logging.getLogger('exceptions_log')
+
+def my_handler(type, value, tb):
+	tmp = traceback.format_exception(type, value, tb)
+	logger.error("EXCEPTION: See exception.log")
+	excep_logger.error("Uncaught exception:\n%s" % ''.join(tmp).strip())
+	print (''.join(tmp).strip())
+
+# Install exception handler
+sys.excepthook = my_handler
+
 
 name_space = {
 'SOAP-ENV': 'http://schemas.xmlsoap.org/soap/envelope/',

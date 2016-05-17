@@ -117,6 +117,7 @@ excep_logger = logging.getLogger('exceptions_log')
 
 def my_handler(type, value, tb):
 	tmp = traceback.format_exception(type, value, tb)
+	logger.error("EXCEPTION: See exception.log")
 	excep_logger.error("Uncaught exception:\n%s" % ''.join(tmp).strip())
 	print (''.join(tmp).strip())
 
@@ -1075,6 +1076,21 @@ def checkPostgresql(dbConfig):
 		return False
 	return True
 
+def checkDatabase(dbConfig, database):
+	if (database,) not in listDatabases(dbConfig):
+		logger.warning("Database %s does not exist" % database)
+		return False
+
+	try:
+		conn = psycopg2.connect("dbname='%s' user='%s' host='%s' password='%s'" % (database, dbConfig['user'],dbConfig['host'],dbConfig['pass']))
+		logger.info('Successfully connected to %s database [user=%s,pass=%s]' % (database, dbConfig['user'],"*" * len(dbConfig['pass'])))
+		conn.close()
+	except:
+		print (ERROR_MSG)
+		logger.error('Unable to connect to %s database [user=%s,pass=%s]' % (database, dbConfig['user'],"*" * len(dbConfig['pass'])))
+		return False
+	return True
+
 def getConn(dbConfig, database):
 	# Assume connection is valid, as checkPostgresql is tested on startup
 	try:
@@ -1084,14 +1100,29 @@ def getConn(dbConfig, database):
 	conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
 	return conn
 
+def listDatabases(dbConfig):
+	conn = getConn(dbConfig, 'postgres')
+	cur = conn.cursor()
+	cur.execute("SELECT datname FROM pg_database WHERE datistemplate = false")
+	data = cur.fetchall()
+	cur.close()
+	conn.close()
+	logger.debug("Returning list of databases: %s" % data)
+	return data
+	
 def dumpTable(dbConfig, database, tableName, targetSave):
+	if not checkDatabase(dbConfig, database):
+		return
+
 	filePath = "%s/%s.sql" %(targetSave, tableName)
 	if os.path.isfile(filePath):
 		print ("%s already exists.\nCreated : %s" % (filePath, time.ctime(os.path.getctime(filePath))))
 		logger.info("%s already exists. Created : %s" % (filePath, time.ctime(os.path.getctime(filePath))))
-		print ()
-		if not askYesOrNo("Overwrite SQL dump"):
+		if os.stat(filePath).st_size == 0:
+			print ("WARNING: SQL file is empty!")
+		if not askYesOrNo("Overwrite SQL file"):
 			return
+
 	logger.info("Dumping %s table from %s database to %s" % (tableName, database, filePath))
 	cmd = "PGPASSWORD=%s pg_dump -U %s %s -D -a -t '\"%s\"' > %s" % (dbConfig['pass'], dbConfig['user'], database, tableName, filePath)
 	dump = subprocess.call(cmd, shell=True)
@@ -1099,47 +1130,52 @@ def dumpTable(dbConfig, database, tableName, targetSave):
 def dropDatabases(dbConfig):
 	conn = getConn(dbConfig, 'postgres')
 	cur = conn.cursor()
+	databases = listDatabases(dbConfig)
 
 	Config.read(dsappSettings)
 	mobile_version = Config.get('Misc', 'mobility.version')
 	mobile_version = int(mobile_version)
 
-	#Dropping Tables
-	print ("Dropping datasync database")
-	logger.info("Dropping databases started")
 	time1 = time.time()
-	try:
-		cur.execute("DROP DATABASE datasync")
-		logger.info('Dropped datasync database')
-	except:
-		print('Unable to drop datasync database')
-		logger.error('Unable to drop datasync database')
-		cur.close()
-		conn.close()
-		return
-
-	print ("Dropping mobility database")
-	try:
-		cur.execute("DROP DATABASE mobility")
-		logger.info('Dropped mobility database')
-	except:
-		print('Unable to drop mobility database')
-		logger.error('Unable to drop mobility database')
-		cur.close()
-		conn.close()
-		return
-
-	if mobile_version >= ds_1x:
-		print ("Dropping dsmonitor database")
+	#Dropping Tables
+	if ('datasync',) in databases:
+		print ("Dropping datasync database")
+		logger.info("Dropping databases started")
 		try:
-			cur.execute("DROP DATABASE IF EXISTS dsmonitor")
-			logger.info('Dropped dsmonitor database')
+			cur.execute("DROP DATABASE datasync")
+			logger.info('Dropped datasync database')
 		except:
-			print('Unable to drop dsmonitor database')
-			logger.error('Unable to drop dsmonitor database')
+			print('Unable to drop datasync database')
+			logger.error('Unable to drop datasync database')
 			cur.close()
 			conn.close()
 			return
+
+	if ('mobility',) in databases: 
+		print ("Dropping mobility database")
+		try:
+			cur.execute("DROP DATABASE mobility")
+			logger.info('Dropped mobility database')
+		except:
+			print('Unable to drop mobility database')
+			logger.error('Unable to drop mobility database')
+			cur.close()
+			conn.close()
+			return
+
+	if mobile_version >= ds_1x:
+		if ('dsmonitor',) in databases:
+			print ("Dropping dsmonitor database")
+			try:
+				cur.execute("DROP DATABASE IF EXISTS dsmonitor")
+				logger.info('Dropped dsmonitor database')
+			except:
+				print('Unable to drop dsmonitor database')
+				logger.error('Unable to drop dsmonitor database')
+				cur.close()
+				conn.close()
+				return
+
 	time2 = time.time()
 	logger.info('Dropping databases complete')
 	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
@@ -1167,7 +1203,7 @@ def verify_clean_database(dbConfig):
 	check = [('datasync',), ('mobility',), ('dsmonitor',)]
 	conn = getConn(dbConfig, 'postgres')
 	cur = conn.cursor()
-	cur.execute("SELECT datname from pg_database")
+	cur.execute("SELECT datname FROM pg_database WHERE datistemplate = false;")
 	databases = cur.fetchall()
 
 	for d in databases:
@@ -1259,9 +1295,21 @@ def cuso(dbConfig, op = 'everything'):
 	continue_cleanup = False
 	if op == 'user':
 		dumpTable(dbConfig, 'datasync', 'membershipCache', dsappdata)
+		print()
 		dumpTable(dbConfig, 'datasync', 'targets', dsappdata)
 
-	# Dropping Tables
+	# Validate SQL exists, and has some data
+	if op == 'user':
+		if not os.path.isfile(dsappdata +'/targets.sql') and not os.path.isfile(dsappdata +'/membershipCache.sql'):
+			print ("\nCUSO pre-check: Unable to find SQL backup")
+			logger.warning("Unable to find user SQL backup")
+			return
+		else:
+			if os.stat(dsappdata +'/targets.sql').st_size == 0:
+				print("\nCUSO pre-check: SQL backup file is empty")
+				logger.warning("targets.sql backup file is empty")
+				return
+	# Dropping Tables		
 	dropDatabases(dbConfig)
 
 	# Check if database is clean
@@ -1884,7 +1932,7 @@ def dCleanup(dbConfig, userConfig):
 	time1 = time.time()
 	cur.execute("delete FROM \"objectMappings\" WHERE \"objectID\" IN (SELECT \"objectID\" FROM \"objectMappings\" WHERE \"objectID\" ilike '%%|%s' OR \"objectID\" ilike '%%|%s' OR \"objectID\" ilike '%%|%s')" % (psqlAppNameG, psqlAppNameM, userConfig['name']))
 	logger.debug('DELETE FROM objectMappings..')
-	cur.execute("delete FROM consumerevents WHERE edata ilike '%%<sourceName>%s</sourceName>%%' OR edata ilike '%%<sourceName>%s</sourceName>%%'" % (psqlAppNameG, psqlAppNameM))
+	cur.execute("delete FROM consumerevents WHERE edata ilike '%%<sourceName>%s</sourceName>%%' OR edata ilike '%%<sourceName>%s</sourceName>%%' OR edata ilike '%%<sourceDN>%s</sourceDN>%%' OR edata ilike '%%<sourceDN>%s</sourceDN>%%'" % (psqlAppNameG, psqlAppNameM, psqlAppNameG, psqlAppNameM))
 	logger.debug('DELETE FROM consumerevents..')
 	cur.execute("delete FROM \"folderMappings\" WHERE \"targetDN\" ilike '(%s[.|,].*)$' OR \"targetDN\" ilike '%s'" % (userConfig['name'],uUser))
 	logger.debug('DELETE FROM folderMappings..')
@@ -1892,7 +1940,7 @@ def dCleanup(dbConfig, userConfig):
 	logger.debug('DELETE FROM cache..')
 	cur.execute("delete FROM \"membershipCache\" WHERE (groupdn ilike '(%s[.|,].*)$' OR memberdn ilike '(%s[.|,].*)$') OR (groupdn ilike '%s' OR memberdn ilike '%s')" % (userConfig['name'], userConfig['name'], uUser, uUser))
 	logger.debug('DELETE FROM membershipCache..')
-	cur.execute("delete FROM targets WHERE dn ~* '(%(name)s[.|,].*)$' OR dn ilike '%(name)s' OR \"targetName\" ilike '%(name)s'" % userConfig)
+	cur.execute("delete FROM targets WHERE dn ~* '(\\m%(name)s[.|,].*)$' OR dn ilike '%(name)s' OR \"targetName\" ilike '%(name)s'" % userConfig)
 	logger.debug('DELETE FROM targets..')
 	
 	time2 = time.time()
@@ -2073,6 +2121,9 @@ def updateMobilityISO():
 	# Get path / file
 	print ()
 	isoPath = getMobilityISO()
+	if isoPath is None:
+		print()
+		return
 
 	# Verify ISO is mobility iso
 	if not checkISO_content(isoPath):
@@ -3610,12 +3661,14 @@ def show_Mob_syncEvents(dbConfig):
 	datasyncBanner(dsappversion)
 	cmd = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"select DISTINCT  u.userid AS \\\"FDN\\\", count(eventid) as \\\"Events\\\", se.userid FROM syncevents se INNER JOIN users u ON se.userid = u.guid GROUP BY u.userid, se.userid ORDER BY \\\"Events\\\" DESC;\"" % dbConfig
 	out = util_subprocess(cmd)
+	logger.info("Checking mobility sync events")
 	print (out[0].rstrip('\n')); print ()
 
 def view_attach_byUser(dbConfig):
 	datasyncBanner(dsappversion)
-	cmd = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"select DISTINCT u.name AS \\\"Name\\\", u.userid AS \\\"FDN\\\", ROUND(a.filesize/1024/1024::numeric,4) AS \\\"MB\\\" from attachments a INNER JOIN attachmentmaps am ON a.attachmentid = am.attachmentid INNER JOIN users u ON am.userid = u.guid WHERE a.filestoreid != '0' GROUP BY u.userid, u.name, a.filesize ORDER BY \\\"MB\\\" DESC;\"" % dbConfig
+	cmd = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"select u.name AS \\\"Name\\\", u.userid AS \\\"FDN\\\", ROUND(SUM(a.filesize)/1024/1024::numeric,4) AS \\\"MB\\\" from attachments a INNER JOIN attachmentmaps am ON a.attachmentid = am.attachmentid INNER JOIN users u ON am.userid = u.guid WHERE a.filestoreid != '0' GROUP BY u.name, u.userid ORDER BY \\\"MB\\\" DESC;\"" % dbConfig
 	out = util_subprocess(cmd)
+	logger.info("Checking users attachments by MB")
 	pydoc.pager(out[0].rstrip('\n'))
 
 def view_users_attach(dbConfig):
@@ -3624,12 +3677,15 @@ def view_users_attach(dbConfig):
 		return
 
 	if confirm_user(userConfig, 'mobility'):
-		cmd = "PGPASSWORD=%s psql -U %s mobility -c \"select a.filename AS \\\"File Name\\\", ROUND(a.filesize/1024/2024::numeric,4) AS \\\"MB\\\", a.tstamp AS \\\"Time Stamp\\\", a.filestoreid from attachments a INNER JOIN attachmentmaps am ON a.attachmentid = am.attachmentid INNER JOIN users u ON am.userid = u.guid WHERE u.userid='%s' GROUP BY a.filename, a.tstamp, a.filestoreid, a.filesize ORDER BY \\\"MB\\\" DESC;\"" % (dbConfig['pass'], dbConfig['user'], userConfig['mName'])
+		cmd = "PGPASSWORD=%s psql -U %s mobility -c \"select a.filename AS \\\"File Name\\\", ROUND(a.filesize/1024/1024::numeric,4) AS \\\"MB\\\", a.tstamp AS \\\"Time Stamp\\\", a.filestoreid from attachments a INNER JOIN attachmentmaps am ON a.attachmentid = am.attachmentid INNER JOIN users u ON am.userid = u.guid WHERE u.userid='%s' GROUP BY a.filename, a.tstamp, a.filestoreid, a.filesize ORDER BY \\\"MB\\\" DESC;\"" % (dbConfig['pass'], dbConfig['user'], userConfig['mName'])
 	out = util_subprocess(cmd)
+	logger.info("Checking attachments on %s" % userConfig['name'])
 	pydoc.pager(out[0].rstrip('\n'))
 
 def check_mob_attachments(dbConfig):
 	datasyncBanner(dsappversion)
+	logger.info("Starting check on filestoreIDs..")
+	time1 = time.time()
 	conn = getConn(dbConfig, 'mobility')
 	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
 	cur.execute("select filestoreid from attachments")
@@ -3674,6 +3730,9 @@ def check_mob_attachments(dbConfig):
 		print ("\n     Informational: %s orphans files on the file system" % orphaned_os_files)
 	if orphaned_db_files > 0:
 		print ("\n     Warning: %s entires missing from the file system!" % orphaned_db_files)
+
+	time2 = time.time()
+	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
 def check_userAuth(dbConfig, authConfig):
 	# User Authentication

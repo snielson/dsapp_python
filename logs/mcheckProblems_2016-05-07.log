@@ -1,0 +1,6 @@
+Exception: 
+Trace: Traceback (most recent call last):
+  File "/tools/mcheck/mcheck.py", line 165, in main
+  File "/tools/mcheck/mcheck.py", line 106, in menu
+EOFError
+
