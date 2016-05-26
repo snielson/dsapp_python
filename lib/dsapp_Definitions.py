@@ -383,16 +383,21 @@ def xmlpath_findall(elem, tree):
 		logger.warning('Unable to find %s' % (elem))
 		return None
 
-def setXML (elem, tree, value, filePath):
+def setXML (elem, tree, value, filePath, hideValue=False):
+	if hideValue:
+		logValue = "*******"
+	else:
+		logValue = value
+
 	root = tree.getroot()
 	path = root.xpath(elem)
 	if value is not None:
 		path[0].text = value
 		try:
 			etree.ElementTree(root).write(filePath, pretty_print=True)
-			logger.debug("Set '%s' at %s in %s" % (value, elem, filePath))
+			logger.debug("Set '%s' at %s in %s" % (logValue, elem, filePath))
 		except:
-			logger.warning('Unable to set %s at %s in %s' % (value, elem, filePath))
+			logger.warning('Unable to set %s at %s in %s' % (logValue, elem, filePath))
 
 
 def askYesOrNo(question, default=None):
@@ -885,13 +890,21 @@ def protect(msg, encode, path, host = None, key = None, skip=False):
 		if encode:
 			result = base64.urlsafe_b64encode(os.popen('echo -n %s | openssl enc -aes-256-cbc -a -k `hostname -f`' % quote(msg)).read().rstrip())
 		else:
-			msg = base64.urlsafe_b64decode(msg)
+			try:
+				msg = base64.urlsafe_b64decode(msg)
+			except:
+				pass
+
 			result = os.popen('echo %s | openssl enc -d -aes-256-cbc -a -k `hostname -f` 2>%s/decode_error_check' % (quote(msg),dsapptmp)).read().rstrip()
 	else:
 		if encode:
 			result = base64.urlsafe_b64encode(os.popen('echo -n %s | openssl enc -aes-256-cbc -a -k %s' % (quote(msg),host)).read().rstrip())
 		else:
-			msg = base64.urlsafe_b64decode(msg)
+			try:
+				msg = base64.urlsafe_b64decode(msg)
+			except:
+				pass
+
 			result = os.popen('echo %s | openssl enc -d -aes-256-cbc -a -k %s 2>%s/decode_error_check' % (quote(msg),host,dsapptmp)).read().rstrip()
 
 	# Check for errors
@@ -2413,19 +2426,19 @@ def changeDBPass(config_files, XMLconfig):
 		if isProtected(XMLconfig['ceconf'], './/configengine/database/protected'):
 			setXML('.//configengine/database/password', XMLconfig['ceconf'], inputEncrpt, config_files['ceconf'])
 		else:
-			setXML('.//configengine/database/password', XMLconfig['ceconf'], p_input, config_files['ceconf'])
+			setXML('.//configengine/database/password', XMLconfig['ceconf'], p_input, config_files['ceconf'], hideValue=True)
 		logger.info("Updated database password in %s" % config_files['ceconf'])
 
 		if isProtected(XMLconfig['econf'], './/settings/database/protected'):
 			setXML('.//settings/database/password', XMLconfig['econf'], inputEncrpt, config_files['econf'])
 		else:
-			setXML('.//settings/database/password', XMLconfig['econf'], p_input, config_files['econf'])
+			setXML('.//settings/database/password', XMLconfig['econf'], p_input, config_files['econf'], hideValue=True)
 		logger.info("Updated database password in %s" % config_files['econf'])
 
 		if isProtected(XMLconfig['mconf'], './/settings/custom/protected'):
 			setXML('.//settings/custom/dbpass', XMLconfig['mconf'], inputEncrpt, config_files['mconf'])
 		else:
-			setXML('.//settings/custom/dbpass', XMLconfig['mconf'], p_input, config_files['mconf'])
+			setXML('.//settings/custom/dbpass', XMLconfig['mconf'], p_input, config_files['mconf'], hideValue=True)
 		logger.info("Updated database password in %s" % config_files['mconf'])
 
 		print ("\nDatabase password updated. Please restart mobility\n")
@@ -2844,13 +2857,20 @@ def checkLDAP(XMLconfig ,ldapConfig, ghc=False):
 			cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D %s -w %s -b %s" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], ldapConfig['group'][0])
 		else:
 			cmd = "/usr/bin/ldapsearch -x -H ldaps://%(host)s:%(port)s -D %(login)s -w %(pass)s %(login)s" % ldapConfig
+	else:
+		cmd = None
 
-	logger.info("Testing LDAP connection")
-	log_cmd = cmd.replace("-w " + ldapConfig['pass'],"-w *******")
-	logger.debug("LDAP test command: %s" % log_cmd)
-	ldapCheck = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-	ldapCheck.wait()
-	out, err = ldapCheck.communicate()
+	if cmd is not None:
+		logger.info("Testing LDAP connection")
+		log_cmd = cmd.replace("-w " + ldapConfig['pass'],"-w *******")
+		logger.debug("LDAP test command: %s" % log_cmd)
+		ldapCheck = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		ldapCheck.wait()
+		out, err = ldapCheck.communicate()
+	else:
+		logger.warning("Unable to test LDAP connection")
+		return False
+
 	if out:
 		logger.info("LDAP tested successfully")
 		return True
@@ -3637,14 +3657,37 @@ def show_GW_syncEvents(dbConfig):
 		userCount = dict()
 		logger.debug("Sorting consumerevents by user..")
 		for row in data:
-			if '<sourceName>' in row['edata'] or '<sourceDN>' in row['edata']: # Added sourceDN for GMS 14.2.0. Left sourceName for backwards compat.
-				userSourceName = row['edata'].split('>')[1].split('<')[0]
-				if userSourceName in userCount:
-					logger.debug("Updating key [%s]:[%s]" % (userSourceName, userCount[userSourceName] + 1))
-					userCount[userSourceName] += 1
+
+			# Gets users sourceName
+			if '<sourceName>' in row['edata']:
+				userSouceDN = row['edata'].split('<sourceName>')[1].split('</sourceName>')[0]
+				if userSouceDN in userCount:
+					logger.debug("Updating key [%s]:[%s]" % (userSouceDN, userCount[userSouceDN] + 1))
+					userCount[userSouceDN] += 1
 				else:
-					logger.debug("Found souce '%s'. Creating key" % userSourceName)
-					userCount[userSourceName] = 1
+					logger.debug("Found souce '%s'. Creating key" % userSouceDN)
+					userCount[userSouceDN] = 1
+
+			# Gets users sourceDN  if sourceName not found
+			elif '<sourceDN>' in row['edata']: # Added sourceDN for GMS 14.2.0.
+				userSouceDN = row['edata'].split('<sourceDN>')[1].split('</sourceDN>')[0]
+				if userSouceDN in userCount:
+					logger.debug("Updating key [%s]:[%s]" % (userSouceDN, userCount[userSouceDN] + 1))
+					userCount[userSouceDN] += 1
+				else:
+					logger.debug("Found souce '%s'. Creating key" % userSouceDN)
+					userCount[userSouceDN] = 1
+
+			# List event as Unknown if neither sourceDN or sourceName are found
+			else:
+				userSouceDN = 'Unknown'
+				if userSouceDN in userCount:
+					logger.debug("Updating key [%s]:[%s]" % (userSouceDN, userCount[userSouceDN] + 1))
+					userCount[userSouceDN] += 1
+				else:
+					logger.debug("Unable to find souce. Creating 'Unknown' key")
+					userCount[userSouceDN] = 1
+
 		logger.debug("Sorting keys on on values..")
 		sorted_users = sorted(userCount.items(), key=operator.itemgetter(1),reverse=True)
 
@@ -4003,13 +4046,13 @@ def clearTextEncryption(config_files, XMLconfig, ldapConfig, authConfig):
 	print ("Updating XMLs with inputs..")
 	logger.info("Updating XMLs with inputs..")
 
-	setXML ('.//configengine/ldap/login/password', XMLconfig['ceconf'], ldapPass, config_files['ceconf'])
+	setXML ('.//configengine/ldap/login/password', XMLconfig['ceconf'], ldapPass, config_files['ceconf'], hideValue=True)
 	if smtpPass is not None:
-		setXML ('.//configengine/notification/smtpPassword', XMLconfig['ceconf'], smtpPass, config_files['ceconf'])
-	setXML('.//settings/custom/trustedAppKey', XMLconfig['gconf'], trustKey, config_files['gconf'])
-	setXML('.//configengine/database/password', XMLconfig['ceconf'], dbPass, config_files['ceconf'])
-	setXML('.//settings/database/password', XMLconfig['econf'], dbPass, config_files['econf'])
-	setXML('.//settings/custom/dbpass', XMLconfig['mconf'], dbPass, config_files['mconf'])
+		setXML ('.//configengine/notification/smtpPassword', XMLconfig['ceconf'], smtpPass, config_files['ceconf'], hideValue=True)
+	setXML('.//settings/custom/trustedAppKey', XMLconfig['gconf'], trustKey, config_files['gconf'], hideValue=True)
+	setXML('.//configengine/database/password', XMLconfig['ceconf'], dbPass, config_files['ceconf'], hideValue=True)
+	setXML('.//settings/database/password', XMLconfig['econf'], dbPass, config_files['econf'], hideValue=True)
+	setXML('.//settings/custom/dbpass', XMLconfig['mconf'], dbPass, config_files['mconf'], hideValue=True)
 
 	print ("\nRun %s/update.sh to re-encrypt XMLs" % dirOptMobility)
 
