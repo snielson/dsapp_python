@@ -493,7 +493,6 @@ def checksQueries_menu():
 			print; ds.eContinue()
 		elif choice == '4':
 			ds.show_GW_syncEvents(dbConfig)
-			print; ds.eContinue()
 		elif choice == '5':
 			ds.show_Mob_syncEvents(dbConfig)
 			ds.eContinue()

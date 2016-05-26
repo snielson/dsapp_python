@@ -3692,7 +3692,7 @@ def show_GW_syncEvents(dbConfig):
 		sorted_users = sorted(userCount.items(), key=operator.itemgetter(1),reverse=True)
 
 		header = ['User', 'Events']
-		print (tabulate(sorted_users, header, tablefmt='orgtbl'))
+		pydoc.pager(tabulate(sorted_users, header, tablefmt='orgtbl'))
 	else:
 		print ("consumerevents table has no events (psql:datasync)")
 		logger.info("consumerevents table has no events (psql:datasync)")
