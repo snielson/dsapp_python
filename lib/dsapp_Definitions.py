@@ -2858,6 +2858,11 @@ def checkLDAP(XMLconfig ,ldapConfig, ghc=False):
 		else:
 			cmd = "/usr/bin/ldapsearch -x -H ldaps://%(host)s:%(port)s -D %(login)s -w %(pass)s %(login)s" % ldapConfig
 	else:
+		try:
+			logger.warning("ldapConfig['secure'] = %s" % ldapConfig['secure'])
+		except:
+			logger.warning("No 'secure' key in ldapConfig")
+
 		cmd = None
 
 	if cmd is not None:
@@ -3696,6 +3701,7 @@ def show_GW_syncEvents(dbConfig):
 	else:
 		print ("consumerevents table has no events (psql:datasync)")
 		logger.info("consumerevents table has no events (psql:datasync)")
+		print(); eContinue()
 
 	cur.close()
 	conn.close()
@@ -3934,7 +3940,7 @@ def getUserPAB(dbConfig):
 
 	objectType = userConfig['type']
 	with open(dsapptmp + '/userPab.txt', 'w') as pabFile:
-		pabFile.write("%s '%s' PAB contacts\n" % (objectType.capitalize(), userConfig['name']))
+		pabFile.write("%s '%s' PAB contacts in GAL\n" % (objectType.capitalize(), userConfig['name']))
 		pabFile.write("\nAddress Book | Name | Email | Home Phone | Mobile Phone | Office Phone\n")
 		pabFile.write("------------------------------\n")
 		for row in data:

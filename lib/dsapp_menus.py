@@ -18,9 +18,11 @@ import textwrap
 import subprocess
 import pydoc
 import subprocess
+from tabulate import tabulate
 
 import dsapp_ghc as ghc
 import dsapp_Soap as dsSOAP
+import dsapp_performance as dsPerformance
 
 COMPANY_BU = 'Micro Focus'
 DISCLAIMER = "%s accepts no liability for the consequences of any actions taken\n     by the use of this application. Use at your own discretion" % COMPANY_BU
@@ -474,7 +476,7 @@ def userInfo_menu():
 			main_menu()
 
 def checksQueries_menu():
-	menu = ['1. General Health Check (beta)', '2. Nightly Maintenance Check', '\n     3. Show Sync Status', '4. GW pending events by User (consumerevents)', '5. Mobility pending events by User (syncevents)', '\n     6. Attachments...', '\n     0. Back']
+	menu = ['1. General Health Check (beta)', '2. Nightly Maintenance Check', '\n     3. Show Sync Status', '4. GW pending events by User (consumerevents)', '5. Mobility pending events by User (syncevents)', '\n     6. Attachments...', '7. Performance...', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -498,9 +500,34 @@ def checksQueries_menu():
 			ds.eContinue()
 		elif choice == '6':
 			viewAttachments_menu()
+		elif choice == '7':
+			performance_menu()
 		elif choice == '0':
 			loop = False
 			main_menu()
+
+### Start ### Sub menu performance_menu ###
+def performance_menu():
+	menu = ['1. Query string counts','\n     0. Back']
+
+	available = build_avaialbe(menu)
+	loop = True
+	while loop:
+		show_menu(menu)
+		choice = get_choice(available)
+		if choice == '1':
+			ds.datasyncBanner(dsappversion)
+			if ds.askYesOrNo("Parse logs for query strings"):
+				environ = dsPerformance.countUsers()
+				page_item = ''
+				for item in environ['Users']:
+					page_item += ("User: %s\n" % item)
+					page_item += ("%s\n\n" % environ['Users'][item])
+				pydoc.pager(page_item)
+		elif choice == '0':
+			loop = False
+			return
+### End ### Sub menus performance_menu ###
 
 ### Start ### Sub menus checkQueries_menu ###
 def viewAttachments_menu():
@@ -538,24 +565,28 @@ def debug_menu():
 		show_menu(menu)
 		choice = get_choice(available)
 		if choice == '1':
+			logger.info("DEBUG MENU: Checking SOAP folder check")
 			userConfig = ds.verifyUser(dbConfig)[0]
 			if userConfig['name'] is not None:
 				pydoc.pager(str(dsSOAP.soap_checkFolderListTEST(trustedConfig, gwConfig, userConfig)))
 		elif choice == '2':
+			logger.info("DEBUG MENU: Running verifyUser()")
 			for user in ds.verifyUser(dbConfig):
 				print user
 				print
 			ds.eContinue()
 		elif choice == '3':
-			print("Database Config:\n%s\n" % dbConfig)
-			print("LDAP Config:\n%s\n" % ldapConfig)
-			print("Mobility Config:\n%s\n" % mobilityConfig)
-			print("GroupWise Config:\n%s\n" % gwConfig)
-			print("Trusted App Config:\n%s\n" % trustedConfig)
-			print("Config Files:\n%s\n" % config_files)
-			print("Web Config:\n%s\n" % webConfig)
-			print("Auth Config:\n%s\n" % authConfig)
-			ds.eContinue()
+			logger.info("DEBUG MENU: Listing variables")
+			saved_variables = ("Database Config:\n%s\n" % dbConfig)
+			saved_variables += ("\nLDAP Config:\n%s\n" % ldapConfig)
+			saved_variables += ("\nMobility Config:\n%s\n" % mobilityConfig)
+			saved_variables += ("\nGroupWise Config:\n%s\n" % gwConfig)
+			saved_variables += ("\nTrusted App Config:\n%s\n" % trustedConfig)
+			saved_variables += ("\nConfig Files:\n%s\n" % config_files)
+			saved_variables += ("\nWeb Config:\n%s\n" % webConfig)
+			saved_variables += ("\nAuth Config:\n%s\n" % authConfig)
+			pydoc.pager(saved_variables)
 		elif choice == '0':
 			loop = False
+			ds.clear()
 			return
