@@ -14,7 +14,7 @@ __credits__ = "Tyler Harris"
 __maintainer__ = "Shane Nielson"
 __email__ = "snielson@projectuminfinitas.com"
 
-dsappversion='236'
+dsappversion='237'
 
 ##################################################################################################
 #	Imports
@@ -607,8 +607,7 @@ if args.clear:
 
 DEBUG_ENABLED = False
 if DEBUG_ENABLED:
-	import dsapp_performance as dsp
-	dsp.countUsers("/var/log/datasync/connectors/mobility-agent.log")
+	pass
 
 	sys.exit(0)
 
