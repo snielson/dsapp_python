@@ -607,7 +607,8 @@ if args.clear:
 
 DEBUG_ENABLED = False
 if DEBUG_ENABLED:
-	pass
+	import dsapp_performance as dsp
+	dsp.countUsers("/var/log/datasync/connectors/mobility-agent.log")
 
 	sys.exit(0)
 

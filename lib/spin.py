@@ -17,7 +17,10 @@ class progress_bar_loading(threading.Thread):
         while (not self.event.is_set()):
             sys.stdout.write(spinner.next())
             time.sleep(0.1)
-            sys.stdout.flush()
+            try:
+                sys.stdout.flush()
+            except:
+                pass
             if not self.event.is_set():
                 sys.stdout.write('\b\b\b')
 

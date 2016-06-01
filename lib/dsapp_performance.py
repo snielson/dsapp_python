@@ -12,6 +12,10 @@ import logging, logging.config
 import ast
 import dsapp_Definitions as ds
 import re
+import spin
+import time
+import sqlite3
+import pydoc
 
 # Folder variables
 dsappDirectory = "/opt/novell/datasync/tools/dsapp"
@@ -30,6 +34,7 @@ ds_2x = 2
 ds_14x = 14
 mobilityVersion = 0
 version = "/opt/novell/datasync/version"
+envrion_db = dsapptmp + '/environ.sqlite'
 
 # Mobility Directories variables
 dirOptMobility = "/opt/novell/datasync"
@@ -57,6 +62,7 @@ sudslog = log + "/connectors/suds.log"
 logging.config.fileConfig('%s/logging.cfg' % (dsappConf))
 logger = logging.getLogger('dsapp_Definitions')
 excep_logger = logging.getLogger('exceptions_log')
+perform_logger = logging.getLogger('performance_log')
 
 def my_handler(type, value, tb):
 	tmp = traceback.format_exception(type, value, tb)
@@ -90,6 +96,11 @@ def declareVariables1():
 	mlog = log + "/connectors/default.pipeline1.mobility.log"
 	glog = log + "/connectors/default.pipeline1.groupwise.log"
 
+def set_spinner():
+	spinner = spin.progress_bar_loading()
+	spinner.setDaemon(True)
+	return spinner
+
 def getDSVersion():
 	with open(version) as f:
 		value = f.read().split('.')[0]
@@ -105,85 +116,145 @@ def setVariables():
 		declareVariables1()
 
 # Parse logs, and build a list of dictionaries
-def getEnvrion():
+def getEnvrion(log=None):
 	# Regex to find the problem object values
 	regex = re.compile(r"(<[^\z]+>)|(<[^>]+>)")
 
-	# Set the variables to the correct logs
-	setVariables()
+	if log is None:
+		# Set the variables to the correct logs
+		setVariables()
+		log = mAlog
 
-	# Createa a list of dictionaries based on logs
-	dict_from_file = []
-	with open(mAlog, 'r') as inf:
+	# Get log size
+	logMB = os.path.getsize(log)/1024.0/1024.0
+
+	spinner = set_spinner()
+	print ("\nParsing %0.2fMB log.. " % logMB, end='')
+	spinner.start(); time.sleep(.000001)
+	time1 = time.time()
+	logger.info("Parsing %0.2fMB log: %s" % (logMB, log))
+	perform_logger.info("Parsing %0.2fMB log: %s" % (logMB, log))
+
+	# If db already exists. remove it
+	if os.path.isfile(envrion_db):
+		os.remove(envrion_db)
+
+	# Create a sqlite db to store the values
+	conn = sqlite3.connect(envrion_db)
+	cur = conn.cursor()
+	cur.execute("CREATE TABLE environ(REMOTE_ADDR TEXT, QUERY_STRING TEXT, HTTP_HOST TEXT, SERVER_PORT TEXT)")
+	conn.commit()
+	conn_flush = 0
+
+	with open(log, 'r') as inf:
 		for line in inf:
-			if 'environ' in line:
+			if '[Server] environ' in line:
 				tempLine = line.strip()
 				environ_dict = ("{%s}\n" % tempLine.split('{')[1].split('}')[0])
 				if environ_dict is not None:
 					newLine = regex.sub("'*****'", environ_dict)
-					# print (newLine)
-					dict_from_file.append(ast.literal_eval(newLine))
+					try:
+						temp_dict = [ast.literal_eval(newLine)]
+					except:
+						perform_logger.warning("Syntax Error!\n%s" % newLine)
 
+					try:
+						cur.execute("INSERT into environ values (?,?,?,?)", [temp_dict[0]['REMOTE_ADDR'], temp_dict[0]['QUERY_STRING'], temp_dict[0]['HTTP_HOST'], temp_dict[0]['SERVER_PORT']])
+						conn_flush += 1
+					except:
+						perform_logger.warning("INSERT Error!\n%s" % temp_dict[0])
 
-	return dict_from_file
+				if conn_flush >= 500:
+					conn.commit()
+					conn_flush = 0
+
+	# Commit any final changes, and close sqlite connections
+	conn.commit()
+	cur.close()
+	conn.close()
+
+	# Stop spinner
+	spinner.stop(); print ('\n')
+	time2 = time.time()
+	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+	perform_logger.info("Operation took %0.3f ms\n" % ((time2 - time1) * 1000))
+
 
 # Create dictionary of users, devices, cmd, and counts
-def countUsers():
-	counts = dict()
-	counts['Users'] = dict()
+def countUsers(log=None):
+	getEnvrion(log)
+	# TODO : Check for empty environ table
+	# Create a sqlite db to store the values
+	conn = sqlite3.connect(envrion_db)
+	cur = conn.cursor()
+	cur.execute("CREATE TABLE data(user TEXT, userKey TEXT, cmd TEXT, deviceid TEXT, devicetype TEXT, address TEXT)")
+	conn.commit()
 
-	environ_list = getEnvrion()
-	for item in environ_list:
+	spinner = set_spinner()
+	print ("Creating table.. ", end='')
+	spinner.start(); time.sleep(.000001)
+	time1 = time.time()
+	logger.info("Creating table: %s" % log)
+	perform_logger.info("Creating table: %s" % log)
+
+	cur.execute("SELECT QUERY_STRING, REMOTE_ADDR from environ")
+	data = cur.fetchall()
+
+	conn_flush = 0
+	for row in data:
 
 		# Get user
-		try:
-			user = item['QUERY_STRING'].split('User=')[1].split('&')[0]
-		except:
-			user = None
+ 		try:
+ 			user = row[0].split('User=')[1].split('&')[0]
+ 		except:
+ 			user = None
 
-		try:
-			cmd = item['QUERY_STRING'].split('Cmd=')[1].split('&')[0]
-		except:
-			cmd = None
+ 		# Get cmd
+ 		try:
+ 			cmd = row[0].split('Cmd=')[1].split('&')[0]
+ 		except:
+ 			cmd = None
 
-		try:
-			deviceId = item['QUERY_STRING'].split('DeviceId=')[1].split('&')[0]
-		except:
-			deviceId = None
+ 		# Get deviceid
+ 		try:
+ 			deviceId = row[0].split('DeviceId=')[1].split('&')[0]
+ 		except:
+ 			deviceId = None
+ 		
+ 		# Get deviceType
+ 		try:	
+ 			deviceType = row[0].split('DeviceType=')[1].split("'")[0]
+ 		except:
+ 			deviceType = None
 
-		try:	
-			deviceType = item['QUERY_STRING'].split('DeviceType=')[1].split("'")[0]
-		except:
-			deviceType = None
+ 		# Get address
+ 		try:	
+ 			remoteAddr = row[1]
+ 		except:
+ 			remoteAddr = None
 
-		# Create dictionary based on user with count
-		if user in counts['Users']:
-			counts['Users'][user]['Total_Count'] += 1
-		else:
-			counts['Users'][user] = dict()
-			counts['Users'][user]['Command'] = dict()
-			counts['Users'][user]["DeviceId"] = dict()
-			counts['Users'][user]["DeviceType"] = dict()
-			counts['Users'][user]['Total_Count'] = 1
+ 		userKey = "%s:%s" % (user, deviceId)
 
-		# Count cmd based on user
-		if cmd in counts['Users'][user]['Command']:
-			counts['Users'][user]['Command'][cmd] += 1
-		else:
-			counts['Users'][user]['Command'][cmd] = 1
+ 		cur.execute("INSERT into data values (?,?,?,?,?,?)", [user, userKey, cmd, deviceId, deviceType, remoteAddr])
+ 		conn_flush += 1
+ 		if conn_flush >= 500:
+			conn.commit()
+			conn_flush = 0
 
-		# Count deviceId based on user
-		if deviceId in counts['Users'][user]['DeviceId']:
-			counts['Users'][user]['DeviceId'][deviceId] += 1
-		else:
-			counts['Users'][user]['DeviceId'][deviceId] = 1
+	conn.commit()
+	cur.close()
+	conn.close()
 
-		# Count deviceType based on user
-		if deviceType in counts['Users'][user]['DeviceType']:
-			counts['Users'][user]['DeviceType'][deviceType] += 1
-		else:
-			counts['Users'][user]['DeviceType'][deviceType] = 1
+	# Stop spinner
+	spinner.stop(); print ('\n')
+	time2 = time.time()
+	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+	perform_logger.info("Operation took %0.3f ms\n" % ((time2 - time1) * 1000))
 
-	return counts
+	select_cmd = "sqlite3 -column -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\", cmd as \"Command\", count(cmd) as \"Count\" from data group by userKey, cmd order by \"Count\" desc;'" % envrion_db
+	out = ds.util_subprocess(select_cmd)
+	pydoc.pager(out[0])
 
-
+	select_cmd = "sqlite3 -csv -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\", cmd as \"Command\", count(cmd) as \"Count\" from data group by userKey, cmd order by \"Count\" desc;' > %s/query_string.csv" % (envrion_db, dsappdata)
+	out = ds.util_subprocess(select_cmd)
+	print ("Data exported to %s/query_string.csv" % dsappdata)

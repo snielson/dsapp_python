@@ -310,6 +310,19 @@ def getVersion(isInstalled,version):
 			logger.error('Unable to find: ' + version)
 			sys.exit(1)
 
+def getFilePath(prompt):
+	while True:
+		filePath = autoCompleteInput(prompt)
+		if not os.path.isfile (filePath):
+			if not askYesOrNo("Invalid path. Try again"):
+				filePath = None
+				break
+		else:
+			break
+
+	return filePath
+
+
 def findReplace(find, replace, filePath):
 	for line in fileinput.input(filePath, inplace=True):
 		print(line.replace(find,replace), end='')

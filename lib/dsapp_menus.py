@@ -518,12 +518,11 @@ def performance_menu():
 		if choice == '1':
 			ds.datasyncBanner(dsappversion)
 			if ds.askYesOrNo("Parse logs for query strings"):
-				environ = dsPerformance.countUsers()
-				page_item = ''
-				for item in environ['Users']:
-					page_item += ("User: %s\n" % item)
-					page_item += ("%s\n\n" % environ['Users'][item])
-				pydoc.pager(page_item)
+				log = ds.getFilePath("Enter path to mobility-agent.log: ")
+				if log is None:
+					return
+				dsPerformance.countUsers(log)
+				ds.eContinue()
 		elif choice == '0':
 			loop = False
 			return
