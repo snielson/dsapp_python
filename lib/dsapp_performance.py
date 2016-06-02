@@ -16,6 +16,8 @@ import spin
 import time
 import sqlite3
 import pydoc
+import tempfile
+import subprocess
 
 # Folder variables
 dsappDirectory = "/opt/novell/datasync/tools/dsapp"
@@ -251,10 +253,17 @@ def countUsers(log=None):
 	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 	perform_logger.info("Operation took %0.3f ms\n" % ((time2 - time1) * 1000))
 
-	select_cmd = "sqlite3 -column -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\", cmd as \"Command\", count(cmd) as \"Count\" from data group by userKey, cmd order by \"Count\" desc;'" % envrion_db
-	out = ds.util_subprocess(select_cmd)
-	pydoc.pager(out[0])
+	# Create tempfile for large tables
+	name = tempfile.TemporaryFile(mode='w+b')
 
-	select_cmd = "sqlite3 -csv -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\", cmd as \"Command\", count(cmd) as \"Count\" from data group by userKey, cmd order by \"Count\" desc;' > %s/query_string.csv" % (envrion_db, dsappdata)
-	out = ds.util_subprocess(select_cmd)
-	print ("Data exported to %s/query_string.csv" % dsappdata)
+	select_cmd = "sqlite3 -column -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\", cmd as \"Command\", count(cmd) as \"Count\" from data group by userKey, cmd order by \"Count\" desc;'" % envrion_db
+	p = subprocess.Popen(select_cmd, shell=True, stdout=name)
+	p.wait()
+	name.seek(0)
+	out = name.read()
+	pydoc.pager(out)
+
+	if ds.askYesOrNo("Output results to CSV"):
+		select_cmd = "sqlite3 -csv -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\", cmd as \"Command\", count(cmd) as \"Count\" from data group by userKey, cmd order by \"Count\" desc;' > %s/query_string.csv" % (envrion_db, dsappdata)
+		out = ds.util_subprocess(select_cmd)
+		print ("Data exported to %s/query_string.csv" % dsappdata)
