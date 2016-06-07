@@ -15,6 +15,8 @@ import datetime
 import time
 import pydoc
 import traceback
+import dsapp_Definitions as ds
+import dsapp_Soap as dsSoap
 import urllib2
 import logging, logging.config
 import ntplib
@@ -23,7 +25,6 @@ import ConfigParser
 Config = ConfigParser.ConfigParser()
 ghc_Config = ConfigParser.ConfigParser()
 
-sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 # Pass import (GMS not installed)
 try:
 	import psycopg2
@@ -35,8 +36,6 @@ import spin
 import filestoreIdToPath
 import getch
 getch = getch._Getch()
-import dsapp_Definitions as ds
-import dsapp_Soap as dsSoap
 
 # Folder variables
 dsappDirectory = "/opt/novell/datasync/tools/dsapp"
@@ -526,6 +525,53 @@ def ghc_util_subprocess(cmd, error=False):
 		out = p.communicate()
 	return out
 
+def ghc_util_checkIPs(gwConfig, mobilityConfig):
+	mobility_ip4 = "Unknown host"
+	groupwise_ip4 = "Unknown host"
+	try:
+		mobility_ip4 = socket.gethostbyname(mobilityConfig['mlistenAddress'])
+	except:
+		pass
+
+	try:
+		groupwise_ip4 = socket.gethostbyname(gwConfig['sListenAddress'])
+	except:
+		pass
+
+	mobile_found = False
+	groupwise_found = False
+
+	ips = ds.ip4_addresses()
+	for ip in ips:
+		logger.debug("Checkking %s interface" % ip)
+		if mobility_ip4 in ip:
+			mobile_found = True
+		if groupwise_ip4 in ip:
+			groupwise_found = True
+
+	if '0.0.0.0' in mobility_ip4:
+		mobile_found = True
+
+	with open(ghcLog, 'a') as log:
+		if not mobile_found:
+			if 'Unknown host' in mobility_ip4:
+				log.write("\nUnable to resolve '%s' for mobility connector\n" % mobilityConfig['mlistenAddress'])
+			else:
+				log.write("\nNo found interface '%s' for mobility connector\n" % mobility_ip4)
+		else:
+			log.write("\nFound interface '%s' for mobility connector\n" % mobility_ip4)
+
+		if not groupwise_found:
+			if 'Unknown host' in groupwise_ip4:
+				log.write("Unable to resolve '%s' for groupwise connector\n" % gwConfig['sListenAddress'])
+			else:
+				log.write("No found interface '%s' for groupwise connector\n" % groupwise_ip4)
+		else:
+			log.write("Found interface '%s' for groupwise connector\n" % groupwise_ip4)
+
+	return mobile_found and groupwise_found
+
+
 def ghc_checkServices(mobilityConfig, gwConfig, webConfig):
 	ghc_util_NewHeader("Checking Mobility Services..")
 	time1 = time.time()
@@ -562,6 +608,8 @@ def ghc_checkServices(mobilityConfig, gwConfig, webConfig):
 	if not ghc_util_checkWebPortConnectivity(webConfig):
 		problem = True
 		web_serviceCheck = False
+	if not ghc_util_checkIPs(gwConfig, mobilityConfig):
+		problem = True
 
 	if problem:
 		ghc_util_passFail('failed')

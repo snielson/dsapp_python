@@ -28,7 +28,10 @@ from multiprocessing import Process, Queue
 import ConfigParser
 Config = ConfigParser.ConfigParser()
 
-sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+# import netifaces after appending to sys.path
+sys.path.append(os.path.dirname(os.path.realpath(__file__)) + '/netifaces-0.10.4-py2.6-linux-x86_64.egg')
+from netifaces import interfaces, ifaddresses, AF_INET
+
 from lxml import etree
 # Pass import (GMS not installed)
 try:
@@ -263,6 +266,14 @@ def removeAllFolders(path):
 			if not os.path.isfile(f):
 				logger.warning('No such directory: %s' % f)
 		logger.debug('Removed: %s' % f)
+
+def ip4_addresses():
+	# Function credit to 'Harley Holcombe' via Stackoverflow.com
+	ip_list = []
+	for interface in interfaces():
+		for link in ifaddresses(interface)[AF_INET]:
+			ip_list.append(link['addr'])
+	return ip_list
 
 def eContinue():
 	if sys.stdout.isatty():
@@ -3448,6 +3459,7 @@ def getLogs(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedCo
 	datasyncBanner(dsappversion)
 	uploadVersion = dsappupload + '/' + 'version'
 	exceptionLog = dsappLogs + '/exceptions.log'
+	performanceLog = dsappLogs + '/performance.log'
 
 	if not askYesOrNo("Grab log files"):
 		return
@@ -3512,6 +3524,7 @@ def getLogs(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedCo
 	print ("\nCompressing logs for upload..")
 	compress_it.append(dsappLog)
 	compress_it.append(exceptionLog)
+	compress_it.append(performanceLog)
 	compress_it.append(sudslog)
 	compress_it.append(webadminlog)
 	compress_it.append(configenginelog)
