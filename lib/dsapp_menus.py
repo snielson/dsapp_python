@@ -349,7 +349,7 @@ def cuso_menu():
 ### End ### Sub menu for database_menu ###
 
 def certificate_menu():
-	menu = ['1. Generate self-signed certificate', '\n     2. Create CSR & Private key', '3. Install certificate from 3rd party', '\n     4. Verify certificate / key pair', '\n     0. Back']
+	menu = ['1. Generate CSR & Private key', '2. Generate self-signed certificate', '3. Apply certificates (Generate PEM)', '\n     4. Verify certificate / key pair', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -357,11 +357,14 @@ def certificate_menu():
 		show_menu(menu)
 		choice = get_choice(available)
 		if choice == '1':
-			ds.createCSRKey(True)
-			print; ds.eContinue()
-		elif choice == '2':
 			ds.createCSRKey()
 			print; ds.eContinue()
+		elif choice == '2': # TODO : Finish
+			ds.pre_signCert()
+			print; ds.eContinue()
+		# elif choice == '3':
+		# 	ds.createCSRKey(True)
+		# 	print; ds.eContinue()
 		elif choice == '3':
 			ds.createPEM()
 			print; ds.eContinue()
@@ -373,7 +376,6 @@ def certificate_menu():
 			main_menu()
 
 def userIssue_menu():
-	# menu = ['1. Monitor user sync options...', '2. GroupWise checks options...', '3. Remove & reinitialize users options...', '\n     4. User authentication issues', '5. Change user application name', '6. Change user FDN', '7. What deleted this (contact, email, folder, calendar)?', '8. List subjects of deleted items from device', '\n     0. Back']
 	menu = ['1. Monitor user sync options...', '2. GroupWise checks options...', '3. Remove & reinitialize users options...', '\n     4. User authentication issues', '5. Change user application name', '6. Change user FDN', '7. What deleted this (contact, email, folder, calendar)?', '\n     0. Back']
 
 	available = build_avaialbe(menu)

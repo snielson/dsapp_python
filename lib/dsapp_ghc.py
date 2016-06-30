@@ -553,6 +553,7 @@ def ghc_util_checkIPs(gwConfig, mobilityConfig):
 		mobile_found = True
 
 	with open(ghcLog, 'a') as log:
+		# TODO : Print out list of interfaces
 		if not mobile_found:
 			if 'Unknown host' in mobility_ip4:
 				log.write("\nUnable to resolve '%s' for mobility connector\n" % mobilityConfig['mlistenAddress'])
