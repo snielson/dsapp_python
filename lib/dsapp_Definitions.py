@@ -2575,7 +2575,16 @@ def pre_signCert():
 		return
 
 	csr_path = autoCompleteInput("Certificate signing request (CSR): ")
+	if not os.path.isfile(csr_path):
+		print ("No such file: %s" % csr_path)
+		logger.error("No such file: %s" % csr_path)
+		return
 	key_path = autoCompleteInput("Private key: ")
+	if not os.path.isfile(key_path):
+		print ("No such file: %s" % key_path)
+		logger.error("No such file: %s" % key_path)
+		return
+
 	cn = getCommonName(csr_path)
 	if cn is None:
 		return
