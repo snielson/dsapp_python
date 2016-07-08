@@ -56,6 +56,24 @@ sys.excepthook = my_handler
 # Read Config
 Config.read(dsappSettings)
 dsappversion = Config.get('Misc', 'dsapp.version')
+temp_updateURL = Config.get('Update URL', 'download.address')
+
+# Set updateURL variable based on setting.cfg
+from urlparse import urlparse
+o = urlparse(temp_updateURL)
+temp_urlOut = o.netloc + o.path
+temp_scheme = o.scheme.strip().upper()
+if 'FTP' in temp_scheme:
+	scheme_URL = 'FTP'
+else:
+	scheme_URL = 'URL'
+
+# Define update URL as default
+updateURL = "URL"
+try:
+	updateURL = "%s (%s)" % (scheme_URL, temp_urlOut.split('/')[0].strip())
+except:
+	pass
 
 # Configs from main script
 dbConfig = None
@@ -232,7 +250,7 @@ def ftf_menu():
 
 ### Start ### Sub menu for Update Mobility (registerUpdate_menu) ###
 def update_menu():
-	menu = ['1. Update via Local ISO', '2. Update via URL', '\n     0. Back']
+	menu = ['1. Update via Local ISO', '2. Update via %s' % updateURL, '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -331,7 +349,7 @@ def cuso_menu():
 ### End ### Sub menu for database_menu ###
 
 def certificate_menu():
-	menu = ['1. Generate self-signed certificate', '\n     2. Create CSR & Private key', '3. Install certificate from 3rd party', '\n     4. Verify certificate / key pair', '\n     0. Back']
+	menu = ['1. Generate CSR & Private key', '2. Generate self-signed certificate', '3. Apply certificates (Generate PEM)', '\n     4. Verify certificate / key pair', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -339,11 +357,14 @@ def certificate_menu():
 		show_menu(menu)
 		choice = get_choice(available)
 		if choice == '1':
-			ds.createCSRKey(True)
-			print; ds.eContinue()
-		elif choice == '2':
 			ds.createCSRKey()
 			print; ds.eContinue()
+		elif choice == '2': # TODO : Finish
+			ds.pre_signCert()
+			print; ds.eContinue()
+		# elif choice == '3':
+		# 	ds.createCSRKey(True)
+		# 	print; ds.eContinue()
 		elif choice == '3':
 			ds.createPEM()
 			print; ds.eContinue()
@@ -355,7 +376,6 @@ def certificate_menu():
 			main_menu()
 
 def userIssue_menu():
-	# menu = ['1. Monitor user sync options...', '2. GroupWise checks options...', '3. Remove & reinitialize users options...', '\n     4. User authentication issues', '5. Change user application name', '6. Change user FDN', '7. What deleted this (contact, email, folder, calendar)?', '8. List subjects of deleted items from device', '\n     0. Back']
 	menu = ['1. Monitor user sync options...', '2. GroupWise checks options...', '3. Remove & reinitialize users options...', '\n     4. User authentication issues', '5. Change user application name', '6. Change user FDN', '7. What deleted this (contact, email, folder, calendar)?', '\n     0. Back']
 
 	available = build_avaialbe(menu)
@@ -517,8 +537,8 @@ def performance_menu():
 		choice = get_choice(available)
 		if choice == '1':
 			ds.datasyncBanner(dsappversion)
-			if ds.askYesOrNo("Parse logs for query strings"):
-				log = ds.getFilePath("Enter path to mobility-agent.log: ")
+			if ds.askYesOrNo("Parse debug log for query strings"):
+				log = ds.getFilePath("Enter path to mobility-agent log file: ")
 				if log is None:
 					return
 				dsPerformance.countUsers(log)

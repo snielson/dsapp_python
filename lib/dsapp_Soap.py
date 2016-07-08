@@ -9,7 +9,6 @@ import os, sys
 import suds.client
 import traceback
 import logging, logging.config
-sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 import dsapp_Definitions as ds
 
 # Global paths
@@ -258,14 +257,17 @@ def soap_getUserList(trustedConfig, gwConfig, noout='true'):
 
 def check_subCalendars(folderList, parent_id):
 	logger.info("Checking sub calendars..")
+	logger.debug("Calendar id = %s" % parent_id)
 	problem = False
 	for folder in folderList[0][0]:
 		try:
-			if folder['calendarAttribute']:
-				if folder['parent'] != parent_id:
-					print ("Folder structure problem with calendar: %s" % folder['name'])
-					logger.warning("Folder structure problem with calendar: %s" % folder['name'])
-					problem = True
+			if 'isSystemFolder' not in folder or folder['isSystemFolder'] == 'False':
+				if folder['calendarAttribute']:
+					if folder['parent'] != parent_id:
+						print ("Folder structure problem with calendar: %s" % folder['name'])
+						logger.warning("Folder structure problem with calendar: %s" % folder['name'])
+						logger.debug("%s parent id = %s" % (folder['name'], folder['parent']))
+						problem = True
 		except:
 			pass
 
@@ -273,14 +275,17 @@ def check_subCalendars(folderList, parent_id):
 
 def check_subContacts(folderList, parent_id):
 	logger.info("Checking sub contacts..")
+	logger.debug("Contact id = %s" % parent_id)
 	problem = False
 	for folder in folderList[0][0]:
 		try:
-			if folder['folderType'] == 'UserContacts':
-				if folder['parent'] != parent_id:
-					print ("Folder structure problem with address book: %s" % folder['name'])
-					logger.warning("Folder structure problem with address book: %s" % folder['name'])
-					problem = True
+			if 'isSystemFolder' not in folder or folder['isSystemFolder'] == 'False':
+				if folder['folderType'] == 'UserContacts':
+					if folder['parent'] != parent_id:
+						print ("Folder structure problem with address book: %s" % folder['name'])
+						logger.warning("Folder structure problem with address book: %s" % folder['name'])
+						logger.debug("%s parent id = %s" % (folder['name'], folder['parent']))
+						problem = True
 		except:
 			pass
 

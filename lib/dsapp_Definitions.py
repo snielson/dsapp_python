@@ -28,7 +28,11 @@ from multiprocessing import Process, Queue
 import ConfigParser
 Config = ConfigParser.ConfigParser()
 
-sys.path.append(os.path.dirname(os.path.realpath(__file__)))
+# import netifaces after appending to sys.path
+sys.path.append(os.path.dirname(os.path.realpath(__file__)) + '/netifaces-0.10.4-py2.6-linux-x86_64.egg')
+sys.path.append(os.path.dirname(os.path.realpath(__file__)) + '/setuptools-18.2-py2.6.egg')
+from netifaces import interfaces, ifaddresses, AF_INET
+
 from lxml import etree
 # Pass import (GMS not installed)
 try:
@@ -263,6 +267,14 @@ def removeAllFolders(path):
 			if not os.path.isfile(f):
 				logger.warning('No such directory: %s' % f)
 		logger.debug('Removed: %s' % f)
+
+def ip4_addresses():
+	# Function credit to 'Harley Holcombe' via Stackoverflow.com
+	ip_list = []
+	for interface in interfaces():
+		for link in ifaddresses(interface)[AF_INET]:
+			ip_list.append(link['addr'])
+	return ip_list
 
 def eContinue():
 	if sys.stdout.isatty():
@@ -2541,11 +2553,42 @@ def reinitAllFailedUsers(dbConfig):
 #	Start of Certificate
 ##################################################################################################
 
-def certPath():
-	certPath = autoCompleteInput("Enter path to store certificate files: ")
+def certPath(prompt):
+	certPath = autoCompleteInput(prompt)
 	if promptVerifyPath(certPath):
 		return certPath
 	return ""
+
+def pre_signCert():
+	datasyncBanner(dsappversion)
+	file_path = autoCompleteInput("Enter directory path for certificate files (ie. /root/certificates): ")
+	file_path = file_path.rstrip('/')
+	if os.path.isdir(file_path):
+		os.chdir(file_path)
+		cmd = "ls --format=single-column | column"
+		if askYesOrNo("List files"):
+			subprocess.call(cmd, shell=True)
+			print ()
+	else:
+		print ("No such directory: %s" % path)
+		logger.warning("No such directory: %s" % path)
+		return
+
+	csr_path = autoCompleteInput("Certificate signing request (CSR): ")
+	if not os.path.isfile(csr_path):
+		print ("No such file: %s" % csr_path)
+		logger.error("No such file: %s" % csr_path)
+		return
+	key_path = autoCompleteInput("Private key: ")
+	if not os.path.isfile(key_path):
+		print ("No such file: %s" % key_path)
+		logger.error("No such file: %s" % key_path)
+		return
+
+	cn = getCommonName(csr_path)
+	if cn is None:
+		return
+	signCert(path = file_path, csr = csr_path, key = key_path, commonName = cn)
 
 def newCertPass():
 	keyPass = getpass.getpass("Enter password for private key: ")
@@ -2563,9 +2606,13 @@ def getCommonName(csrFile):
 	out.wait()
 	pout = p = out.communicate()[0]
 	search = re.search('CN=.*', pout)
-	return search.group().split('=')[1]
+	if search is None:
+		print ("\nFailed: Unable to get common name")
+		logger.error("Failed: Unable to get common name")
+		return None
+	return search.group().split('=')[1].split('/')[0]
 
-def signCert(path, csr, key, keyPass, commonName, sign = False):
+def signCert(path, csr, key, commonName, keyPass = None, sign = False):
 	print ("\nSigning certificate")
 	logger.info("Signing certificate..")
 	if os.path.isfile(path + '/' + csr) and os.path.isfile(path + '/' + key):
@@ -2574,7 +2621,10 @@ def signCert(path, csr, key, keyPass, commonName, sign = False):
 			certDays = '730'
 
 		crt = "%s.crt" % commonName
-		cmd = "openssl x509 -req -sha256 -days %s -in %s/%s -signkey %s/%s -out %s/%s -passin pass:%s &>/dev/null" % (certDays, path, csr, path, key, path, crt, keyPass)
+		if keyPass is not None:
+			cmd = "openssl x509 -req -sha256 -days %s -in %s/%s -signkey %s/%s -out %s/%s -passin pass:%s &>/dev/null" % (certDays, path, csr, path, key, path, crt, keyPass)
+		else:
+			cmd = "openssl x509 -req -sha256 -days %s -in %s/%s -signkey %s/%s -out %s/%s &>/dev/null" % (certDays, path, csr, path, key, path, crt)
 		logger.debug("Signing %s" % csr)
 		signed = subprocess.call(cmd, shell=True)
 
@@ -2583,14 +2633,13 @@ def signCert(path, csr, key, keyPass, commonName, sign = False):
 	else:
 		print ("Unable to locate certificate files")
 
-	if sign:
-		eContinue()
+	if askYesOrNo("\nApply certificates (Generate PEM) now"):
 		createPEM(sign, commonName, keyPass, key, crt, path)
 
 def createCSRKey(sign = False):
 	datasyncBanner(dsappversion)
 	#Start of Generate CSR and Key script.
-	path = certPath()
+	path = certPath("Enter path to store certificate files: ")
 	if path:
 		# Remove '/' from end of path
 		path = path.rstrip('/')
@@ -2601,14 +2650,16 @@ def createCSRKey(sign = False):
 		print ()
 
 		cmd = "openssl genrsa -passout pass:%s -des3 -out %s/server.key 2048" % (keyPass, path)
-		logger.debug("Creating private key..")
+		logger.info("Creating private key..")
 		key = subprocess.call(cmd, shell=True)
 		cmd = "openssl req -sha256 -new -key %s/server.key -out %s/server.csr -passin pass:%s" % (path, path, keyPass)
-		logger.debug("Creating certificate signing request..")
+		logger.info("Creating certificate signing request..")
 		csr = subprocess.call(cmd, shell=True)
 		
 		csr = '%s/server.csr' % path
 		commonName = getCommonName(csr)
+		if commonName is None:
+			return
 		print ("CommonName is : %s" % commonName)
 
 		# Rename CSR and Key to common an used
@@ -2626,9 +2677,8 @@ def createCSRKey(sign = False):
 		print ("Certificate Signing Request (CSR): %s/%s" % (path, csr))
 		logger.info("Certificates created at %s" % path)
 
-		if sign:
-			eContinue()
-			signCert(path, csr, key, keyPass, commonName, sign)
+		if askYesOrNo("\nGenerate self signed-certificate from CSR"):
+			signCert(path, csr, key, commonName, keyPass, sign)
 
 def createPEM(sign = None, commonName = None, keyPass = None, key = None, crt = None, path = None):
 	datasyncBanner(dsappversion)
@@ -3448,6 +3498,7 @@ def getLogs(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedCo
 	datasyncBanner(dsappversion)
 	uploadVersion = dsappupload + '/' + 'version'
 	exceptionLog = dsappLogs + '/exceptions.log'
+	performanceLog = dsappLogs + '/performance.log'
 
 	if not askYesOrNo("Grab log files"):
 		return
@@ -3512,6 +3563,7 @@ def getLogs(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedCo
 	print ("\nCompressing logs for upload..")
 	compress_it.append(dsappLog)
 	compress_it.append(exceptionLog)
+	compress_it.append(performanceLog)
 	compress_it.append(sudslog)
 	compress_it.append(webadminlog)
 	compress_it.append(configenginelog)

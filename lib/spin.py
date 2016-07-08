@@ -15,9 +15,9 @@ class progress_bar_loading(threading.Thread):
     def run(self):
         spinner = itertools.cycle(['[-]', '[/]', '[|]', '[\\]'])
         while (not self.event.is_set()):
-            sys.stdout.write(spinner.next())
-            time.sleep(0.1)
             try:
+                sys.stdout.write(spinner.next())
+                time.sleep(0.1)
                 sys.stdout.flush()
             except:
                 pass

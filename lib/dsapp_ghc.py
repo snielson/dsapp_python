@@ -15,6 +15,8 @@ import datetime
 import time
 import pydoc
 import traceback
+import dsapp_Definitions as ds
+import dsapp_Soap as dsSoap
 import urllib2
 import logging, logging.config
 import ntplib
@@ -23,7 +25,6 @@ import ConfigParser
 Config = ConfigParser.ConfigParser()
 ghc_Config = ConfigParser.ConfigParser()
 
-sys.path.append(os.path.dirname(os.path.realpath(__file__)))
 # Pass import (GMS not installed)
 try:
 	import psycopg2
@@ -35,8 +36,6 @@ import spin
 import filestoreIdToPath
 import getch
 getch = getch._Getch()
-import dsapp_Definitions as ds
-import dsapp_Soap as dsSoap
 
 # Folder variables
 dsappDirectory = "/opt/novell/datasync/tools/dsapp"
@@ -526,6 +525,54 @@ def ghc_util_subprocess(cmd, error=False):
 		out = p.communicate()
 	return out
 
+def ghc_util_checkIPs(gwConfig, mobilityConfig):
+	mobility_ip4 = "Unknown host"
+	groupwise_ip4 = "Unknown host"
+	try:
+		mobility_ip4 = socket.gethostbyname(mobilityConfig['mlistenAddress'])
+	except:
+		pass
+
+	try:
+		groupwise_ip4 = socket.gethostbyname(gwConfig['sListenAddress'])
+	except:
+		pass
+
+	mobile_found = False
+	groupwise_found = False
+
+	ips = ds.ip4_addresses()
+	for ip in ips:
+		logger.debug("Checkking %s interface" % ip)
+		if mobility_ip4 in ip:
+			mobile_found = True
+		if groupwise_ip4 in ip:
+			groupwise_found = True
+
+	if '0.0.0.0' in mobility_ip4:
+		mobile_found = True
+
+	with open(ghcLog, 'a') as log:
+		# TODO : Print out list of interfaces
+		if not mobile_found:
+			if 'Unknown host' in mobility_ip4:
+				log.write("\nUnable to resolve '%s' for mobility connector\n" % mobilityConfig['mlistenAddress'])
+			else:
+				log.write("\nNo found interface '%s' for mobility connector\n" % mobility_ip4)
+		else:
+			log.write("\nFound interface '%s' for mobility connector\n" % mobility_ip4)
+
+		if not groupwise_found:
+			if 'Unknown host' in groupwise_ip4:
+				log.write("Unable to resolve '%s' for groupwise connector\n" % gwConfig['sListenAddress'])
+			else:
+				log.write("No found interface '%s' for groupwise connector\n" % groupwise_ip4)
+		else:
+			log.write("Found interface '%s' for groupwise connector\n" % groupwise_ip4)
+
+	return mobile_found and groupwise_found
+
+
 def ghc_checkServices(mobilityConfig, gwConfig, webConfig):
 	ghc_util_NewHeader("Checking Mobility Services..")
 	time1 = time.time()
@@ -562,6 +609,8 @@ def ghc_checkServices(mobilityConfig, gwConfig, webConfig):
 	if not ghc_util_checkWebPortConnectivity(webConfig):
 		problem = True
 		web_serviceCheck = False
+	if not ghc_util_checkIPs(gwConfig, mobilityConfig):
+		problem = True
 
 	if problem:
 		ghc_util_passFail('failed')
@@ -1349,6 +1398,7 @@ def ghc_verifyCertificates(mobilityConfig, webConfig):
 	global web_serviceCheck
 	global mobile_serviceCheck
 	global serverDateCheck
+	mSecure = bool(int(mobilityConfig['mSecure']))
 
 	devCert = dirVarMobility + "/device/mobility.pem"
 	webCert = dirVarMobility + "/webadmin/server.pem"
@@ -1360,8 +1410,9 @@ def ghc_verifyCertificates(mobilityConfig, webConfig):
 	no_web = False
 	no_CA = False
 	if not os.path.isfile(devCert):
-		problem = 'no-file'
-		no_dev = True
+		if mSecure:
+			problem = 'no-file'
+			no_dev = True
 	if not os.path.isfile(webCert):
 		problem = 'no-file'
 		no_web = True
@@ -1371,22 +1422,25 @@ def ghc_verifyCertificates(mobilityConfig, webConfig):
 
 	if not no_dev and not no_web and not no_CA:
 		# Check certificate expiry
-		devChk = "openssl x509 -checkend %s -in %s" % (dateTolerance, devCert)
+		if mSecure:
+			devChk = "openssl x509 -checkend %s -in %s" % (dateTolerance, devCert)
 		webChk = "openssl x509 -checkend %s -in %s" % (dateTolerance, webCert)
 		CAChk = "openssl x509 -checkend %s -in %s" % (dateTolerance, CACert)
-		devOut = ghc_util_subprocess(devChk)
+		if mSecure:
+			devOut = ghc_util_subprocess(devChk)
 		webOut = ghc_util_subprocess(webChk)
 		CAOut = ghc_util_subprocess(CAChk)
 
 		getDate = "openssl x509 -noout -enddate -in %s"
 		with open(ghcLog, 'a') as log:
-			cmd = getDate % devCert
-			out = ghc_util_subprocess(cmd)[0].split('=')[1]
-			if 'will expire' in devOut[0]:
-				log.write("File: %s\nCertificate has or will expire in 90 days\nExpiry date: %s\n" % (devCert,out))
-				problem = 'warning'
-			else:
-				log.write("File: %s\nExpiry date: %s\n" %(devCert,out))
+			if not no_dev and mSecure:
+				cmd = getDate % devCert
+				out = ghc_util_subprocess(cmd)[0].split('=')[1]
+				if 'will expire' in devOut[0]:
+					log.write("File: %s\nCertificate has or will expire in 90 days\nExpiry date: %s\n" % (devCert,out))
+					problem = 'warning'
+				else:
+					log.write("File: %s\nExpiry date: %s\n" %(devCert,out))
 
 			cmd = getDate % webCert
 			out = ghc_util_subprocess(cmd)[0].split('=')[1]
@@ -1408,18 +1462,19 @@ def ghc_verifyCertificates(mobilityConfig, webConfig):
 
 
 			# Check key pair devCert
-			cmd = "openssl rsa -in %s -pubout" % devCert
-			out1 = ghc_util_subprocess(cmd, True)
-			cmd = "openssl x509 -in %s -pubkey -noout" % devCert
-			out2 = ghc_util_subprocess(cmd, True)
+			if not no_dev and mSecure:
+				cmd = "openssl rsa -in %s -pubout" % devCert
+				out1 = ghc_util_subprocess(cmd, True)
+				cmd = "openssl x509 -in %s -pubkey -noout" % devCert
+				out2 = ghc_util_subprocess(cmd, True)
 
-			if out2[1]:
-				log.write("Error: Unable to load certificate")
-				problem = True
-			else:
-				if out1[0] != out2[0]:
-					log.write("Private key does not match public certificate\nFile: %s" % devCert)
+				if out2[1]:
+					log.write("Error: Unable to load certificate")
 					problem = True
+				else:
+					if out1[0] != out2[0]:
+						log.write("Private key does not match public certificate\nFile: %s" % devCert)
+						problem = True
 
 			# Check key pair webCert
 			cmd = "openssl rsa -in %s -pubout" % webCert
@@ -1436,18 +1491,19 @@ def ghc_verifyCertificates(mobilityConfig, webConfig):
 					problem = True
 
 			# Check SSL Handshake mobility.pem
-			if mobile_serviceCheck and mobile_serviceCheck is not None:
-				cmd = "echo 'QUIT' | openssl s_client -connect %s:%s -CAfile %s" % (mobilityConfig['mlistenAddress'], mobilityConfig['mPort'], devCert)
-				out = ghc_util_subprocess(cmd,True)
-				if 'return code: 0 (ok)' not in out[0]:
-					log.write("Handshake Failed: Return code: 0 (ok) not found\nAttempt made to: %s:%s\nCA file: %s\n" % (mobilityConfig['mlistenAddress'], mobilityConfig['mPort'], devCert))
-					problem = 'warning'
+			if not no_dev and mSecure:
+				if mobile_serviceCheck and mobile_serviceCheck is not None:
+					cmd = "echo 'QUIT' | openssl s_client -connect %s:%s -CAfile %s" % (mobilityConfig['mlistenAddress'], mobilityConfig['mPort'], devCert)
+					out = ghc_util_subprocess(cmd,True)
+					if 'return code: 0 (ok)' not in out[0]:
+						log.write("Handshake Failed: Return code: 0 (ok) not found\nAttempt made to: %s:%s\nCA file: %s\n" % (mobilityConfig['mlistenAddress'], mobilityConfig['mPort'], devCert))
+						problem = 'warning'
+					else:
+						log.write("Handshake Successful\nConnect: %s:%s\nCA File: %s\n" % (mobilityConfig['mlistenAddress'], mobilityConfig['mPort'], devCert))
 				else:
-					log.write("Handshake Successful\nConnect: %s:%s\nCA File: %s\n" % (mobilityConfig['mlistenAddress'], mobilityConfig['mPort'], devCert))
-			else:
-				log.write("Problem with mobility connector\nUnable to request handshake with %s:%s\n" % (mobilityConfig['mlistenAddress'], mobilityConfig['mPort']))
-				problem = 'warning'
-			log.write('\n')
+					log.write("Problem with mobility connector\nUnable to request handshake with %s:%s\n" % (mobilityConfig['mlistenAddress'], mobilityConfig['mPort']))
+					problem = 'warning'
+				log.write('\n')
 
 			# Check SSL Handshake server.pem
 			if web_serviceCheck and web_serviceCheck is not None:
@@ -1464,11 +1520,12 @@ def ghc_verifyCertificates(mobilityConfig, webConfig):
 			# log.write('\n')
 
 			# Check for ^M carriage return character
-			cmd = 'grep -Pl "\r" %s %s' % (devCert, webCert)
-			out = ghc_util_subprocess(cmd)
-			if out[0]:
-				problem = True
-				log.write("\nFailed: Found ^M carriage return characters\nSuggestion: See TID 7014821\n")
+			if not no_dev and mSecure:
+				cmd = 'grep -Pl "\r" %s %s' % (devCert, webCert)
+				out = ghc_util_subprocess(cmd)
+				if out[0]:
+					problem = True
+					log.write("\nFailed: Found ^M carriage return characters\nSuggestion: See TID 7014821\n")
 
 	if problem == 'no-file':
 		if no_dev and no_web:
