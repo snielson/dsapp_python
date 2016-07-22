@@ -575,7 +575,7 @@ def viewAttachments_menu():
 
 # DEBUG MENU
 def debug_menu():
-	menu = ['DEBUG MENU\n','1. SOAP - View user folder list','2. View verifyUser data', '3. View variables', '\n     0. Back']
+	menu = ['DEBUG MENU\n','1. SOAP - View user folder list','2. View verifyUser data', '3. View variables', '4. SOAP - getUserListRequest','\n     0. Back']
 	logger.info("Running DEBUG menu!")
 
 	available = build_avaialbe(menu)
@@ -605,6 +605,11 @@ def debug_menu():
 			saved_variables += ("\nWeb Config:\n%s\n" % webConfig)
 			saved_variables += ("\nAuth Config:\n%s\n" % authConfig)
 			pydoc.pager(saved_variables)
+		elif choice =='4':
+			gw_location = "%(sSecure)s://%(gListenAddress)s:%(sPort)s/soap" % gwConfig
+			info = "Trusted Name: %s\nTrusted Key: %s\nAddress: %s\n\n" % (trustedConfig['name'], trustedConfig['key'],gw_location)
+			info += str(dsSOAP.soap_getUserList(trustedConfig, gwConfig))
+			pydoc.pager(info)
 		elif choice == '0':
 			loop = False
 			ds.clear()

@@ -272,8 +272,13 @@ def ip4_addresses():
 	# Function credit to 'Harley Holcombe' via Stackoverflow.com
 	ip_list = []
 	for interface in interfaces():
-		for link in ifaddresses(interface)[AF_INET]:
-			ip_list.append(link['addr'])
+		try:
+			for link in ifaddresses(interface)[AF_INET]:
+				ip_list.append(link['addr'])
+		except:
+			logger.debug("AF_INET: %s" % AF_INET)
+			logger.debug("ifaddresses: %s" ifaddresses(interface))
+			
 	return ip_list
 
 def eContinue():
