@@ -81,6 +81,7 @@ mobilityVersion = 0
 version = "/opt/novell/datasync/version"
 python_Directory = '/usr/bin/python'
 INIT_NAME = 'datasync-'
+RELEASE_FILE = '/etc/SuSE-release'
 
 # Mobility Directories
 dirOptMobility = "/opt/novell/datasync"
@@ -98,6 +99,7 @@ monitorlog = log + "/monitorengine/monitor.log"
 systemagentlog = log + "/monitorengine/systemagent.log"
 updatelog = log + "/update.log"
 webadminlog = log + "/webadmin/server.log"
+statuslog = log + "/datasync_status"
 mAlog = None
 gAlog = None
 mlog = None
@@ -225,6 +227,12 @@ def kill_pid(pid, sig=1):
 	except OSError:
 		logger.warning('No such process: %s' %(pid))
 
+def getOS_Version():
+	with open(RELEASE_FILE, 'r') as f:
+		for line in f:
+			if 'VERSION' in line:
+				return line.split()[2]
+
 def removeLine(filePath, search):
 	found = False
 	try:
@@ -277,7 +285,7 @@ def ip4_addresses():
 				ip_list.append(link['addr'])
 		except:
 			logger.debug("AF_INET: %s" % AF_INET)
-			logger.debug("ifaddresses: %s" ifaddresses(interface))
+			logger.debug("ifaddresses: %s" % ifaddresses(interface))
 			
 	return ip_list
 
@@ -3571,6 +3579,7 @@ def getLogs(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedCo
 	compress_it.append(performanceLog)
 	compress_it.append(sudslog)
 	compress_it.append(webadminlog)
+	compress_it.append(statuslog)
 	compress_it.append(configenginelog)
 	compress_it.append(connectormanagerlog)
 	compress_it.append(syncenginelog)

@@ -447,7 +447,7 @@ def ghc_util_checkGWPortConnectivity(gwConfig):
 
 def ghc_util_checkWebPortConnectivity(webConfig):
 	result = False
-	cmd = "netcat -z -w 5 %s %s -v" % (webConfig['ip'], webConfig['port'])
+	cmd = "netcat -z -w 5 %s %s -v -z" % (webConfig['ip'], webConfig['port'])
 	time1 = time.time()
 	logger.debug("Checking port %s connectivity on %s" % (webConfig['port'], webConfig['ip']))
 	p = subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE)
@@ -543,7 +543,7 @@ def ghc_util_checkIPs(gwConfig, mobilityConfig):
 
 	ips = ds.ip4_addresses()
 	for ip in ips:
-		logger.debug("Checkking %s interface" % ip)
+		logger.debug("Checking %s interface" % ip)
 		if mobility_ip4 in ip:
 			mobile_found = True
 		if groupwise_ip4 in ip:
@@ -998,7 +998,10 @@ def ghc_checkDiskSpace():
 
 	cmd = "df -H"
 	out = ghc_util_subprocess(cmd)
-	device, size, used, available, percent, mountpoint = out[0].split("\n")[1].split()
+
+	cmd2 = "df -H /var"
+	out2 = ghc_util_subprocess(cmd2)
+	device, size, used, available, percent, mountpoint = out2[0].split("\n")[1].split()
 
 	with open(ghcLog, 'a') as log:
 		log.write(out[0])

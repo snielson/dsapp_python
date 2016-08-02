@@ -82,6 +82,7 @@ ds_2x = 2
 ds_14x = 14
 mobilityVersion = 0
 version = "/opt/novell/datasync/version"
+osVersion = None
 
 # Mobility Directories
 log = "/var/log/datasync"
@@ -205,6 +206,20 @@ if sys.stdout.isatty():
 	if int(windowSize[0]) < int(24) or int(windowSize[1]) < int(80):
 		print ("Terminal window does not meet size requirements\nCurrent Size: [%s x %s]\nPlease resize window to [80 x 24] or greater\n" % (windowSize[1],windowSize[0]))
 		sys.exit(1)
+
+# Check OS version 
+try:
+	osVersion = int(ds.getOS_Version())
+	logger.info("Detected SLES version %s" % osVersion)
+except:
+	logger.warning("Unable to detect SLES version")
+
+# TODO : Quit if SLES 12 -- TEST SLES 12!! --
+# if osVersion >= 12 and not None:
+# 	print ("dsapp not currently supported on SLES %s" % osVersion)
+# 	logger.info("dsapp not currently supported on SLES %s" % osVersion)
+# 	ds.eContinue()
+# 	sys.exit(1)
 
 
 ##################################################################################################
@@ -607,7 +622,7 @@ if args.clear:
 
 DEBUG_ENABLED = False
 if DEBUG_ENABLED:
-	pass
+	pass 
 
 	sys.exit(0)
 
