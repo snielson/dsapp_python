@@ -404,7 +404,7 @@ def ghc_util_checkMobPortConnectivity(mobilityConfig):
 		except:
 			listener = None
 
-		if 'open' in listener:
+		if 'open' in listener or 'succeeded!' in listener:
 			result = True
 			log.write("\nConnection successful on port %s\n" % mobilityConfig['mPort'])
 		elif 'timed out' in listener or listener is None:
@@ -431,7 +431,7 @@ def ghc_util_checkGWPortConnectivity(gwConfig):
 		except:
 			listener = None
 
-		if 'open' in listener:
+		if 'open' in listener or 'succeeded!' in listener:
 			result = True
 			log.write("Connection successful on port %s\n" % gwConfig['gport'])
 		elif 'timed out' in listener or listener is None:
@@ -458,7 +458,7 @@ def ghc_util_checkWebPortConnectivity(webConfig):
 		except:
 			listener = None
 
-		if 'open' in listener:
+		if 'open' in listener or 'succeeded!' in listener:
 			result = True
 			log.write("Connection successful on port %s\n" % webConfig['port'])
 		elif 'timed out' in listener or listener is None:
@@ -642,15 +642,21 @@ def ghc_checkLDAP(XMLconfig ,ldapConfig):
 		ghc_util_passFail('passed', msg)
 
 def ghc_checkRPMs(system_rpms):
+	Config.read(dsappSettings)
+	osVersion = Config.getint('Misc', 'sles.version')
+	if osVersion <= 11:
+		ghc_file = dsappConf + '/ghc_sles11_RPMs.txt'
+	else:
+		ghc_file = dsappConf + '/ghc_sles12_RPMs.txt'
+
 	ghc_util_NewHeader("Checking RPMs..")
 	time1 = time.time()
 	problem = False
-	ghc_file = dsappConf + '/ghc_RPMs.txt'
 
 	if not os.path.isfile(ghc_file):
 		problem = 'warning'
 	else:
-		# Read in conf/ghc_RPMs.txt
+		# Read in conf/ghc_slesX_RPMS.txt
 		logger.info("Reading %s" % ghc_file)
 		with open(ghc_file, 'r') as open_file:
 			required_RPMs = open_file.read().strip().splitlines()
@@ -842,7 +848,7 @@ def ghc_checkReqXMLs():
 	if not os.path.isfile(ghc_file):
 		problem = 'warning'
 	else:
-		# Read in conf/ghc_RPMs.txt
+		# Read in conf/ghc_XMLs.txt
 		with open(ghc_file, 'r') as open_file:
 			required_XMLs = open_file.read().strip().splitlines()
 
@@ -1027,6 +1033,25 @@ def ghc_checkManualMaintenance(dbConfig):
 	time1 = time.time()
 	dbMaintTolerance = 180
 	problem = False
+	delta_days = False
+
+	# Set up month dict
+	months = dict(Jan=1, Feb=2, Mar=3, Apr=4, May=5, Jun=6, Jul=7, Aug=8, Sep=9, Oct=10, Nov=11, Dec=12)
+
+	# Attempt to time GMS  has been installed
+	cmd = "rpm --last -qa | grep 'datasync-common-[0-9]' | awk  '{print $6\",\"$3\",\"$4}' | uniq"
+	install_date = ghc_util_subprocess(cmd)[0]
+	if install_date is not None:
+		install_date_year = int(install_date.split(',')[0])
+		install_date_month = install_date.split(',')[1]
+		install_date_day = int(install_date.split(',')[2])
+
+		d0 = datetime.date(install_date_year, months[install_date_month], install_date_day)
+		d1 = datetime.date(int(time.strftime("%Y")), int(time.strftime("%m")), int(time.strftime("%d")))
+		# Convert datetime.timedelta to string > to int
+		int_delta = (int(str(abs(d1 - d0).days)))
+		delta_days = True
+
 
 	conn = ds.getConn(dbConfig, 'datasync')
 	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
@@ -1067,10 +1092,23 @@ def ghc_checkManualMaintenance(dbConfig):
 		if row['days_ago'] is not None:
 			mo_allNone = row['days_ago']
 
-	if ds_allNone is None or mo_allNone is None:
-		problem = True
+	if ds_allNone is None and mo_allNone is None:
+		problem = 'empty'
+	elif ds_allNone is None or mo_allNone is None:
+		problem = 'not-ran'
 
-	if problem:
+	if problem == 'empty':
+		if delta_days:
+			if int_delta < dbMaintTolerance:
+				msg = "No maintenance required. GMS installed %s days ago\n" % int_delta
+				ghc_util_passFail('passed', msg)
+			else:
+				msg = "Manual maintenance never ran.\nSuggestion: TID 7009453\n"
+				ghc_util_passFail('failed', msg)
+		else:
+			msg = "No manual maintenance in over %s days.\nSuggestion: TID 7009453\n" % dbMaintTolerance
+			ghc_util_passFail('failed', msg)
+	elif problem == 'not-ran':
 		msg = "No manual maintenance in over %s days.\nSuggestion: TID 7009453\n" % dbMaintTolerance
 		ghc_util_passFail('failed', msg)
 	elif not problem:
@@ -1111,8 +1149,10 @@ def ghc_checkPSQLConfig():
 	pghba = "/var/lib/pgsql/data/pg_hba.conf"
 	problem = False
 
-	# /var/lib/pgsql/data/postgresql.conf
-	searchLines = ["local*.*all*.*postgres*.*ident*.*sameuser",
+	Config.read(dsappSettings)
+	osVersion = Config.getint('Misc', 'sles.version')
+	if osVersion <= 11:
+		searchLines = ["local*.*all*.*postgres*.*ident*.*sameuser",
 	"host*.*all*.*postgres*.*127.0.0.1/32*.*ident*.*sameuser",
 	"host*.*all*.*postgres*.*::1/128*.*ident*.*sameuser",
 	"local*.*datasync*.*all*.*md5",
@@ -1124,6 +1164,22 @@ def ghc_checkPSQLConfig():
 	"local*.*mobility*.*all*.*md5",
 	"host*.*mobility*.*all*.*127.0.0.1/32*.*md5",
 	"host*.*mobility*.*all*.*::1/128*.*md5"]
+	else:
+		searchLines = ["local*.*all*.*postgres*.*peer",
+	"host*.*all*.*postgres*.*127.0.0.1/32*.*ident",
+	"host*.*all*.*postgres*.*::1/128*.*ident",
+	"local*.*datasync*.*all*.*md5",
+	"host*.*datasync*.*all*.*127.0.0.1/32*.*md5",
+	"host*.*datasync*.*all*.*::1/128*.*md5",
+	"local*.*postgres*.*datasync_user*.*md5",
+	"host*.*postgres*.*datasync_user*.*127.0.0.1/32*.*md5",
+	"host*.*postgres*.*datasync_user*.*::1/128*.*md5",
+	"local*.*mobility*.*all*.*md5",
+	"host*.*mobility*.*all*.*127.0.0.1/32*.*md5",
+	"host*.*mobility*.*all*.*::1/128*.*md5"]
+
+	# /var/lib/pgsql/data/postgresql.conf
+	
 
 	search = "grep -iw %s %s"
 

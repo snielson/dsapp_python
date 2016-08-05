@@ -119,6 +119,7 @@ if not os.path.isfile(dsappSettings):
 		Config.add_section('Update URL')
 		Config.add_section('Upload URL')
 		Config.add_section('dsapp URL')
+		Config.add_section('Upload Logs')
 		Config.set('FTF URL', 'check.service.address', 'ftp.novell.com')
 		Config.set('Update URL', 'check.service.address', 'ftp.novell.com')
 		Config.set('dsapp URL', 'check.service.address', 'www.github.com')
@@ -141,6 +142,13 @@ if not os.path.isfile(dsappSettings):
 		Config.set('Log', 'datasync.log.maxage', 14)
 		Config.set('Log', 'dsapp.log.maxage', 14)
 		Config.set('GHC', 'ntp.server', 'time.nist.gov')
+		Config.set('Misc', 'sles.version', None)
+		Config.set('Upload Logs', 'mobility.agent', 3)
+		Config.set('Upload Logs', 'mobility', 3)
+		Config.set('Upload Logs', 'groupwise.agent', 3)
+		Config.set('Upload Logs', 'groupwise', 3)
+		Config.set('Upload Logs', 'messages', 2)
+		Config.set('Upload Logs', 'postgres', 3)
 		Config.write(cfgfile)
 
 import dsapp_Definitions as ds
@@ -213,13 +221,6 @@ try:
 	logger.info("Detected SLES version %s" % osVersion)
 except:
 	logger.warning("Unable to detect SLES version")
-
-# TODO : Quit if SLES 12 -- TEST SLES 12!! --
-# if osVersion >= 12 and not None:
-# 	print ("dsapp not currently supported on SLES %s" % osVersion)
-# 	logger.info("dsapp not currently supported on SLES %s" % osVersion)
-# 	ds.eContinue()
-# 	sys.exit(1)
 
 
 ##################################################################################################
@@ -324,9 +325,11 @@ elif dsVersion >= ds_1x:
 Config.read(dsappSettings)
 Config.set('Misc', 'mobility.version', dsVersion)
 Config.set('Misc', 'dsapp.version', dsappversion)
+Config.set('Misc', 'sles.version', osVersion)
 with open(dsappSettings, 'wb') as cfgfile:
 	logger.debug("Writing: [Misc] mobility.version = %s" % dsVersion)
 	logger.debug("Writing: [Misc] dsapp.version = %s" % dsappversion)
+	logger.debug("Writing: [Misc] sles.version = %s" % osVersion)
 	Config.write(cfgfile)
 
 # Assign variables based on settings.cfg
@@ -622,7 +625,7 @@ if args.clear:
 
 DEBUG_ENABLED = False
 if DEBUG_ENABLED:
-	pass 
+	pass
 
 	sys.exit(0)
 

@@ -81,7 +81,7 @@ mobilityVersion = 0
 version = "/opt/novell/datasync/version"
 python_Directory = '/usr/bin/python'
 INIT_NAME = 'datasync-'
-RELEASE_FILE = '/etc/SuSE-release'
+OS_VERSION_FILE = '/etc/issue'
 
 # Mobility Directories
 dirOptMobility = "/opt/novell/datasync"
@@ -193,6 +193,23 @@ def datasyncBanner(dsappversion):
 	clear()
 	print (banner + "\t\t      v" + dsappversion + "\n")
 
+def readlines_reverse(filename):
+# Credit to Berislav Lopac on Stackoverflow
+	with open(filename) as qfile:
+		qfile.seek(0, os.SEEK_END)
+		position = qfile.tell()
+		line = ''
+		while position >= 0:
+			qfile.seek(position)
+			next_char = qfile.read(1)
+			if next_char == "\n":
+				yield line[::-1]
+				line = ''
+			else:
+				line += next_char
+			position -= 1
+		yield line[::-1]
+
 def announceNewFeature():
 	Config.read(dsappSettings)
 	newFeature = Config.getboolean('Settings', 'new.feature')
@@ -228,10 +245,8 @@ def kill_pid(pid, sig=1):
 		logger.warning('No such process: %s' %(pid))
 
 def getOS_Version():
-	with open(RELEASE_FILE, 'r') as f:
-		for line in f:
-			if 'VERSION' in line:
-				return line.split()[2]
+	with open(OS_VERSION_FILE, 'r') as f:
+		return f.read().strip().split('Server')[1].strip().split(' ')[0]
 
 def removeLine(filePath, search):
 	found = False
@@ -1116,13 +1131,14 @@ def checkYaST():
 
 #### Postgres Definitions #####
 
-def checkPostgresql(dbConfig):
+def checkPostgresql(dbConfig, report=True):
 	try:
 		conn = psycopg2.connect("dbname='postgres' user='%s' host='%s' password='%s'" % (dbConfig['user'],dbConfig['host'],dbConfig['pass']))
 		logger.info('Successfully connected to postgresql [user=%s,pass=%s]' % (dbConfig['user'],"*" * len(dbConfig['pass'])))
 		conn.close()
 	except:
-		print (ERROR_MSG)
+		if report:
+			print (ERROR_MSG)
 		logger.error('Unable to connect to postgresql [user=%s,pass=%s]' % (dbConfig['user'],"*" * len(dbConfig['pass'])))
 		return False
 	return True
@@ -1175,7 +1191,7 @@ def dumpTable(dbConfig, database, tableName, targetSave):
 			return
 
 	logger.info("Dumping %s table from %s database to %s" % (tableName, database, filePath))
-	cmd = "PGPASSWORD=%s pg_dump -U %s %s -D -a -t '\"%s\"' > %s" % (dbConfig['pass'], dbConfig['user'], database, tableName, filePath)
+	cmd = "PGPASSWORD=%s pg_dump --inserts -U %s %s -a -t '\"%s\"' > %s" % (dbConfig['pass'], dbConfig['user'], database, tableName, filePath)
 	dump = subprocess.call(cmd, shell=True)
 
 def dropDatabases(dbConfig):
@@ -1348,6 +1364,7 @@ def cuso(dbConfig, op = 'everything'):
 		dumpTable(dbConfig, 'datasync', 'membershipCache', dsappdata)
 		print()
 		dumpTable(dbConfig, 'datasync', 'targets', dsappdata)
+		print()
 
 	# Validate SQL exists, and has some data
 	if op == 'user':
@@ -1360,8 +1377,17 @@ def cuso(dbConfig, op = 'everything'):
 				print("\nCUSO pre-check: SQL backup file is empty")
 				logger.warning("targets.sql backup file is empty")
 				return
-	# Dropping Tables		
-	dropDatabases(dbConfig)
+
+	# Dropping Databases
+	logger.info("Restarting postgres..")
+	p = subprocess.Popen(['rcpostgresql', 'restart'], stdout=subprocess.PIPE,  stderr=subprocess.PIPE)
+	p.wait()
+	if checkPostgresql(dbConfig, report=False):
+		dropDatabases(dbConfig)
+	else:
+		print("Postgres unable to restart")
+		logger.info("Postgres unable to restart")
+		return
 
 	# Check if database is clean
 	if verify_clean_database(dbConfig):
@@ -2154,9 +2180,11 @@ def updateMobilityFTP():
 				uncompressIt(ds)
 
 				cmd = "zypper rr mobility"
+				logger.debug(cmd)
 				zypper = util_subprocess(cmd, True)
 
 				cmd = "zypper addrepo 'iso:///?iso=%s&url=file:///root/Downloads' mobility" % dsISO[0]
+				logger.debug(cmd)
 				zypper = util_subprocess(cmd, True)
 
 				dsUpdate('mobility')
@@ -2185,9 +2213,12 @@ def updateMobilityISO():
 	print ("Setting up mobility repository..")
 	logger.info("Setting up mobility repository")
 	cmd = "zypper rr mobility"
+	logger.debug(cmd)
 	zypper = util_subprocess(cmd, True)
 
+	logger.info("Adding mobility repo")
 	cmd = "zypper addrepo 'iso:///?iso=%s&url=file://%s' mobility" % (os.path.basename(isoPath), os.path.dirname(isoPath))
+	logger.debug(cmd)
 	zypper = util_subprocess(cmd, True)
 
 	dsUpdate('mobility')
@@ -2344,8 +2375,12 @@ def showStatus(dbConfig):
 	data = cur.fetchall()
 	cur.close()
 	conn.close()
+	setVariables()
 	if len(data) != 0:
-		print ("\nGroupWise events")
+		print ("GroupWise events:")
+		for line in readlines_reverse(gAlog):
+			if 'queue' in line:
+				print (line); break
 		data_found = True
 		logger.info("Found pending consumerevents")
 		print (tabulate(data, headers="keys", tablefmt='orgtbl'))
@@ -2357,7 +2392,10 @@ def showStatus(dbConfig):
 	cur.close()
 	conn.close()
 	if len(data) != 0:
-		print ("\nMobility events")
+		print ("\nMobility events:")
+		for line in readlines_reverse(mAlog):
+			if 'queue' in line:
+				print (line); break
 		data_found = True
 		logger.info("Found pending syncevents")
 		print (tabulate(data, headers="keys", tablefmt='orgtbl'))
@@ -3565,8 +3603,9 @@ def getLogs(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedCo
 	compress_it.append('sync-status.txt')
 
 	# Health Check
-	print ("Running health check..")
-	ghc.generalHealthCheck(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedConfig, config_files, webConfig, True)
+	if askYesOrNo("Run health check"):
+		print ("Running health check..")
+		ghc.generalHealthCheck(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedConfig, config_files, webConfig, True)
 	compress_it.append(ghcLog)
 
 	# Compress log files
@@ -3589,17 +3628,37 @@ def getLogs(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedCo
 	compress_it.append(warn)
 	compress_it.append(updatelog)
 
+	# Get variables from setting.cfg to number of logs to grab
+	Config.read(dsappSettings)
+	mob_agent_Log = Config.getint('Upload Logs', 'mobility.agent')
+	mob_log = Config.getint('Upload Logs', 'mobility')
+	group_agent_log = Config.getint('Upload Logs', 'groupwise.agent')
+	group_log = Config.getint('Upload Logs', 'groupwise')
+	message_log = Config.getint('Upload Logs', 'messages')
+	postgres_log = Config.getint('Upload Logs', 'postgres')
+
+
 	files = sorted(glob.glob(log +'/connectors/mobility-agent.*'), key=os.path.getctime)
-	for file in files[-3:]:
+	for file in files[-mob_agent_Log:]:
 		compress_it.append(file)
 	files = sorted(glob.glob(log +'/connectors/mobility.*'), key=os.path.getctime)
-	for file in files[-3:]:
+	for file in files[-mob_log:]:
 		compress_it.append(file)
 	files = sorted(glob.glob(log +'/connectors/groupwise-agent.*'), key=os.path.getctime)
-	for file in files[-3:]:
+	for file in files[-group_agent_log:]:
 		compress_it.append(file)
 	files = sorted(glob.glob(log +'/connectors/groupwise.*'), key=os.path.getctime)
-	for file in files[-3:]:
+	for file in files[-group_log:]:
+		compress_it.append(file)
+
+	# Compressed message logs
+	files = sorted(glob.glob('/var/log/messages-*'), key=os.path.getctime)
+	for file in files[-message_log:]:
+		compress_it.append(file)
+
+	# Postgres logs
+	files = sorted(glob.glob('/var/lib/pgsql/data/pg_log/postgresql-*'), key=os.path.getctime)
+	for file in files[-postgres_log:]:
 		compress_it.append(file)
 
 	# Tar up all files
