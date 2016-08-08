@@ -14,7 +14,7 @@ __credits__ = "Tyler Harris"
 __maintainer__ = "Shane Nielson"
 __email__ = "snielson@projectuminfinitas.com"
 
-dsappversion='238'
+dsappversion='239'
 
 ##################################################################################################
 #	Imports
@@ -150,6 +150,21 @@ if not os.path.isfile(dsappSettings):
 		Config.set('Upload Logs', 'messages', 2)
 		Config.set('Upload Logs', 'postgres', 3)
 		Config.write(cfgfile)
+
+# Create defaults to config if missing
+Config.read(dsappSettings)
+if not Config.has_section('Upload Logs'): # Added v239
+	Config.add_section('Upload Logs')
+	Config.set('Upload Logs', 'mobility.agent', 3)
+	Config.set('Upload Logs', 'mobility', 3)
+	Config.set('Upload Logs', 'groupwise.agent', 3)
+	Config.set('Upload Logs', 'groupwise', 3)
+	Config.set('Upload Logs', 'messages', 2)
+	Config.set('Upload Logs', 'postgres', 3)
+
+with open(dsappSettings, 'wb') as cfgfile:
+	Config.write(cfgfile)
+
 
 import dsapp_Definitions as ds
 

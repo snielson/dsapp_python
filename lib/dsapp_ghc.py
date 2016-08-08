@@ -1100,7 +1100,7 @@ def ghc_checkManualMaintenance(dbConfig):
 	if problem == 'empty':
 		if delta_days:
 			if int_delta < dbMaintTolerance:
-				msg = "No maintenance required. GMS installed %s days ago\n" % int_delta
+				msg = "No maintenance required. GMS installed %s day(s) ago\n" % int_delta
 				ghc_util_passFail('passed', msg)
 			else:
 				msg = "Manual maintenance never ran.\nSuggestion: TID 7009453\n"

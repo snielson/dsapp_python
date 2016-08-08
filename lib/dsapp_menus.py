@@ -485,10 +485,8 @@ def userInfo_menu():
 		choice = get_choice(available)
 		if choice == '1':
 			ds.list_deviceInfo(dbConfig)
-			ds.eContinue()
 		elif choice == '2':
 			ds.list_usersAndEmails(dbConfig)
-			ds.eContinue()
 		elif choice == '3':
 			ds.getUserPAB(dbConfig)
 		elif choice == '0':
@@ -496,7 +494,7 @@ def userInfo_menu():
 			main_menu()
 
 def checksQueries_menu():
-	menu = ['1. General Health Check (beta)', '2. Nightly Maintenance Check', '\n     3. Show Sync Status', '4. GW pending events by User (consumerevents)', '5. Mobility pending events by User (syncevents)', '\n     6. Attachments...', '7. Performance...', '\n     0. Back']
+	menu = ['1. General Health Check', '2. Nightly Maintenance Check', '\n     3. Show Sync Status', '4. GW pending events by User (consumerevents)', '5. Mobility pending events by User (syncevents)', '\n     6. Attachments...', '7. Performance...', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
