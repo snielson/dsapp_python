@@ -7,10 +7,6 @@
 *.o
 *.so
 *.changelog
-*dsapp*.pyc
-*filestoreIdToPath*.pyc
-*spin*.pyc
-*getch*.pyc
 
 # Sublime #
 ###################
