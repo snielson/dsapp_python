@@ -485,10 +485,8 @@ def userInfo_menu():
 		choice = get_choice(available)
 		if choice == '1':
 			ds.list_deviceInfo(dbConfig)
-			ds.eContinue()
 		elif choice == '2':
 			ds.list_usersAndEmails(dbConfig)
-			ds.eContinue()
 		elif choice == '3':
 			ds.getUserPAB(dbConfig)
 		elif choice == '0':
@@ -496,7 +494,7 @@ def userInfo_menu():
 			main_menu()
 
 def checksQueries_menu():
-	menu = ['1. General Health Check (beta)', '2. Nightly Maintenance Check', '\n     3. Show Sync Status', '4. GW pending events by User (consumerevents)', '5. Mobility pending events by User (syncevents)', '\n     6. Attachments...', '7. Performance...', '\n     0. Back']
+	menu = ['1. General Health Check', '2. Nightly Maintenance Check', '\n     3. Show Sync Status', '4. GW pending events by User (consumerevents)', '5. Mobility pending events by User (syncevents)', '\n     6. Attachments...', '7. Performance...', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -575,7 +573,7 @@ def viewAttachments_menu():
 
 # DEBUG MENU
 def debug_menu():
-	menu = ['DEBUG MENU\n','1. SOAP - View user folder list','2. View verifyUser data', '3. View variables', '\n     0. Back']
+	menu = ['DEBUG MENU\n','1. SOAP - View user folder list','2. View verifyUser data', '3. View variables', '4. SOAP - getUserListRequest','\n     0. Back']
 	logger.info("Running DEBUG menu!")
 
 	available = build_avaialbe(menu)
@@ -605,6 +603,11 @@ def debug_menu():
 			saved_variables += ("\nWeb Config:\n%s\n" % webConfig)
 			saved_variables += ("\nAuth Config:\n%s\n" % authConfig)
 			pydoc.pager(saved_variables)
+		elif choice =='4':
+			gw_location = "%(sSecure)s://%(gListenAddress)s:%(sPort)s/soap" % gwConfig
+			info = "Trusted Name: %s\nTrusted Key: %s\nAddress: %s\n\n" % (trustedConfig['name'], trustedConfig['key'],gw_location)
+			info += str(dsSOAP.soap_getUserList(trustedConfig, gwConfig))
+			pydoc.pager(info)
 		elif choice == '0':
 			loop = False
 			ds.clear()

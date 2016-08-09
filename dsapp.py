@@ -14,7 +14,7 @@ __credits__ = "Tyler Harris"
 __maintainer__ = "Shane Nielson"
 __email__ = "snielson@projectuminfinitas.com"
 
-dsappversion='238'
+dsappversion='239'
 
 ##################################################################################################
 #	Imports
@@ -82,6 +82,7 @@ ds_2x = 2
 ds_14x = 14
 mobilityVersion = 0
 version = "/opt/novell/datasync/version"
+osVersion = None
 
 # Mobility Directories
 log = "/var/log/datasync"
@@ -118,6 +119,7 @@ if not os.path.isfile(dsappSettings):
 		Config.add_section('Update URL')
 		Config.add_section('Upload URL')
 		Config.add_section('dsapp URL')
+		Config.add_section('Upload Logs')
 		Config.set('FTF URL', 'check.service.address', 'ftp.novell.com')
 		Config.set('Update URL', 'check.service.address', 'ftp.novell.com')
 		Config.set('dsapp URL', 'check.service.address', 'www.github.com')
@@ -140,7 +142,29 @@ if not os.path.isfile(dsappSettings):
 		Config.set('Log', 'datasync.log.maxage', 14)
 		Config.set('Log', 'dsapp.log.maxage', 14)
 		Config.set('GHC', 'ntp.server', 'time.nist.gov')
+		Config.set('Misc', 'sles.version', None)
+		Config.set('Upload Logs', 'mobility.agent', 3)
+		Config.set('Upload Logs', 'mobility', 3)
+		Config.set('Upload Logs', 'groupwise.agent', 3)
+		Config.set('Upload Logs', 'groupwise', 3)
+		Config.set('Upload Logs', 'messages', 2)
+		Config.set('Upload Logs', 'postgres', 3)
 		Config.write(cfgfile)
+
+# Create defaults to config if missing
+Config.read(dsappSettings)
+if not Config.has_section('Upload Logs'): # Added v239
+	Config.add_section('Upload Logs')
+	Config.set('Upload Logs', 'mobility.agent', 3)
+	Config.set('Upload Logs', 'mobility', 3)
+	Config.set('Upload Logs', 'groupwise.agent', 3)
+	Config.set('Upload Logs', 'groupwise', 3)
+	Config.set('Upload Logs', 'messages', 2)
+	Config.set('Upload Logs', 'postgres', 3)
+
+with open(dsappSettings, 'wb') as cfgfile:
+	Config.write(cfgfile)
+
 
 import dsapp_Definitions as ds
 
@@ -205,6 +229,13 @@ if sys.stdout.isatty():
 	if int(windowSize[0]) < int(24) or int(windowSize[1]) < int(80):
 		print ("Terminal window does not meet size requirements\nCurrent Size: [%s x %s]\nPlease resize window to [80 x 24] or greater\n" % (windowSize[1],windowSize[0]))
 		sys.exit(1)
+
+# Check OS version 
+try:
+	osVersion = int(ds.getOS_Version())
+	logger.info("Detected SLES version %s" % osVersion)
+except:
+	logger.warning("Unable to detect SLES version")
 
 
 ##################################################################################################
@@ -309,9 +340,11 @@ elif dsVersion >= ds_1x:
 Config.read(dsappSettings)
 Config.set('Misc', 'mobility.version', dsVersion)
 Config.set('Misc', 'dsapp.version', dsappversion)
+Config.set('Misc', 'sles.version', osVersion)
 with open(dsappSettings, 'wb') as cfgfile:
 	logger.debug("Writing: [Misc] mobility.version = %s" % dsVersion)
 	logger.debug("Writing: [Misc] dsapp.version = %s" % dsappversion)
+	logger.debug("Writing: [Misc] sles.version = %s" % osVersion)
 	Config.write(cfgfile)
 
 # Assign variables based on settings.cfg

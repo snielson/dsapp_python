@@ -81,6 +81,7 @@ mobilityVersion = 0
 version = "/opt/novell/datasync/version"
 python_Directory = '/usr/bin/python'
 INIT_NAME = 'datasync-'
+OS_VERSION_FILE = '/etc/issue'
 
 # Mobility Directories
 dirOptMobility = "/opt/novell/datasync"
@@ -98,6 +99,7 @@ monitorlog = log + "/monitorengine/monitor.log"
 systemagentlog = log + "/monitorengine/systemagent.log"
 updatelog = log + "/update.log"
 webadminlog = log + "/webadmin/server.log"
+statuslog = log + "/datasync_status"
 mAlog = None
 gAlog = None
 mlog = None
@@ -191,6 +193,23 @@ def datasyncBanner(dsappversion):
 	clear()
 	print (banner + "\t\t      v" + dsappversion + "\n")
 
+def readlines_reverse(filename):
+# Credit to Berislav Lopac on Stackoverflow
+	with open(filename) as qfile:
+		qfile.seek(0, os.SEEK_END)
+		position = qfile.tell()
+		line = ''
+		while position >= 0:
+			qfile.seek(position)
+			next_char = qfile.read(1)
+			if next_char == "\n":
+				yield line[::-1]
+				line = ''
+			else:
+				line += next_char
+			position -= 1
+		yield line[::-1]
+
 def announceNewFeature():
 	Config.read(dsappSettings)
 	newFeature = Config.getboolean('Settings', 'new.feature')
@@ -224,6 +243,10 @@ def kill_pid(pid, sig=1):
 		logger.info('Killing process: %s' %(pid))
 	except OSError:
 		logger.warning('No such process: %s' %(pid))
+
+def getOS_Version():
+	with open(OS_VERSION_FILE, 'r') as f:
+		return f.read().strip().split('Server')[1].strip().split(' ')[0]
 
 def removeLine(filePath, search):
 	found = False
@@ -272,8 +295,13 @@ def ip4_addresses():
 	# Function credit to 'Harley Holcombe' via Stackoverflow.com
 	ip_list = []
 	for interface in interfaces():
-		for link in ifaddresses(interface)[AF_INET]:
-			ip_list.append(link['addr'])
+		try:
+			for link in ifaddresses(interface)[AF_INET]:
+				ip_list.append(link['addr'])
+		except:
+			logger.debug("AF_INET: %s" % AF_INET)
+			logger.debug("ifaddresses: %s" % ifaddresses(interface))
+			
 	return ip_list
 
 def eContinue():
@@ -1103,13 +1131,14 @@ def checkYaST():
 
 #### Postgres Definitions #####
 
-def checkPostgresql(dbConfig):
+def checkPostgresql(dbConfig, report=True):
 	try:
 		conn = psycopg2.connect("dbname='postgres' user='%s' host='%s' password='%s'" % (dbConfig['user'],dbConfig['host'],dbConfig['pass']))
 		logger.info('Successfully connected to postgresql [user=%s,pass=%s]' % (dbConfig['user'],"*" * len(dbConfig['pass'])))
 		conn.close()
 	except:
-		print (ERROR_MSG)
+		if report:
+			print (ERROR_MSG)
 		logger.error('Unable to connect to postgresql [user=%s,pass=%s]' % (dbConfig['user'],"*" * len(dbConfig['pass'])))
 		return False
 	return True
@@ -1162,7 +1191,7 @@ def dumpTable(dbConfig, database, tableName, targetSave):
 			return
 
 	logger.info("Dumping %s table from %s database to %s" % (tableName, database, filePath))
-	cmd = "PGPASSWORD=%s pg_dump -U %s %s -D -a -t '\"%s\"' > %s" % (dbConfig['pass'], dbConfig['user'], database, tableName, filePath)
+	cmd = "PGPASSWORD=%s pg_dump --inserts -U %s %s -a -t '\"%s\"' > %s" % (dbConfig['pass'], dbConfig['user'], database, tableName, filePath)
 	dump = subprocess.call(cmd, shell=True)
 
 def dropDatabases(dbConfig):
@@ -1335,6 +1364,7 @@ def cuso(dbConfig, op = 'everything'):
 		dumpTable(dbConfig, 'datasync', 'membershipCache', dsappdata)
 		print()
 		dumpTable(dbConfig, 'datasync', 'targets', dsappdata)
+		print()
 
 	# Validate SQL exists, and has some data
 	if op == 'user':
@@ -1347,8 +1377,17 @@ def cuso(dbConfig, op = 'everything'):
 				print("\nCUSO pre-check: SQL backup file is empty")
 				logger.warning("targets.sql backup file is empty")
 				return
-	# Dropping Tables		
-	dropDatabases(dbConfig)
+
+	# Dropping Databases
+	logger.info("Restarting postgres..")
+	p = subprocess.Popen(['rcpostgresql', 'restart'], stdout=subprocess.PIPE,  stderr=subprocess.PIPE)
+	p.wait()
+	if checkPostgresql(dbConfig, report=False):
+		dropDatabases(dbConfig)
+	else:
+		print("Postgres unable to restart")
+		logger.info("Postgres unable to restart")
+		return
 
 	# Check if database is clean
 	if verify_clean_database(dbConfig):
@@ -1417,6 +1456,12 @@ def cuso(dbConfig, op = 'everything'):
 	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
 def registerDS():
+	Config.read(dsappSettings)
+	osVersion = Config.getint('Misc', 'sles.version')
+	if osVersion >= 12:
+		print("Registration for SLES %s coming soon" % osVersion)
+		logger.info("Registration for SLES %s coming soon" % osVersion)
+		return
 	#Obtain Registration/Activation Code and Email Address
 	try:
 		reg = raw_input("Registration Code: ")
@@ -2141,9 +2186,11 @@ def updateMobilityFTP():
 				uncompressIt(ds)
 
 				cmd = "zypper rr mobility"
+				logger.debug(cmd)
 				zypper = util_subprocess(cmd, True)
 
 				cmd = "zypper addrepo 'iso:///?iso=%s&url=file:///root/Downloads' mobility" % dsISO[0]
+				logger.debug(cmd)
 				zypper = util_subprocess(cmd, True)
 
 				dsUpdate('mobility')
@@ -2172,9 +2219,12 @@ def updateMobilityISO():
 	print ("Setting up mobility repository..")
 	logger.info("Setting up mobility repository")
 	cmd = "zypper rr mobility"
+	logger.debug(cmd)
 	zypper = util_subprocess(cmd, True)
 
+	logger.info("Adding mobility repo")
 	cmd = "zypper addrepo 'iso:///?iso=%s&url=file://%s' mobility" % (os.path.basename(isoPath), os.path.dirname(isoPath))
+	logger.debug(cmd)
 	zypper = util_subprocess(cmd, True)
 
 	dsUpdate('mobility')
@@ -2331,8 +2381,12 @@ def showStatus(dbConfig):
 	data = cur.fetchall()
 	cur.close()
 	conn.close()
+	setVariables()
 	if len(data) != 0:
-		print ("\nGroupWise events")
+		print ("GroupWise events:")
+		for line in readlines_reverse(gAlog):
+			if 'queue' in line:
+				print (line); break
 		data_found = True
 		logger.info("Found pending consumerevents")
 		print (tabulate(data, headers="keys", tablefmt='orgtbl'))
@@ -2344,7 +2398,10 @@ def showStatus(dbConfig):
 	cur.close()
 	conn.close()
 	if len(data) != 0:
-		print ("\nMobility events")
+		print ("\nMobility events:")
+		for line in readlines_reverse(mAlog):
+			if 'queue' in line:
+				print (line); break
 		data_found = True
 		logger.info("Found pending syncevents")
 		print (tabulate(data, headers="keys", tablefmt='orgtbl'))
@@ -3552,8 +3609,9 @@ def getLogs(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedCo
 	compress_it.append('sync-status.txt')
 
 	# Health Check
-	print ("Running health check..")
-	ghc.generalHealthCheck(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedConfig, config_files, webConfig, True)
+	if askYesOrNo("Run health check"):
+		print ("Running health check..")
+		ghc.generalHealthCheck(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedConfig, config_files, webConfig, True)
 	compress_it.append(ghcLog)
 
 	# Compress log files
@@ -3566,6 +3624,7 @@ def getLogs(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedCo
 	compress_it.append(performanceLog)
 	compress_it.append(sudslog)
 	compress_it.append(webadminlog)
+	compress_it.append(statuslog)
 	compress_it.append(configenginelog)
 	compress_it.append(connectormanagerlog)
 	compress_it.append(syncenginelog)
@@ -3575,17 +3634,37 @@ def getLogs(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedCo
 	compress_it.append(warn)
 	compress_it.append(updatelog)
 
+	# Get variables from setting.cfg to number of logs to grab
+	Config.read(dsappSettings)
+	mob_agent_Log = Config.getint('Upload Logs', 'mobility.agent')
+	mob_log = Config.getint('Upload Logs', 'mobility')
+	group_agent_log = Config.getint('Upload Logs', 'groupwise.agent')
+	group_log = Config.getint('Upload Logs', 'groupwise')
+	message_log = Config.getint('Upload Logs', 'messages')
+	postgres_log = Config.getint('Upload Logs', 'postgres')
+
+
 	files = sorted(glob.glob(log +'/connectors/mobility-agent.*'), key=os.path.getctime)
-	for file in files[-3:]:
+	for file in files[-mob_agent_Log:]:
 		compress_it.append(file)
 	files = sorted(glob.glob(log +'/connectors/mobility.*'), key=os.path.getctime)
-	for file in files[-3:]:
+	for file in files[-mob_log:]:
 		compress_it.append(file)
 	files = sorted(glob.glob(log +'/connectors/groupwise-agent.*'), key=os.path.getctime)
-	for file in files[-3:]:
+	for file in files[-group_agent_log:]:
 		compress_it.append(file)
 	files = sorted(glob.glob(log +'/connectors/groupwise.*'), key=os.path.getctime)
-	for file in files[-3:]:
+	for file in files[-group_log:]:
+		compress_it.append(file)
+
+	# Compressed message logs
+	files = sorted(glob.glob('/var/log/messages-*'), key=os.path.getctime)
+	for file in files[-message_log:]:
+		compress_it.append(file)
+
+	# Postgres logs
+	files = sorted(glob.glob('/var/lib/pgsql/data/pg_log/postgresql-*'), key=os.path.getctime)
+	for file in files[-postgres_log:]:
 		compress_it.append(file)
 
 	# Tar up all files
@@ -3704,14 +3783,14 @@ def list_deviceInfo(dbConfig):
 	cmd = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"select u.userid, description, identifierstring, devicetype from devices d INNER JOIN users u ON d.userid = u.guid;\"" % dbConfig
 	logger.info("Listing all devices from the database")
 	out = util_subprocess(cmd)
-	print (out[0].rstrip('\n')); print ()
+	pydoc.pager(out[0].rstrip('\n'))
 
 def list_usersAndEmails(dbConfig):
 	datasyncBanner(dsappversion)
 	cmd = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"select g.displayname, g.firstname, g.lastname, u.userid, g.emailaddress from gal g INNER JOIN users u ON (g.alias = u.name);\"" % dbConfig
 	logger.info("Listing all users and emails")
 	out = util_subprocess(cmd)
-	print (out[0].rstrip('\n')); print ()
+	pydoc.pager(out[0].rstrip('\n'))
 
 def show_GW_syncEvents(dbConfig):
 	datasyncBanner(dsappversion)
@@ -3868,74 +3947,82 @@ def check_userAuth(dbConfig, authConfig):
 	logger.info("Checking log files for '%s'" % userConfig['mAppName'])
 	# authErrors = dict()
 	error = False
-	with open(mAlog, 'r') as open_file:
-		for line in open_file:
+	# with open(mAlog, 'r') as open_file:
+	# 	for line in open_file:
+	for line in readlines_reverse(mAlog):
 
-			# User locked/expired/disabled - "authentication problem"
-			if userConfig['name'].lower() in line and 'description=User Database is temporarily disabled' in line:
-				logger.debug("Line found: Account disabled")
+		# User locked/expired/disabled - "authentication problem"
+		if userConfig['name'].lower() in line and 'description=User Database is temporarily disabled' in line:
+			logger.debug("Line found: Account disabled")
+			error = True
+			errDate, errTime = line.split(' ')[0:2]
+			# authErrors['disabled'] = "%s had an authentication problem. %s %s\nThe user is locked, expired, and/or disabled\n" % (userConfig['name'].lower(), errDate, errTime)
+			authErrors = "%s had an authentication problem. %s %s\nThe user is locked, expired, and/or disabled\n" % (userConfig['name'].lower(), errDate, errTime)
+			break
+
+		# Incorrect Password - "Failed to Authenticate user <userID(FDN)>"
+		if userConfig['name'].lower() in line and 'description=Invalid password' in line:
+			logger.debug("Line found: Invalid password")
+			error = True
+			errDate, errTime = line.split(' ')[0:2]
+			# authErrors['invalid'] = "%s had a authentication problem %s %s\nThe password is incorrect\nSuggestion: See TID 7007504\n" % (userConfig['name'].lower(), errDate, errTime)
+			authErrors = "%s had a authentication problem %s %s\nThe password is incorrect\nSuggestion: See TID 7007504\n" % (userConfig['name'].lower(), errDate, errTime)
+			break
+
+		if userConfig['name'].lower() in line and 'description=LDAP authentication failed because the password has expired' in line:
+			logger.debug("Line found: Password expired")
+			error = True
+			errDate, errTime = line.split(' ')[0:2]
+			# authErrors['database'] = "%s had a authentication problem %s %s\nThe password is expired\n" % (userConfig['name'].lower(), errDate, errTime)
+			authErrors = "%s had a authentication problem %s %s\nThe password is expired\n" % (userConfig['name'].lower(), errDate, errTime)
+			break
+
+		# Database access has been denied - No password
+		if userConfig['name'].lower() in line and 'description=User Database access has been denied' in line:
+			logger.debug("Line found: User Database")
+			error = True
+			errDate, errTime = line.split(' ')[0:2]
+			# authErrors['database'] = "%s had a database problem %s %s\nUser may not have a password set for authentication type\n" % (userConfig['name'].lower(), errDate, errTime)
+			authErrors = "%s had a database problem %s %s\nUser may not have a password set for authentication type\n" % (userConfig['name'].lower(), errDate, errTime)
+			break
+
+		# Initial Sync Problem - "Connection Blocked - user <userID(FDN)> initial sync"
+		if userConfig['name'].lower() in line and 'Connection Blocked' in line and 'has not completed the initial sync':
+			logger.debug("Line found: Connection Blocked")
+			error = True
+			errDate, errTime = line.split(' ')[0:2]
+			# authErrors['blocked'] = "%s had a connection problem %s %s\nUser has not completed the initial sync\n" % (userConfig['name'].lower(), errDate, errTime)
+			authErrors = "%s had a connection problem %s %s\nUser has not completed the initial sync\n" % (userConfig['name'].lower(), errDate, errTime)
+			break
+
+		if userConfig['name'].lower() in line and 'Connection Blocked' in line and 'sync failed':
+			logger.debug("Line found: User failed")
+			error = True
+			errDate, errTime = line.split(' ')[0:2]
+			# authErrors['failed'] = "%s had a sync problem %s %s\nUser initial sync failed\n" % (userConfig['name'].lower(), errDate, errTime)
+			authErrors = "%s had a sync problem %s %s\nUser initial sync failed\n" % (userConfig['name'].lower(), errDate, errTime)
+		try:
+			if userConfig['mAppName'] in line and 'Connection Blocked' in line and 'currently blocked from accessing the server':
+				logger.debug("Line found: Quarantined")
 				error = True
 				errDate, errTime = line.split(' ')[0:2]
-				# authErrors['disabled'] = "%s had an authentication problem. %s %s\nThe user is locked, expired, and/or disabled\n" % (userConfig['name'].lower(), errDate, errTime)
-				authErrors = "%s had an authentication problem. %s %s\nThe user is locked, expired, and/or disabled\n" % (userConfig['name'].lower(), errDate, errTime)
-	
-			# Incorrect Password - "Failed to Authenticate user <userID(FDN)>"
-			if userConfig['name'].lower() in line and 'description=Invalid password' in line:
-				logger.debug("Line found: Invalid password")
-				error = True
-				errDate, errTime = line.split(' ')[0:2]
-				# authErrors['invalid'] = "%s had a authentication problem %s %s\nThe password is incorrect\nSuggestion: See TID 7007504\n" % (userConfig['name'].lower(), errDate, errTime)
-				authErrors = "%s had a authentication problem %s %s\nThe password is incorrect\nSuggestion: See TID 7007504\n" % (userConfig['name'].lower(), errDate, errTime)
+				# authErrors['failed'] = "%s had a connection problem %s %s\nDevice has been quarantined\n" % (userConfig['name'].lower(), errDate, errTime)
+				authErrors = "%s had a connection problem %s %s\nDevice has been quarantined\n" % (userConfig['name'].lower(), errDate, errTime)
+				break
+		except:
+			pass
 
-			if userConfig['name'].lower() in line and 'description=LDAP authentication failed because the password has expired' in line:
-				logger.debug("Line found: Password expired")
-				error = True
-				errDate, errTime = line.split(' ')[0:2]
-				# authErrors['database'] = "%s had a authentication problem %s %s\nThe password is expired\n" % (userConfig['name'].lower(), errDate, errTime)
-				authErrors = "%s had a authentication problem %s %s\nThe password is expired\n" % (userConfig['name'].lower(), errDate, errTime)
-
-			# Database access has been denied - No password
-			if userConfig['name'].lower() in line and 'description=User Database access has been denied' in line:
-				logger.debug("Line found: User Database")
-				error = True
-				errDate, errTime = line.split(' ')[0:2]
-				# authErrors['database'] = "%s had a database problem %s %s\nUser may not have a password set for authentication type\n" % (userConfig['name'].lower(), errDate, errTime)
-				authErrors = "%s had a database problem %s %s\nUser may not have a password set for authentication type\n" % (userConfig['name'].lower(), errDate, errTime)
-
-			# Initial Sync Problem - "Connection Blocked - user <userID(FDN)> initial sync"
-			if userConfig['name'].lower() in line and 'Connection Blocked' in line and 'has not completed the initial sync':
-				logger.debug("Line found: Connection Blocked")
-				error = True
-				errDate, errTime = line.split(' ')[0:2]
-				# authErrors['blocked'] = "%s had a connection problem %s %s\nUser has not completed the initial sync\n" % (userConfig['name'].lower(), errDate, errTime)
-				authErrors = "%s had a connection problem %s %s\nUser has not completed the initial sync\n" % (userConfig['name'].lower(), errDate, errTime)
-
-			if userConfig['name'].lower() in line and 'Connection Blocked' in line and 'sync failed':
-				logger.debug("Line found: User failed")
-				error = True
-				errDate, errTime = line.split(' ')[0:2]
-				# authErrors['failed'] = "%s had a sync problem %s %s\nUser initial sync failed\n" % (userConfig['name'].lower(), errDate, errTime)
-				authErrors = "%s had a sync problem %s %s\nUser initial sync failed\n" % (userConfig['name'].lower(), errDate, errTime)
-			try:
-				if userConfig['mAppName'] in line and 'Connection Blocked' in line and 'currently blocked from accessing the server':
-					logger.debug("Line found: Quarantined")
-					error = True
-					errDate, errTime = line.split(' ')[0:2]
-					# authErrors['failed'] = "%s had a connection problem %s %s\nDevice has been quarantined\n" % (userConfig['name'].lower(), errDate, errTime)
-					authErrors = "%s had a connection problem %s %s\nDevice has been quarantined\n" % (userConfig['name'].lower(), errDate, errTime)
-			except:
-				pass
-
-			# TODO : Test LDAP communication
-				# # Communication - "Can't contact LDAP server"
-				# if (grep -i "$vuid" $mAlog | grep -i "Can't contact LDAP server" > /dev/null); then
-				# 	err=false
-				# 	errDate=`grep -i "$vuid" $mAlog | grep -i "Can't contact LDAP server" | cut -d" " -f1,2 | tail -1 | cut -d "." -f1`
-				# 	ifReturn $"Mobility cannot contact LDAP server. $errDate\n Check LDAP settings in WebAdmin.\n"
-				# fi
+		# TODO : Test LDAP communication
+			# # Communication - "Can't contact LDAP server"
+			# if (grep -i "$vuid" $mAlog | grep -i "Can't contact LDAP server" > /dev/null); then
+			# 	err=false
+			# 	errDate=`grep -i "$vuid" $mAlog | grep -i "Can't contact LDAP server" | cut -d" " -f1,2 | tail -1 | cut -d "." -f1`
+			# 	ifReturn $"Mobility cannot contact LDAP server. $errDate\n Check LDAP settings in WebAdmin.\n"
+			# fi
 
 	if error:
 		logger.info("Problems found with authentication for '%s'" % userConfig['name'].lower())
+		logger.debug(authErrors)
 		# for key in authErrors:
 		# 	print (authErrors[key])
 		print (authErrors)
