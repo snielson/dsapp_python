@@ -4214,3 +4214,8 @@ def clearTextEncryption(config_files, XMLconfig, ldapConfig, authConfig):
 
 	print ("\nRun %s/update.sh to re-encrypt XMLs" % dirOptMobility)
 
+def getPostgresModDate(dbConfig):
+	cmd = "su postgres -c \"cd /;psql -t -c \\\"SELECT (pg_stat_file('base/'||oid ||'/PG_VERSION')).modification FROM pg_database where datname='postgres';\\\"\""
+	out = util_subprocess(cmd, True)
+
+	return out[0].strip().split(' ')[0]

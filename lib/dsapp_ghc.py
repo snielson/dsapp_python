@@ -1036,17 +1036,19 @@ def ghc_checkManualMaintenance(dbConfig):
 	delta_days = False
 
 	# Set up month dict
-	months = dict(Jan=1, Feb=2, Mar=3, Apr=4, May=5, Jun=6, Jul=7, Aug=8, Sep=9, Oct=10, Nov=11, Dec=12)
+	# months = dict(Jan=1, Feb=2, Mar=3, Apr=4, May=5, Jun=6, Jul=7, Aug=8, Sep=9, Oct=10, Nov=11, Dec=12)
 
 	# Attempt to time GMS  has been installed
-	cmd = "rpm --last -qa | grep 'datasync-common-[0-9]' | awk  '{print $6\",\"$3\",\"$4}' | uniq"
-	install_date = ghc_util_subprocess(cmd)[0]
-	if install_date is not None:
-		install_date_year = int(install_date.split(',')[0])
-		install_date_month = install_date.split(',')[1]
-		install_date_day = int(install_date.split(',')[2])
+	install_date = ds.getPostgresModDate(dbConfig)
 
-		d0 = datetime.date(install_date_year, months[install_date_month], install_date_day)
+	# cmd = "rpm --last -qa | grep 'datasync-common-[0-9]' | awk  '{print $6\",\"$3\",\"$4}' | uniq"
+	# install_date = ghc_util_subprocess(cmd)[0]
+	if install_date is not None:
+		install_date_year = int(install_date.split('-')[0])
+		install_date_month = int(install_date.split('-')[1])
+		install_date_day = int(install_date.split('-')[2])
+
+		d0 = datetime.date(install_date_year, install_date_month, install_date_day)
 		d1 = datetime.date(int(time.strftime("%Y")), int(time.strftime("%m")), int(time.strftime("%d")))
 		# Convert datetime.timedelta to string > to int
 		int_delta = (int(str(abs(d1 - d0).days)))

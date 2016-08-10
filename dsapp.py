@@ -641,6 +641,7 @@ if args.clear:
 DEBUG_ENABLED = False
 if DEBUG_ENABLED:
 	pass
+	
 
 	sys.exit(0)
 
