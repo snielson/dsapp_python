@@ -337,7 +337,7 @@ def soap_check_allSharedFolders(trustedConfig, gwConfig, userList):
 	allUsers['totalSharedBy'] = total_sharedBy
 	allUsers['totalSharedTo'] = total_sharedTo
 
-	listPrint = '---Users shared folders ---\n\n'
+	listPrint = '--- Users shared folders ---\n\n'
 	for key in userList:
 		if allUsers[key]['isSharedByMe'] > 0 or allUsers[key]['isSharedToMe'] > 0:
 			listPrint += ("Folders shared by %s: %s\nFolders shared to %s: %s\n----------------------------------------\n" % (key, allUsers[key]['isSharedByMe'], key, allUsers[key]['isSharedToMe']))
