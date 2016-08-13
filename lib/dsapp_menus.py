@@ -423,7 +423,7 @@ def monitorUser_menu():
 			return
 
 def groupwiseChecks_menu():
-	menu = ['1. Check user over SOAP', '2. Check GroupWise folder structure', '\n     0. Back']
+	menu = ['1. Check user over SOAP', '2. Check GroupWise folder structure', '\n     3. Count user shared folders', '4. Count all users shared folders', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -440,6 +440,26 @@ def groupwiseChecks_menu():
 				print; ds.eContinue()
 		elif choice == '2':
 			dsSOAP.soap_checkFolderList(trustedConfig, gwConfig, ds.verifyUser(dbConfig)[0])
+		elif choice == '3':
+			userConfig = ds.verifyUser(dbConfig)[0]
+			if userConfig['name'] != None:
+				if userConfig['type'] != 'group':
+					dsSOAP.soap_check_sharedFolders(trustedConfig, gwConfig, userConfig)
+				else:
+					print ("Input '%(name)s' is not a user. Type='%(type)s'" % userConfig)
+				print; ds.eContinue()
+		elif choice == '4':
+			ds.datasyncBanner(dsappversion)
+			if ds.askYesOrNo("This can take some time to check every user. Continue"):
+				userList = ds.getMobilityUserList(dbConfig)
+				shared_list = dsSOAP.soap_check_allSharedFolders(trustedConfig, gwConfig, userList)
+				pydoc.pager(shared_list)
+				if ds.askYesOrNo("Save to file"):
+					with open(dsappdata + '/shared_folder_list.txt', 'w') as file:
+						file.write(shared_list)
+					logger.info("Saving shared list to %s" % (dsappdata + '/shared_folder_list.txt'))
+					print ("Saved to %s\n" % (dsappdata + '/shared_folder_list.txt'))
+					ds.eContinue()
 		elif choice == '0':
 			loop = False
 			return

@@ -4219,3 +4219,17 @@ def getPostgresModDate(dbConfig):
 	out = util_subprocess(cmd, True)
 
 	return out[0].strip().split(' ')[0]
+
+def getMobilityUserList(dbConfig):
+	userList = []
+	conn = getConn(dbConfig, 'mobility')
+	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+	logger.debug("Getting list of all mobility users")
+	cur.execute("SELECT name from users")
+	data = cur.fetchall()
+	cur.close()
+	conn.close()
+
+	for row in data:
+		userList.append(row['name'])
+	return userList

@@ -260,9 +260,12 @@ def check_subCalendars(folderList, parent_id):
 	logger.debug("Calendar id = %s" % parent_id)
 	problem = False
 	for folder in folderList[0][0]:
+		folderType = 'None'
 		try:
+			if 'folderType' in folder:
+				folderType = folder['folderType']
 			if 'isSystemFolder' not in folder or folder['isSystemFolder'] == 'False':
-				if folder['calendarAttribute']:
+				if folder['calendarAttribute'] and folderType != 'Proxy':
 					if folder['parent'] != parent_id:
 						print ("Folder structure problem with calendar: %s" % folder['name'])
 						logger.warning("Folder structure problem with calendar: %s" % folder['name'])
@@ -290,6 +293,57 @@ def check_subContacts(folderList, parent_id):
 			pass
 
 	return problem
+
+def soap_check_sharedFolders(trustedConfig, gwConfig, userConfig):
+	logger.info("Getting folder list..")
+	soap_folderList = soap_getFolderList(trustedConfig, gwConfig, userConfig)
+	if soap_folderList == None:
+		logger.debug("SOAP folder list is None")
+		return
+
+	count_sharedTo = 0
+	count_sharedBy = 0
+	for folder in soap_folderList[0][0]:
+		if 'isSharedByMe' in folder:
+			count_sharedBy += 1
+		if 'isSharedToMe' in folder:
+			count_sharedTo += 1
+	# myDict = {'isSharedByMe': count_sharedBy, 'isSharedToMe' : count_sharedTo}
+	print ("Folders shared by %s: %s\nFolders shared to %s: %s" % (userConfig['name'], count_sharedBy, userConfig['name'], count_sharedTo))
+
+def soap_check_allSharedFolders(trustedConfig, gwConfig, userList):
+	print ('Totaling all users shared folders... Please wait\n')
+	allUsers = {}
+	total_sharedBy = 0
+	total_sharedTo = 0
+	for user in userList:
+		userConfig = {'name': user}
+		logger.info("Getting folder list..")
+		soap_folderList = soap_getFolderList(trustedConfig, gwConfig, userConfig)
+		if soap_folderList == None:
+			logger.debug("SOAP folder list is None")
+		else:
+			count_sharedTo = 0
+			count_sharedBy = 0
+			for folder in soap_folderList[0][0]:
+				if 'isSharedByMe' in folder:
+					count_sharedBy += 1
+					total_sharedBy += 1
+				if 'isSharedToMe' in folder:
+					count_sharedTo += 1
+					total_sharedTo += 1
+			myUserDict = {'isSharedByMe': count_sharedBy, 'isSharedToMe' : count_sharedTo}
+			allUsers[user] = myUserDict
+	allUsers['totalSharedBy'] = total_sharedBy
+	allUsers['totalSharedTo'] = total_sharedTo
+
+	listPrint = '---Users shared folders ---\n\n'
+	for key in userList:
+		if allUsers[key]['isSharedByMe'] > 0 or allUsers[key]['isSharedToMe'] > 0:
+			listPrint += ("Folders shared by %s: %s\nFolders shared to %s: %s\n----------------------------------------\n" % (key, allUsers[key]['isSharedByMe'], key, allUsers[key]['isSharedToMe']))
+	listPrint += ("\nTotal folders shared by: %s\nTotal folders shared to: %s" % (allUsers['totalSharedBy'], allUsers['totalSharedTo']))
+	return listPrint
+	# print ("Total folders shared by: %s\nTotal folders shared to: %s" % (allUsers['totalSharedBy'], allUsers['totalSharedTo']))
 
 # This function is for developement / troubleshooting
 def soap_checkFolderListTEST(trustedConfig, gwConfig, userConfig):
