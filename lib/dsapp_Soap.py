@@ -313,9 +313,9 @@ def soap_check_sharedFolders(trustedConfig, gwConfig, userConfig):
 
 def soap_check_allSharedFolders(trustedConfig, gwConfig, userList):
 	print ('Totaling all users shared folders... Please wait\n')
-	allUsers = {}
 	total_sharedBy = 0
 	total_sharedTo = 0
+	listPrint = '--- Users shared folders ---\n\n'
 	for user in userList:
 		userConfig = {'name': user}
 		logger.info("Getting folder list..")
@@ -332,18 +332,11 @@ def soap_check_allSharedFolders(trustedConfig, gwConfig, userList):
 				if 'isSharedToMe' in folder:
 					count_sharedTo += 1
 					total_sharedTo += 1
-			myUserDict = {'isSharedByMe': count_sharedBy, 'isSharedToMe' : count_sharedTo}
-			allUsers[user] = myUserDict
-	allUsers['totalSharedBy'] = total_sharedBy
-	allUsers['totalSharedTo'] = total_sharedTo
+			if count_sharedBy > 0 or count_sharedTo > 0:
+				listPrint += ("Folders shared by %s: %s\nFolders shared to %s: %s\n----------------------------------------\n" % (user, count_sharedBy, user, count_sharedTo))
 
-	listPrint = '--- Users shared folders ---\n\n'
-	for key in userList:
-		if allUsers[key]['isSharedByMe'] > 0 or allUsers[key]['isSharedToMe'] > 0:
-			listPrint += ("Folders shared by %s: %s\nFolders shared to %s: %s\n----------------------------------------\n" % (key, allUsers[key]['isSharedByMe'], key, allUsers[key]['isSharedToMe']))
-	listPrint += ("\nTotal folders shared by: %s\nTotal folders shared to: %s" % (allUsers['totalSharedBy'], allUsers['totalSharedTo']))
+	listPrint += ("\nTotal folders shared by: %s\nTotal folders shared to: %s" % (total_sharedBy, total_sharedTo))
 	return listPrint
-	# print ("Total folders shared by: %s\nTotal folders shared to: %s" % (allUsers['totalSharedBy'], allUsers['totalSharedTo']))
 
 # This function is for developement / troubleshooting
 def soap_checkFolderListTEST(trustedConfig, gwConfig, userConfig):
