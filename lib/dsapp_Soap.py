@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 # Written by Shane Nielson <snielson@projectuminfinitas.com>
+from __future__ import print_function
+
 __author__ = "Shane Nielson"
 __credits__ = ["Tyler Harris", "Tim Draper"]
 __maintainer__ = "Shane Nielson"
@@ -97,7 +99,7 @@ def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False
 	# if verifyMobility is True, only check users found in GMS
 	if verifyMobility:
 		if userConfig['verify'] == 0 or userConfig['verify'] == None:
-			print "%s not configured with Mobility" % userConfig['name']
+			print ("%s not configured with Mobility" % userConfig['name'])
 			return
 		else:
 			userid = userConfig['name']
@@ -110,7 +112,7 @@ def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False
 	elif gwConfig['sSecure'] == 'http':
 		secureOrder = ['http', 'https']
 	else:
-		print "Missing value for http(s). Aborting"
+		print ("Missing value for http(s). Aborting")
 		logger.error('Missing value for http(s)')
 		return
 
@@ -123,7 +125,7 @@ def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False
 	# Check for invalid soap name / key
 	if  'description' in results['status']:
 		if "Directory Services Data missing" in results['status']['description']:
-			print "Unable to return results. Directory Services Data missing"
+			print ("Unable to return results. Directory Services Data missing")
 			logger.info("Unable to return results. Directory Services Data missing")
 			return
 
@@ -142,7 +144,7 @@ def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False
 			try:
 				results = soapClient.service.loginRequest(__inject={'msg': soap})
 			except:
-				print "Unable to return results for %s" % userid
+				print ("Unable to return results for %s" % userid)
 				logger.warning('Unable to return results for %s' % userid)
 				return
 
@@ -151,11 +153,11 @@ def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False
 	if results['status']['code'] == 0:
 		soap_userConfig = {'session': results['session'], 'name': results[1]['name'], 'email': results[1]['email'], 'userid': results[1]['userid'], 'domain': results[1]['domain'], 'postoffice': results[1]['postOffice'], 'fid': results[1]['fid'], 'gwVersion': results['gwVersion'], 'build': results['build'], 'soapAddr': soapAddr}
 	elif results['status']['description'] is not None:
-		print "Problem with '%s'\n%s" % (userid, results['status']['description'])
+		print ("Problem with '%s'\n%s" % (userid, results['status']['description']))
 		logger.warning("Problem with '%s' - %s" % (userid, results['status']['description']))
 		return
 	else:
-		print "Unable to return results for %s" % userid
+		print ("Unable to return results for %s" % userid)
 		logger.warning('Unable to return results for %s' % userid)
 		return
 	return soap_userConfig
@@ -180,7 +182,7 @@ def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
 	soap_folderList = soap_getFolderList(trustedConfig, gwConfig, userConfig)
 	if soap_folderList == None:
 		logger.debug("SOAP folder list is None")
-		print; ds.eContinue()
+		print(); ds.eContinue()
 		return
 
 	# Get root folder ID
@@ -192,7 +194,7 @@ def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
 				root_id = folder['id']
 				break
 			else:
-				print "Unable to find the root folder for %s" % userConfig['name']
+				print ("Unable to find the root folder for %s" % userConfig['name'])
 				logger.warning("Unable to find the root folder for %s" % userConfig['name'])
 				return
 
@@ -203,7 +205,7 @@ def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
 		if 'folderType' in folder:
 			if folder['folderType'] in folder_check:
 				if folder['parent'] != root_id:
-					print "Problem with system folder structure\n%s not found under root of mailbox\n" % folder['folderType']
+					print ("Problem with system folder structure\n%s not found under root of mailbox\n" % folder['folderType'])
 					logger.error("Problem with system folder structure - %s not found under root of mailbox\n" % folder['folderType'])
 					problem = True
 				else:
@@ -212,10 +214,10 @@ def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
 					if folder['folderType'] == 'Calendar':
 						if check_subCalendars(soap_folderList, folder['id']): problem = True
 	if not problem:
-		print "No problems found with GroupWise folder structure"
+		print ("No problems found with GroupWise folder structure")
 		logger.info("No problems found with GroupWise folder structure")
 
-	print; ds.eContinue()
+	print(); ds.eContinue()
 
 
 def soap_printUser(trustedConfig, gwConfig, userConfig):
@@ -237,7 +239,7 @@ User Email: %(email)s
 User GroupWise ID: %(userid)s 
 User File ID: %(fid)s """ % soap_userConfig
 
-	print results
+	print (results)
 
 
 def soap_getUserList(trustedConfig, gwConfig, noout='true'):
@@ -295,28 +297,52 @@ def check_subContacts(folderList, parent_id):
 	return problem
 
 def soap_check_sharedFolders(trustedConfig, gwConfig, userConfig):
+	print ('Totaling all %s shared folders... Please wait\n' % userConfig['name'])
 	logger.info("Getting folder list..")
 	soap_folderList = soap_getFolderList(trustedConfig, gwConfig, userConfig)
 	if soap_folderList == None:
 		logger.debug("SOAP folder list is None")
 		return
 
+	listPrint = '--- %s shared folders ---\n\n' % userConfig['name']
+	folder_list_sharedBy = []
+	folder_list_sharedTo = []
 	count_sharedTo = 0
 	count_sharedBy = 0
 	for folder in soap_folderList[0][0]:
 		if 'isSharedByMe' in folder:
+			folder_list_sharedBy.append((folder['name'], folder['id']))
 			count_sharedBy += 1
 		if 'isSharedToMe' in folder:
+			folder_list_sharedTo.append((folder['name'], folder['id']))
 			count_sharedTo += 1
-	# myDict = {'isSharedByMe': count_sharedBy, 'isSharedToMe' : count_sharedTo}
-	print ("Folders shared by %s: %s\nFolders shared to %s: %s" % (userConfig['name'], count_sharedBy, userConfig['name'], count_sharedTo))
+
+	if len(folder_list_sharedBy) > 0:
+		listPrint += ("Folders shared by %s\n----------------------------------------\n" % userConfig['name'])
+		for index in xrange(len(folder_list_sharedBy)):
+			listPrint += "Name: %s\nID: %s\n\n" % (folder_list_sharedBy[index][0], folder_list_sharedBy[index][1])
+
+	if len(folder_list_sharedTo) > 0:
+		listPrint += ("Folders shared to %s\n----------------------------------------\n" % userConfig['name'])
+		for index in xrange(len(folder_list_sharedTo)):
+			listPrint += "Name: %s\nID: %s\n\n" % (folder_list_sharedTo[index][0], folder_list_sharedTo[index][1])
+
+
+	listPrint += ("\nFolders shared by %s: %s\nFolders shared to %s: %s" % (userConfig['name'], count_sharedBy, userConfig['name'], count_sharedTo))
+	
+	return listPrint
 
 def soap_check_allSharedFolders(trustedConfig, gwConfig, userList):
 	print ('Totaling all users shared folders... Please wait\n')
 	total_sharedBy = 0
 	total_sharedTo = 0
 	listPrint = '--- Users shared folders ---\n\n'
+	userCount = len(userList)
+	current_userCount = 0
 	for user in userList:
+		sys.stdout.write("\rStatus: %s of %s users done" % (current_userCount, userCount))
+		sys.stdout.flush()		
+
 		userConfig = {'name': user}
 		logger.info("Getting folder list..")
 		soap_folderList = soap_getFolderList(trustedConfig, gwConfig, userConfig)
@@ -334,7 +360,11 @@ def soap_check_allSharedFolders(trustedConfig, gwConfig, userList):
 					total_sharedTo += 1
 			if count_sharedBy > 0 or count_sharedTo > 0:
 				listPrint += ("Folders shared by %s: %s\nFolders shared to %s: %s\n----------------------------------------\n" % (user, count_sharedBy, user, count_sharedTo))
+		current_userCount += 1
 
+	sys.stdout.write("\rProgress: %s of %s users done" % (current_userCount, userCount))
+	sys.stdout.flush()	
+	print('\n')
 	listPrint += ("\nTotal folders shared by: %s\nTotal folders shared to: %s" % (total_sharedBy, total_sharedTo))
 	return listPrint
 
