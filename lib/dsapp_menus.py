@@ -559,7 +559,7 @@ def checksQueries_menu():
 
 ### Start ### Sub menu performance_menu ###
 def performance_menu():
-	menu = ['1. Query string counts','\n     0. Back']
+	menu = ['1. Query string counts','2. Manual sync devices', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -572,8 +572,18 @@ def performance_menu():
 				log = ds.getFilePath("Enter path to mobility-agent log file: ")
 				if log is None:
 					return
-				dsPerformance.countUsers(log)
+				dsPerformance.getDeviceCommands(log)
 				ds.eContinue()
+
+		elif choice == '2':
+			ds.datasyncBanner(dsappversion)
+			if ds.askYesOrNo("Parse debug log for devices set to manual sync"):
+				log = ds.getFilePath("Enter path to mobility-agent log file: ")
+				if log is None:
+					return
+				dsPerformance.getPinglessDevices(log)
+				ds.eContinue()
+
 		elif choice == '0':
 			loop = False
 			return

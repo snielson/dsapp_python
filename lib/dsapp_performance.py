@@ -36,7 +36,7 @@ ds_2x = 2
 ds_14x = 14
 mobilityVersion = 0
 version = "/opt/novell/datasync/version"
-envrion_db = dsapptmp + '/environ.sqlite'
+environ_db = dsapptmp + '/environ.sqlite'
 
 # Mobility Directories variables
 dirOptMobility = "/opt/novell/datasync"
@@ -138,11 +138,11 @@ def getEnvrion(log=None):
 	perform_logger.info("Parsing %0.2fMB log: %s" % (logMB, log))
 
 	# If db already exists. remove it
-	if os.path.isfile(envrion_db):
-		os.remove(envrion_db)
+	if os.path.isfile(environ_db):
+		os.remove(environ_db)
 
 	# Create a sqlite db to store the values
-	conn = sqlite3.connect(envrion_db)
+	conn = sqlite3.connect(environ_db)
 	cur = conn.cursor()
 	cur.execute("CREATE TABLE environ(REMOTE_ADDR TEXT, QUERY_STRING TEXT, HTTP_HOST TEXT, SERVER_PORT TEXT)")
 	conn.commit()
@@ -183,10 +183,10 @@ def getEnvrion(log=None):
 
 
 # Create dictionary of users, devices, cmd, and counts
-def countUsers(log=None):
+def create_QueryString_table(log=None):
 	getEnvrion(log)
 
-	conn = sqlite3.connect(envrion_db)
+	conn = sqlite3.connect(environ_db)
 	cur = conn.cursor()
 
 	# Check if environ table is empty
@@ -264,10 +264,13 @@ def countUsers(log=None):
 	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 	perform_logger.info("Operation took %0.3f ms\n" % ((time2 - time1) * 1000))
 
+def getDeviceCommands(log):
+	create_QueryString_table(log)
+
 	# Create tempfile for large tables
 	name = tempfile.TemporaryFile(mode='w+b')
 
-	select_cmd = "sqlite3 -column -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\", cmd as \"Command\", count(cmd) as \"Count\" from data group by userKey, cmd order by \"Count\" desc;'" % envrion_db
+	select_cmd = "sqlite3 -column -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\", cmd as \"Command\", count(cmd) as \"Count\" from data group by userKey, cmd order by \"Count\" desc;'" % environ_db
 	p = subprocess.Popen(select_cmd, shell=True, stdout=name)
 	p.wait()
 	name.seek(0)
@@ -275,8 +278,27 @@ def countUsers(log=None):
 	pydoc.pager(out)
 
 	if ds.askYesOrNo("Output results to CSV"):
-		select_cmd = "sqlite3 -csv -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\", cmd as \"Command\", count(cmd) as \"Count\" from data group by userKey, cmd order by \"Count\" desc;' > %s/query_string.csv" % (envrion_db, dsappdata)
+		select_cmd = "sqlite3 -csv -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\", cmd as \"Command\", count(cmd) as \"Count\" from data group by userKey, cmd order by \"Count\" desc;' > %s/query_string.csv" % (environ_db, dsappdata)
 		out = ds.util_subprocess(select_cmd)
 		print ("Data exported to %s/query_string.csv" % dsappdata)
 	print()
 	
+
+def getPinglessDevices(log):
+	create_QueryString_table(log)
+
+	# Create tempfile for large tables
+	name = tempfile.TemporaryFile(mode='w+b')
+
+	select_cmd ="sqlite3 -column -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\" from data where deviceid not in (select deviceid from data where cmd=\"Ping\") group by deviceid;'" % environ_db
+	p = subprocess.Popen(select_cmd, shell=True, stdout=name)
+	p.wait()
+	name.seek(0)
+	out = name.read()
+	pydoc.pager(out)
+
+	if ds.askYesOrNo("Output results to CSV"):
+		select_cmd ="sqlite3 -csv -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\" from data where deviceid not in (select deviceid from data where cmd=\"Ping\") group by deviceid;' > %s/ping-less_devices.csv" % (environ_db, dsappdata)
+		out = ds.util_subprocess(select_cmd)
+		print ("Data exported to %s/query_string.csv" % dsappdata)
+	print()
