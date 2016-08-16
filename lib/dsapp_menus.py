@@ -459,7 +459,7 @@ def groupwiseChecks_menu():
 
 		elif choice == '4':
 			ds.datasyncBanner(dsappversion)
-			print ("This can take some time to check every user")
+			print ("This can take some time to check every user in mobility")
 			if ds.askYesOrNo("Warning! CPU may become busy. Continue"):
 				userList = ds.getMobilityUserList(dbConfig)
 				shared_list = dsSOAP.soap_check_allSharedFolders(trustedConfig, gwConfig, userList)

@@ -94,7 +94,7 @@ getFolderListRequest = """<?xml version="1.0" encoding="UTF-8"?>
 	</SOAP-ENV:Envelope>
 """
 
-def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False):
+def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False, ignoreError=False):
 	soapAddr = None
 	# if verifyMobility is True, only check users found in GMS
 	if verifyMobility:
@@ -125,7 +125,8 @@ def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False
 	# Check for invalid soap name / key
 	if  'description' in results['status']:
 		if "Directory Services Data missing" in results['status']['description']:
-			print ("Unable to return results. Directory Services Data missing")
+			if not ignoreError:
+				print ("Unable to return results. Directory Services Data missing")
 			logger.info("Unable to return results. Directory Services Data missing")
 			return
 
@@ -144,7 +145,8 @@ def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False
 			try:
 				results = soapClient.service.loginRequest(__inject={'msg': soap})
 			except:
-				print ("Unable to return results for %s" % userid)
+				if not ignoreError:
+					print ("Unable to return results for %s" % userid)
 				logger.warning('Unable to return results for %s' % userid)
 				return
 
@@ -153,17 +155,19 @@ def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False
 	if results['status']['code'] == 0:
 		soap_userConfig = {'session': results['session'], 'name': results[1]['name'], 'email': results[1]['email'], 'userid': results[1]['userid'], 'domain': results[1]['domain'], 'postoffice': results[1]['postOffice'], 'fid': results[1]['fid'], 'gwVersion': results['gwVersion'], 'build': results['build'], 'soapAddr': soapAddr}
 	elif results['status']['description'] is not None:
-		print ("Problem with '%s'\n%s" % (userid, results['status']['description']))
+		if not ignoreError:
+			print ("Problem with '%s'\n%s" % (userid, results['status']['description']))
 		logger.warning("Problem with '%s' - %s" % (userid, results['status']['description']))
 		return
 	else:
-		print ("Unable to return results for %s" % userid)
+		if not ignoreError:
+			print ("Unable to return results for %s" % userid)
 		logger.warning('Unable to return results for %s' % userid)
 		return
 	return soap_userConfig
 
-def soap_getFolderList(trustedConfig, gwConfig, userConfig):
-	soap_userConfig = soap_getUserInfo(trustedConfig, gwConfig, userConfig)
+def soap_getFolderList(trustedConfig, gwConfig, userConfig, ignoreError=False):
+	soap_userConfig = soap_getUserInfo(trustedConfig, gwConfig, userConfig, ignoreError=ignoreError)
 	if soap_userConfig == None:
 		return
 
@@ -345,7 +349,7 @@ def soap_check_allSharedFolders(trustedConfig, gwConfig, userList):
 
 		userConfig = {'name': user}
 		logger.info("Getting folder list..")
-		soap_folderList = soap_getFolderList(trustedConfig, gwConfig, userConfig)
+		soap_folderList = soap_getFolderList(trustedConfig, gwConfig, userConfig, ignoreError=True)
 		if soap_folderList == None:
 			logger.debug("SOAP folder list is None")
 		else:
