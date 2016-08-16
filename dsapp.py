@@ -27,7 +27,6 @@ import logging
 import logging.config
 import time
 import atexit
-import pydoc
 import subprocess
 import traceback
 import ConfigParser
@@ -37,8 +36,10 @@ Config = ConfigParser.ConfigParser()
 if not os.path.exists('/opt/novell/datasync/tools/dsapp/logs/'):
 	os.makedirs('/opt/novell/datasync/tools/dsapp/logs/')
 
-sys.path.append(os.path.dirname(os.path.realpath(__file__)) + '/lib')
+# sys.path.append(os.path.dirname(os.path.realpath(__file__)) + '/lib')
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)) + '/lib')
 import spin
+import pydoc
 
 ##################################################################################################
 #	Start up check
@@ -641,7 +642,6 @@ if args.clear:
 DEBUG_ENABLED = False
 if DEBUG_ENABLED:
 	pass
-	
 
 	sys.exit(0)
 

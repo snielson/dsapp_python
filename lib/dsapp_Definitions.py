@@ -3841,7 +3841,9 @@ def show_GW_syncEvents(dbConfig):
 		sorted_users = sorted(userCount.items(), key=operator.itemgetter(1),reverse=True)
 
 		header = ['User', 'Events']
-		pydoc.pager(tabulate(sorted_users, header, tablefmt='orgtbl'))
+		printTable = "Note: Pending events may be valid\n\n"
+		printTable += str(tabulate(sorted_users, header, tablefmt='orgtbl'))
+		pydoc.pager(printTable)
 	else:
 		print ("consumerevents table has no events (psql:datasync)")
 		logger.info("consumerevents table has no events (psql:datasync)")
@@ -3855,7 +3857,9 @@ def show_Mob_syncEvents(dbConfig):
 	cmd = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"select DISTINCT  u.userid AS \\\"FDN\\\", count(eventid) as \\\"Events\\\", se.userid FROM syncevents se INNER JOIN users u ON se.userid = u.guid GROUP BY u.userid, se.userid ORDER BY \\\"Events\\\" DESC;\"" % dbConfig
 	out = util_subprocess(cmd)
 	logger.info("Checking mobility sync events")
-	print (out[0].rstrip('\n')); print ()
+	printTable = "Note: Pending events may be valid\n\n"
+	printTable += str(out[0].rstrip('\n'))
+	pydoc.pager(printTable)
 
 def view_attach_byUser(dbConfig):
 	datasyncBanner(dsappversion)

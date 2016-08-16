@@ -94,6 +94,19 @@ getFolderListRequest = """<?xml version="1.0" encoding="UTF-8"?>
 	</SOAP-ENV:Envelope>
 """
 
+getAddressBookListRequest = """<?xml version="1.0" encoding="UTF-8"?>
+	<SOAP-ENV:Envelope xmlns:ns0="http://schemas.novell.com/2005/01/GroupWise/types" xmlns:ns1="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns2="http://schemas.novell.com/2005/01/GroupWise/methods" xmlns:tns="http://schemas.novell.com/2005/01/GroupWise/types" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
+		<SOAP-ENV:Header>
+			<tns:session>%s</tns:session>
+		</SOAP-ENV:Header>
+		<SOAP-ENV:Body>
+			<ns0:getAddressBookListRequest>
+				<view xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">shared fullid</view>
+			</ns0:getAddressBookListRequest>
+		</SOAP-ENV:Body>
+	</SOAP-ENV:Envelope>
+"""
+
 def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False, ignoreError=False):
 	soapAddr = None
 	# if verifyMobility is True, only check users found in GMS
@@ -174,6 +187,16 @@ def soap_getFolderList(trustedConfig, gwConfig, userConfig, ignoreError=False):
 	soap = getFolderListRequest % (soap_userConfig['session'])
 	soapClient = suds.client.Client(WSDL, location='%(soapAddr)s' % soap_userConfig)
 	results = soapClient.service.getFolderListRequest(__inject={'msg': soap})
+	return results
+
+def soap_getAddressBookList(trustedConfig, gwConfig, userConfig, ignoreError=False):
+	soap_userConfig = soap_getUserInfo(trustedConfig, gwConfig, userConfig, ignoreError=ignoreError)
+	if soap_userConfig == None:
+		return
+
+	soap = getAddressBookListRequest % (soap_userConfig['session'])
+	soapClient = suds.client.Client(WSDL, location='%(soapAddr)s' % soap_userConfig)
+	results = soapClient.service.getAddressBookListRequest(__inject={'msg': soap})
 	return results
 
 def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
@@ -304,8 +327,10 @@ def soap_check_sharedFolders(trustedConfig, gwConfig, userConfig):
 	print ('Totaling all %s shared folders... Please wait\n' % userConfig['name'])
 	logger.info("Getting folder list..")
 	soap_folderList = soap_getFolderList(trustedConfig, gwConfig, userConfig)
-	if soap_folderList == None:
-		logger.debug("SOAP folder list is None")
+	logger.info("Getting address book list..")
+	soap_addressList = soap_getAddressBookList(trustedConfig, gwConfig, userConfig)
+	if soap_folderList == None and soap_addressList == None:
+		logger.debug("SOAP result(s) are None")
 		return
 
 	listPrint = '--- %s shared folders ---\n\n' % userConfig['name']
@@ -320,14 +345,21 @@ def soap_check_sharedFolders(trustedConfig, gwConfig, userConfig):
 		if 'isSharedToMe' in folder:
 			folder_list_sharedTo.append((folder['name'], folder['id']))
 			count_sharedTo += 1
+	for folder in soap_addressList[0][0]:
+		if 'isSharedByMe' in folder:
+			folder_list_sharedBy.append((folder['name'], folder['id']))
+			count_sharedBy += 1
+		if 'isSharedToMe' in folder:
+			folder_list_sharedTo.append((folder['name'], folder['id']))
+			count_sharedTo += 1
 
 	if len(folder_list_sharedBy) > 0:
-		listPrint += ("Folders shared by %s\n----------------------------------------\n" % userConfig['name'])
+		listPrint += ("----------------------------------------\nFolders shared by %s\n----------------------------------------\n" % userConfig['name'])
 		for index in xrange(len(folder_list_sharedBy)):
 			listPrint += "Name: %s\nID: %s\n\n" % (folder_list_sharedBy[index][0], folder_list_sharedBy[index][1])
 
 	if len(folder_list_sharedTo) > 0:
-		listPrint += ("Folders shared to %s\n----------------------------------------\n" % userConfig['name'])
+		listPrint += ("----------------------------------------\nFolders shared to %s\n----------------------------------------\n" % userConfig['name'])
 		for index in xrange(len(folder_list_sharedTo)):
 			listPrint += "Name: %s\nID: %s\n\n" % (folder_list_sharedTo[index][0], folder_list_sharedTo[index][1])
 
@@ -350,8 +382,10 @@ def soap_check_allSharedFolders(trustedConfig, gwConfig, userList):
 		userConfig = {'name': user}
 		logger.info("Getting folder list..")
 		soap_folderList = soap_getFolderList(trustedConfig, gwConfig, userConfig, ignoreError=True)
-		if soap_folderList == None:
-			logger.debug("SOAP folder list is None")
+		logger.info("Getting address book list..")
+		soap_addressList = soap_getAddressBookList(trustedConfig, gwConfig, userConfig, ignoreError=True)
+		if soap_folderList == None and soap_addressList == None:
+			logger.debug("SOAP result(s) are None")
 		else:
 			count_sharedTo = 0
 			count_sharedBy = 0
@@ -362,8 +396,15 @@ def soap_check_allSharedFolders(trustedConfig, gwConfig, userList):
 				if 'isSharedToMe' in folder:
 					count_sharedTo += 1
 					total_sharedTo += 1
+			for folder in soap_addressList[0][0]:
+				if 'isSharedByMe' in folder:
+					count_sharedBy += 1
+					total_sharedBy += 1
+				if 'isSharedToMe' in folder:
+					count_sharedTo += 1
+					total_sharedTo += 1
 			if count_sharedBy > 0 or count_sharedTo > 0:
-				listPrint += ("Folders shared by %s: %s\nFolders shared to %s: %s\n----------------------------------------\n" % (user, count_sharedBy, user, count_sharedTo))
+				listPrint += ("----------------------------------------\nFolders shared by %s: %s\nFolders shared to %s: %s\n----------------------------------------\n" % (user, count_sharedBy, user, count_sharedTo))
 		current_userCount += 1
 
 	sys.stdout.write("\rProgress: %s of %s users done" % (current_userCount, userCount))
@@ -383,4 +424,13 @@ def soap_checkFolderListTEST(trustedConfig, gwConfig, userConfig):
 
 	return soap_folderList
 
+def soap_checkAddressBookListTEST(trustedConfig, gwConfig, userConfig):
+	problem = False
+	print ("Getting folder list..")
+	logger.info("Getting folder list..")
+	soap_AdddressBookList = soap_getAddressBookList(trustedConfig, gwConfig, userConfig)
+	if soap_AdddressBookList == None:
+		return
+
+	return soap_AdddressBookList
 	

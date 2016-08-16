@@ -17,6 +17,7 @@ getch = getch._Getch()
 import textwrap
 import subprocess
 import pydoc
+from locale import getpreferredencoding
 import subprocess
 from tabulate import tabulate
 
@@ -548,7 +549,6 @@ def checksQueries_menu():
 			ds.show_GW_syncEvents(dbConfig)
 		elif choice == '5':
 			ds.show_Mob_syncEvents(dbConfig)
-			ds.eContinue()
 		elif choice == '6':
 			viewAttachments_menu()
 		elif choice == '7':
@@ -616,7 +616,7 @@ def viewAttachments_menu():
 
 # DEBUG MENU
 def debug_menu():
-	menu = ['DEBUG MENU\n','1. SOAP - View user folder list','2. View verifyUser data', '3. View variables', '4. SOAP - getUserListRequest','\n     0. Back']
+	menu = ['DEBUG MENU\n','1. SOAP - View user folder list', '2. SOAP - View user address book list', '3. SOAP - getUserListRequest', '4. View verifyUser data', '5. View variables', '\n     0. Back']
 	logger.info("Running DEBUG menu!")
 
 	available = build_avaialbe(menu)
@@ -629,13 +629,26 @@ def debug_menu():
 			userConfig = ds.verifyUser(dbConfig)[0]
 			if userConfig['name'] is not None:
 				pydoc.pager(str(dsSOAP.soap_checkFolderListTEST(trustedConfig, gwConfig, userConfig)))
+
 		elif choice == '2':
+			logger.info("DEBUG MENU: Checking SOAP folder check")
+			userConfig = ds.verifyUser(dbConfig)[0]
+			if userConfig['name'] is not None:
+				pydoc.pager(str(dsSOAP.soap_checkAddressBookListTEST(trustedConfig, gwConfig, userConfig)))
+
+		elif choice =='3':
+			gw_location = "%(sSecure)s://%(gListenAddress)s:%(sPort)s/soap" % gwConfig
+			info = "Trusted Name: %s\nTrusted Key: %s\nAddress: %s\n\n" % (trustedConfig['name'], trustedConfig['key'],gw_location)
+			info += str(dsSOAP.soap_getUserList(trustedConfig, gwConfig))
+			pydoc.pager(info)
+
+		elif choice == '4':
 			logger.info("DEBUG MENU: Running verifyUser()")
 			for user in ds.verifyUser(dbConfig):
 				print user
 				print
 			ds.eContinue()
-		elif choice == '3':
+		elif choice == '5':
 			logger.info("DEBUG MENU: Listing variables")
 			saved_variables = ("Database Config:\n%s\n" % dbConfig)
 			saved_variables += ("\nLDAP Config:\n%s\n" % ldapConfig)
@@ -646,11 +659,7 @@ def debug_menu():
 			saved_variables += ("\nWeb Config:\n%s\n" % webConfig)
 			saved_variables += ("\nAuth Config:\n%s\n" % authConfig)
 			pydoc.pager(saved_variables)
-		elif choice =='4':
-			gw_location = "%(sSecure)s://%(gListenAddress)s:%(sPort)s/soap" % gwConfig
-			info = "Trusted Name: %s\nTrusted Key: %s\nAddress: %s\n\n" % (trustedConfig['name'], trustedConfig['key'],gw_location)
-			info += str(dsSOAP.soap_getUserList(trustedConfig, gwConfig))
-			pydoc.pager(info)
+
 		elif choice == '0':
 			loop = False
 			ds.clear()
