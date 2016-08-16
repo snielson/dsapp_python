@@ -447,14 +447,15 @@ def groupwiseChecks_menu():
 			if userConfig['name'] != None:
 				if userConfig['type'] != 'group':
 					shared_list = dsSOAP.soap_check_sharedFolders(trustedConfig, gwConfig, userConfig)
-					pydoc.pager(shared_list)
-					if ds.askYesOrNo("Save to file"):
-						with open(dsappdata + '/shared_folder_list.txt', 'w') as file:
-							file.write(shared_list)
-							file.write('\n')
-						logger.info("Saving shared list to %s" % (dsappdata + '/shared_folder_list.txt'))
-						print ("Saved to %s\n" % (dsappdata + '/shared_folder_list.txt'))
-						ds.eContinue()
+					if shared_list is not None:
+						pydoc.pager(shared_list)
+						if ds.askYesOrNo("Save to file"):
+							with open(dsappdata + '/shared_folder_list.txt', 'w') as file:
+								file.write(shared_list)
+								file.write('\n')
+							logger.info("Saving shared list to %s" % (dsappdata + '/shared_folder_list.txt'))
+							print ("Saved to %s" % (dsappdata + '/shared_folder_list.txt'))
+					print; ds.eContinue()
 
 		elif choice == '4':
 			ds.datasyncBanner(dsappversion)
@@ -462,14 +463,15 @@ def groupwiseChecks_menu():
 			if ds.askYesOrNo("Warning! CPU may become busy. Continue"):
 				userList = ds.getMobilityUserList(dbConfig)
 				shared_list = dsSOAP.soap_check_allSharedFolders(trustedConfig, gwConfig, userList)
-				pydoc.pager(shared_list)
-				if ds.askYesOrNo("Save to file"):
-					with open(dsappdata + '/shared_folder_list-allUsers.txt', 'w') as file:
-						file.write(shared_list)
-						file.write('\n')
-					logger.info("Saving shared list to %s" % (dsappdata + '/shared_folder_list-allUsers.txt'))
-					print ("Saved to %s\n" % (dsappdata + '/shared_folder_list-allUsers.txt'))
-					ds.eContinue()
+				if shared_list is not None:
+					pydoc.pager(shared_list)
+					if ds.askYesOrNo("Save to file"):
+						with open(dsappdata + '/shared_folder_list-allUsers.txt', 'w') as file:
+							file.write(shared_list)
+							file.write('\n')
+						logger.info("Saving shared list to %s" % (dsappdata + '/shared_folder_list-allUsers.txt'))
+						print ("Saved to %s" % (dsappdata + '/shared_folder_list-allUsers.txt'))
+					print; ds.eContinue()
 					
 		elif choice == '0':
 			loop = False
