@@ -559,7 +559,7 @@ def checksQueries_menu():
 
 ### Start ### Sub menu performance_menu ###
 def performance_menu():
-	menu = ['1. Query string counts','2. Manual sync devices', '\n     0. Back']
+	menu = ['1. Total query strings','2. Check manual syncing devices', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
