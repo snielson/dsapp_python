@@ -15,7 +15,8 @@ import re
 import spin
 import time
 import sqlite3
-import pydoc
+import imp
+pydoc = imp.load_source('pydoc', os.path.dirname(os.path.realpath(__file__)) + '/pydoc.py')
 import tempfile
 import subprocess
 

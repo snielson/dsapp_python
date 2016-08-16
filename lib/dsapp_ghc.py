@@ -13,7 +13,8 @@ import socket
 import subprocess
 import datetime
 import time
-import pydoc
+import imp
+pydoc = imp.load_source('pydoc', os.path.dirname(os.path.realpath(__file__)) + '/pydoc.py')
 import traceback
 import dsapp_Definitions as ds
 import dsapp_Soap as dsSoap

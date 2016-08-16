@@ -16,7 +16,8 @@ import getch
 getch = getch._Getch()
 import textwrap
 import subprocess
-import pydoc
+import imp
+pydoc = imp.load_source('pydoc', os.path.dirname(os.path.realpath(__file__)) + '/pydoc.py')
 from locale import getpreferredencoding
 import subprocess
 from tabulate import tabulate
@@ -628,7 +629,12 @@ def debug_menu():
 			logger.info("DEBUG MENU: Checking SOAP folder check")
 			userConfig = ds.verifyUser(dbConfig)[0]
 			if userConfig['name'] is not None:
-				pydoc.pager(str(dsSOAP.soap_checkFolderListTEST(trustedConfig, gwConfig, userConfig)))
+				# pydoc.pager(str(dsSOAP.soap_checkFolderListTEST(trustedConfig, gwConfig, userConfig)))
+				folderList = dsSOAP.soap_checkFolderListTEST(trustedConfig, gwConfig, userConfig)
+				for folder in folderList:
+					if 'owner' in folder and 'isSharedToMe' in folder:
+						print (folder['owner']['displayName'])
+
 
 		elif choice == '2':
 			logger.info("DEBUG MENU: Checking SOAP folder check")

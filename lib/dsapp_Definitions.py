@@ -14,7 +14,8 @@ import thread, threading
 from pipes import quote
 import io
 import gzip
-import pydoc
+import imp
+pydoc = imp.load_source('pydoc', os.path.dirname(os.path.realpath(__file__)) + '/pydoc.py')
 import traceback
 import urllib2
 import readline
