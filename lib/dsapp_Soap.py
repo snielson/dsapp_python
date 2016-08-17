@@ -432,7 +432,7 @@ def soap_checkFolderListTEST(trustedConfig, gwConfig, userConfig):
 	if soap_folderList == None:
 		return
 
-	return soap_folderList[0][0]
+	return soap_folderList
 
 def soap_checkAddressBookListTEST(trustedConfig, gwConfig, userConfig):
 	problem = False

@@ -629,12 +629,7 @@ def debug_menu():
 			logger.info("DEBUG MENU: Checking SOAP folder check")
 			userConfig = ds.verifyUser(dbConfig)[0]
 			if userConfig['name'] is not None:
-				# pydoc.pager(str(dsSOAP.soap_checkFolderListTEST(trustedConfig, gwConfig, userConfig)))
-				folderList = dsSOAP.soap_checkFolderListTEST(trustedConfig, gwConfig, userConfig)
-				for folder in folderList:
-					if 'owner' in folder and 'isSharedToMe' in folder:
-						print (folder['owner']['displayName'])
-
+				pydoc.pager(str(dsSOAP.soap_checkFolderListTEST(trustedConfig, gwConfig, userConfig)))
 
 		elif choice == '2':
 			logger.info("DEBUG MENU: Checking SOAP folder check")

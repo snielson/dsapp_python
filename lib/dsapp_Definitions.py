@@ -7,12 +7,10 @@ __credits__ = "Tyler Harris"
 __maintainer__ = "Shane Nielson"
 __email__ = "snielson@projectuminfinitas.com"
 
-import os,base64,binascii,sys,signal,select,getpass,shutil,fileinput,glob,atexit,time,datetime,itertools,pprint,textwrap
+import os,base64,sys,signal,select,getpass,shutil,fileinput,glob,time,datetime,pprint,textwrap
 import subprocess,socket,re,rpm,contextlib
 import tarfile, zipfile, bz2
-import thread, threading
 from pipes import quote
-import io
 import gzip
 import imp
 pydoc = imp.load_source('pydoc', os.path.dirname(os.path.realpath(__file__)) + '/pydoc.py')
@@ -25,9 +23,12 @@ from tabulate import tabulate
 from urllib2 import urlopen, URLError, HTTPError
 from xml.parsers.expat import ExpatError
 import logging, logging.config
-from multiprocessing import Process, Queue
 import ConfigParser
 Config = ConfigParser.ConfigParser()
+
+# Unused imports
+# import thread, threading, itertools, atexit, binascii, io
+# from multiprocessing import Process, Queue
 
 # import netifaces after appending to sys.path
 sys.path.append(os.path.dirname(os.path.realpath(__file__)) + '/netifaces-0.10.4-py2.6-linux-x86_64.egg')
