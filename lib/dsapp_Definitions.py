@@ -218,9 +218,8 @@ def announceNewFeature():
 	if newFeature:
 		datasyncBanner(dsappversion)
 		logger.debug('Prompt feature')
-		print ("General Health Check.\nLocated in the Checks & Queries menu.\n")
-		if askYesOrNo("Would you like to run it now?"):
-			generalHealthCheck(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedConfig, config_files, webConfig)
+		print ("New feature for GMS shared folders.\nCheck users shared folders, and total all users shares.\n\nOptions can be found at (5. User Issues, 2. GroupWise checks options)\nCounting all users shares can run about 8-10 users per minute.\n")
+		eContinue()
 	Config.read(dsappSettings)
 	Config.set('Settings', 'new.feature', False)
 	with open(dsappSettings, 'wb') as cfgfile:
