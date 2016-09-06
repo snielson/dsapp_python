@@ -2295,7 +2295,8 @@ def checkISO_content(isoPath):
 		datasyncBanner(dsappversion)
 		print ("Unable to find content in ISO (%s)" % os.path.basename(isoPath))
 		logger.error("Unable to find content in ISO (%s)" % os.path.basename(isoPath))
-		return False
+		if not askYesOrNo("Continue with ISO (%s): " % os.path.basename(isoPath)):
+			return False
 
 	logger.info("ISO (%s) selected" % os.path.basename(isoPath))
 	return True
