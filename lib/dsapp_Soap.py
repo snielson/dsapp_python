@@ -165,6 +165,11 @@ def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False
 
 	# Create new userConfig dictionary if status code is 0
 	logger.info("Done checking '%s' on GroupWise SOAP" % userid)
+	if results is None:
+		if not ignoreError:
+			print ("Unable to connect to address: %s" % soapAddr)
+		logger.error("Unable to connect to address: %s" % soapAddr)
+		return
 	if results['status']['code'] == 0:
 		soap_userConfig = {'session': results['session'], 'name': results[1]['name'], 'email': results[1]['email'], 'userid': results[1]['userid'], 'domain': results[1]['domain'], 'postoffice': results[1]['postOffice'], 'fid': results[1]['fid'], 'gwVersion': results['gwVersion'], 'build': results['build'], 'soapAddr': soapAddr}
 	elif results['status']['description'] is not None:

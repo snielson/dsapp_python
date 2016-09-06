@@ -2278,7 +2278,7 @@ def checkISO_content(isoPath):
 
 	output = StringIO.StringIO(out[0])
 	isoContent = dict((i.split()[0].rstrip(' '),i.split()[1:]) for i in output.readlines())
-	# print(' '.join(isoContent['LABEL'])) # DEV Print all values in key, with spaces
+
 	try:
 		logger.debug("ISO Content:\n%s" % isoContent)
 	except:
