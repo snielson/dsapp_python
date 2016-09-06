@@ -197,6 +197,10 @@ def exit_cleanup():
 	# Clear dsapp/tmp
 	ds.removeAllFolders(dsapptmp)
 	ds.removeAllFiles(dsapptmp)
+
+	# Reset terminal (for blank text bug on Ctrl + C)
+	os.system('stty sane')
+	
 	logger.info('------------- Successfully shutdown dsapp -------------')
 
 def signal_handler_SIGINT(signal, frame):

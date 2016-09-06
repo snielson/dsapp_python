@@ -2270,7 +2270,6 @@ def getMobilityISO():
 		print ("No such directory or file: %s" % isoPath)
 		logger.warning("No such directory or file: %s" % isoPath)
 		return None
-	return isoPath
 
 def checkISO_content(isoPath):
 	# Verify ISO is mobility iso
@@ -2280,6 +2279,10 @@ def checkISO_content(isoPath):
 	output = StringIO.StringIO(out[0])
 	isoContent = dict((i.split()[0].rstrip(' '),i.split()[1:]) for i in output.readlines())
 	# print(' '.join(isoContent['LABEL'])) # DEV Print all values in key, with spaces
+	try:
+		logger.debug("ISO Content:\n%s" % isoContent)
+	except:
+		logger.debug("ISO Conent is blank or didn't run")
 
 	try:
 		if 'Mobility' not in isoContent['LABEL'] and 'mobility' not in isoContent['LABEL']:

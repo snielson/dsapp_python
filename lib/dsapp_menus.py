@@ -160,9 +160,12 @@ def main_menu():
 		ds.clear()
 		return
 	elif choice == 'd':
+		logger.debug("Entering datasync database")
 		cmd = "PGPASSWORD=%(pass)s psql -U %(user)s datasync" % dbConfig
 		ds.clear()
-		subprocess.call(cmd, shell=True)
+		p = subprocess.Popen(cmd, shell=True)
+		p.wait()
+		main_menu()
 	else:
 		sub_menus[choice]()
 
