@@ -1070,8 +1070,8 @@ def ghc_checkManualMaintenance(dbConfig):
 	cur.close()
 	conn.close()
 
-	cmd_datasync = "PGPASSWORD=%(pass)s psql -U %(user)s datasync -c \"select relname,last_vacuum,date_part('days', now() - last_vacuum) as \"days_ago\" from pg_stat_user_tables;\"" % dbConfig
-	cmd_mobility = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"select relname,last_vacuum,date_part('days', now() - last_vacuum) as \"days_ago\" from pg_stat_user_tables;\"" % dbConfig
+	cmd_datasync = "PGPASSWORD='%(pass)s' psql -U %(user)s datasync -c \"select relname,last_vacuum,date_part('days', now() - last_vacuum) as \"days_ago\" from pg_stat_user_tables;\"" % dbConfig
+	cmd_mobility = "PGPASSWORD='%(pass)s' psql -U %(user)s mobility -c \"select relname,last_vacuum,date_part('days', now() - last_vacuum) as \"days_ago\" from pg_stat_user_tables;\"" % dbConfig
 	with open(ghcLog, 'a') as log:
 		p = subprocess.Popen(cmd_datasync, shell=True, stdout=subprocess.PIPE)
 		p.wait()

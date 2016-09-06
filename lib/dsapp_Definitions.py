@@ -1192,7 +1192,7 @@ def dumpTable(dbConfig, database, tableName, targetSave):
 			return
 
 	logger.info("Dumping %s table from %s database to %s" % (tableName, database, filePath))
-	cmd = "PGPASSWORD=%s pg_dump --inserts -U %s %s -a -t '\"%s\"' > %s" % (dbConfig['pass'], dbConfig['user'], database, tableName, filePath)
+	cmd = "PGPASSWORD='%s' pg_dump --inserts -U %s %s -a -t '\"%s\"' > %s" % (dbConfig['pass'], dbConfig['user'], database, tableName, filePath)
 	dump = subprocess.call(cmd, shell=True)
 
 def dropDatabases(dbConfig):
@@ -2419,7 +2419,7 @@ def indexDB(dbConfig, database=None):
 	pids = get_pid(python_Directory)
 	if len(pids) == 0:
 		if database is None:
-			cmd = "PGPASSWORD=%(pass)s psql -U %(user)s datasync -c \"reindex database datasync\"" % dbConfig
+			cmd = "PGPASSWORD='%(pass)s' psql -U %(user)s datasync -c \"reindex database datasync\"" % dbConfig
 			logger.info("Indexing datasync database..")
 			time1 = time.time()
 			i = subprocess.Popen(cmd, shell=True)
@@ -2427,7 +2427,7 @@ def indexDB(dbConfig, database=None):
 			time2 = time.time()
 			logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
-			cmd = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"reindex database mobility\"" % dbConfig
+			cmd = "PGPASSWORD='%(pass)s' psql -U %(user)s mobility -c \"reindex database mobility\"" % dbConfig
 			logger.info("Indexing mobility database..")
 			time1 = time.time()
 			i = subprocess.Popen(cmd, shell=True)
@@ -2436,7 +2436,7 @@ def indexDB(dbConfig, database=None):
 			logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
 		elif database:
-			cmd = "PGPASSWORD=%s psql -U %s %s -c \"reindex database %s\"" % (dbConfig['pass'], dbConfig['user'], database, database)
+			cmd = "PGPASSWORD='%s' psql -U %s %s -c \"reindex database %s\"" % (dbConfig['pass'], dbConfig['user'], database, database)
 			logger.info("Indexing mobility database..")
 			time1 = time.time()
 			i = subprocess.Popen(cmd, shell=True)
@@ -2451,7 +2451,7 @@ def vacuumDB(dbConfig, database=None):
 	pids = get_pid(python_Directory)
 	if len(pids) == 0:
 		if database is None:
-			cmd = "PGPASSWORD=%(pass)s vacuumdb -U %(user)s datasync --full -v" % dbConfig
+			cmd = "PGPASSWORD='%(pass)s' vacuumdb -U %(user)s datasync --full -v" % dbConfig
 			logger.info("Vacuuming datasync database..")
 			time1 = time.time()
 			v = subprocess.Popen(cmd, shell=True)
@@ -2459,7 +2459,7 @@ def vacuumDB(dbConfig, database=None):
 			time2 = time.time()
 			logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
-			cmd = "PGPASSWORD=%(pass)s vacuumdb -U %(user)s mobility --full -v" % dbConfig
+			cmd = "PGPASSWORD='%(pass)s' vacuumdb -U %(user)s mobility --full -v" % dbConfig
 			logger.info("Vacuuming mobility database..")
 			time1 = time.time()
 			v = subprocess.Popen(cmd, shell=True)
@@ -2468,7 +2468,7 @@ def vacuumDB(dbConfig, database=None):
 			logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
 		elif database:
-			cmd = "PGPASSWORD=%s vacuumdb -U %s %s --full -v" % (dbConfig['pass'], dbConfig['user'], database)
+			cmd = "PGPASSWORD='%s' vacuumdb -U %s %s --full -v" % (dbConfig['pass'], dbConfig['user'], database)
 			logger.info("Vacuuming %s database.." % database)
 			time1 = time.time()
 			v = subprocess.Popen(cmd, shell=True)
@@ -3441,7 +3441,7 @@ def backupDatabase(dbConfig):
 		print ("\nDumping databases..")
 		logger.info("Dumping databases..")
 
-		cmd = "PGPASSWORD=%s pg_dump -U %s mobility > %s/mobility.BAK_%s.sql" % (dbConfig['pass'], dbConfig['user'], path, DATE)
+		cmd = "PGPASSWORD='%s' pg_dump -U %s mobility > %s/mobility.BAK_%s.sql" % (dbConfig['pass'], dbConfig['user'], path, DATE)
 		p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		p.wait()
 		if not (p.communicate()[1]):
@@ -3451,7 +3451,7 @@ def backupDatabase(dbConfig):
 			print ("\nError: Unable to dump mobility database")
 			logger.warning("Unable to dump mobility database")
 
-		cmd = "PGPASSWORD=%s pg_dump -U %s datasync > %s/datasync.BAK_%s.sql" % (dbConfig['pass'], dbConfig['user'], path, DATE)
+		cmd = "PGPASSWORD='%s' pg_dump -U %s datasync > %s/datasync.BAK_%s.sql" % (dbConfig['pass'], dbConfig['user'], path, DATE)
 		p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		p.wait()
 		if not (p.communicate()[1]):
@@ -3535,7 +3535,7 @@ def restoreDatabase(dbConfig):
 			# Dropping mobility database
 			if dropSpecificDatabases(dbConfig, 'mobility'):
 				createSpecificDatabases(dbConfig,'mobility')
-				cmd = "PGPASSWORD=%s psql -U %s mobility < %s/%s" % (dbConfig['pass'], dbConfig['user'], path, mobility_backup_list[m_choice])
+				cmd = "PGPASSWORD='%s' psql -U %s mobility < %s/%s" % (dbConfig['pass'], dbConfig['user'], path, mobility_backup_list[m_choice])
 				print ("Restoring mobility: %s" % mobility_backup_list[m_choice])
 				logger.info("Restoring mobility: %s" % mobility_backup_list[m_choice])
 				p = subprocess.Popen(cmd,shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -3548,7 +3548,7 @@ def restoreDatabase(dbConfig):
 			# Dropping datasync database
 			if dropSpecificDatabases(dbConfig, 'datasync'):
 				createSpecificDatabases(dbConfig,'datasync')
-				cmd = "PGPASSWORD=%s psql -U %s datasync < %s/%s" % (dbConfig['pass'], dbConfig['user'], path, datasync_backup_list[d_choice])
+				cmd = "PGPASSWORD='%s' psql -U %s datasync < %s/%s" % (dbConfig['pass'], dbConfig['user'], path, datasync_backup_list[d_choice])
 				print ("Restoring mobility: %s" % mobility_backup_list[m_choice])
 				logger.info("Restoring mobility: %s" % mobility_backup_list[m_choice])
 				p = subprocess.Popen(cmd,shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -3785,14 +3785,14 @@ def list_deviceInfo(dbConfig):
 	datasyncBanner(dsappversion)
 	# print (textwrap.fill("Below is a list of users and devices. For more details about each device (i.e. OS version), look up what is in the description column. For an iOS device, there could be a listing of Apple-iPhone3C1/902.176. Use the following website, http://enterpriseios.com/wiki/UserAgent to convert to an Apple product, iOS Version and Build.", 80))
 	# print ()
-	cmd = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"select u.userid, description, identifierstring, devicetype from devices d INNER JOIN users u ON d.userid = u.guid;\"" % dbConfig
+	cmd = "PGPASSWORD='%(pass)s' psql -U %(user)s mobility -c \"select u.userid, description, identifierstring, devicetype from devices d INNER JOIN users u ON d.userid = u.guid;\"" % dbConfig
 	logger.info("Listing all devices from the database")
 	out = util_subprocess(cmd)
 	pydoc.pager(out[0].rstrip('\n'))
 
 def list_usersAndEmails(dbConfig):
 	datasyncBanner(dsappversion)
-	cmd = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"select g.displayname, g.firstname, g.lastname, u.userid, g.emailaddress from gal g INNER JOIN users u ON (g.alias = u.name);\"" % dbConfig
+	cmd = "PGPASSWORD='%(pass)s' psql -U %(user)s mobility -c \"select g.displayname, g.firstname, g.lastname, u.userid, g.emailaddress from gal g INNER JOIN users u ON (g.alias = u.name);\"" % dbConfig
 	logger.info("Listing all users and emails")
 	out = util_subprocess(cmd)
 	pydoc.pager(out[0].rstrip('\n'))
@@ -3859,7 +3859,7 @@ def show_GW_syncEvents(dbConfig):
 
 def show_Mob_syncEvents(dbConfig):
 	datasyncBanner(dsappversion)
-	cmd = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"select DISTINCT  u.userid AS \\\"FDN\\\", count(eventid) as \\\"Events\\\", se.userid FROM syncevents se INNER JOIN users u ON se.userid = u.guid GROUP BY u.userid, se.userid ORDER BY \\\"Events\\\" DESC;\"" % dbConfig
+	cmd = "PGPASSWORD='%(pass)s' psql -U %(user)s mobility -c \"select DISTINCT  u.userid AS \\\"FDN\\\", count(eventid) as \\\"Events\\\", se.userid FROM syncevents se INNER JOIN users u ON se.userid = u.guid GROUP BY u.userid, se.userid ORDER BY \\\"Events\\\" DESC;\"" % dbConfig
 	out = util_subprocess(cmd)
 	logger.info("Checking mobility sync events")
 	printTable = "Note: Pending events may be valid\n\n"
@@ -3868,7 +3868,7 @@ def show_Mob_syncEvents(dbConfig):
 
 def view_attach_byUser(dbConfig):
 	datasyncBanner(dsappversion)
-	cmd = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"select u.name AS \\\"Name\\\", u.userid AS \\\"FDN\\\", ROUND(SUM(a.filesize)/1024/1024::numeric,4) AS \\\"MB\\\" from attachments a INNER JOIN attachmentmaps am ON a.attachmentid = am.attachmentid INNER JOIN users u ON am.userid = u.guid WHERE a.filestoreid != '0' GROUP BY u.name, u.userid ORDER BY \\\"MB\\\" DESC;\"" % dbConfig
+	cmd = "PGPASSWORD='%(pass)s' psql -U %(user)s mobility -c \"select u.name AS \\\"Name\\\", u.userid AS \\\"FDN\\\", ROUND(SUM(a.filesize)/1024/1024::numeric,4) AS \\\"MB\\\" from attachments a INNER JOIN attachmentmaps am ON a.attachmentid = am.attachmentid INNER JOIN users u ON am.userid = u.guid WHERE a.filestoreid != '0' GROUP BY u.name, u.userid ORDER BY \\\"MB\\\" DESC;\"" % dbConfig
 	out = util_subprocess(cmd)
 	logger.info("Checking users attachments by MB")
 	pydoc.pager(out[0].rstrip('\n'))
@@ -3879,7 +3879,7 @@ def view_users_attach(dbConfig):
 		return
 
 	if confirm_user(userConfig, 'mobility'):
-		cmd = "PGPASSWORD=%s psql -U %s mobility -c \"select a.filename AS \\\"File Name\\\", ROUND(a.filesize/1024/1024::numeric,4) AS \\\"MB\\\", a.tstamp AS \\\"Time Stamp\\\", a.filestoreid from attachments a INNER JOIN attachmentmaps am ON a.attachmentid = am.attachmentid INNER JOIN users u ON am.userid = u.guid WHERE u.userid='%s' GROUP BY a.filename, a.tstamp, a.filestoreid, a.filesize ORDER BY \\\"MB\\\" DESC;\"" % (dbConfig['pass'], dbConfig['user'], userConfig['mName'])
+		cmd = "PGPASSWORD='%s' psql -U %s mobility -c \"select a.filename AS \\\"File Name\\\", ROUND(a.filesize/1024/1024::numeric,4) AS \\\"MB\\\", a.tstamp AS \\\"Time Stamp\\\", a.filestoreid from attachments a INNER JOIN attachmentmaps am ON a.attachmentid = am.attachmentid INNER JOIN users u ON am.userid = u.guid WHERE u.userid='%s' GROUP BY a.filename, a.tstamp, a.filestoreid, a.filesize ORDER BY \\\"MB\\\" DESC;\"" % (dbConfig['pass'], dbConfig['user'], userConfig['mName'])
 	out = util_subprocess(cmd)
 	logger.info("Checking attachments on %s" % userConfig['name'])
 	pydoc.pager(out[0].rstrip('\n'))
@@ -4045,7 +4045,7 @@ def whereDidIComeFromAndWhereAmIGoingOrWhatHappenedToMe(dbConfig):
 	datasyncBanner(dsappversion)
 	displayName = raw_input("Item name (subject, folder, contact, calendar): ")
 	if displayName:
-		cmd = ("PGPASSWORD=%s psql -U %s mobility -t -c \"drop table if exists tmp; select (xpath('./DisplayName/text()', di.edata::xml)) AS displayname,di.eclass,di.eaction,di.statedata,d.identifierstring,d.devicetype,d.description, d.deviceid, di.creationtime INTO tmp from deviceimages di INNER JOIN devices d ON (di.deviceid = d.deviceid) INNER JOIN users u ON di.userid = u.guid WHERE di.edata ilike '%%%s%%' ORDER BY di.creationtime ASC, di.eaction ASC; select * from tmp;\"" % (dbConfig['pass'], dbConfig['user'], displayName))
+		cmd = ("PGPASSWORD='%s' psql -U %s mobility -t -c \"drop table if exists tmp; select (xpath('./DisplayName/text()', di.edata::xml)) AS displayname,di.eclass,di.eaction,di.statedata,d.identifierstring,d.devicetype,d.description, d.deviceid, di.creationtime INTO tmp from deviceimages di INNER JOIN devices d ON (di.deviceid = d.deviceid) INNER JOIN users u ON di.userid = u.guid WHERE di.edata ilike '%%%s%%' ORDER BY di.creationtime ASC, di.eaction ASC; select * from tmp;\"" % (dbConfig['pass'], dbConfig['user'], displayName))
 		out = util_subprocess(cmd,True)
 		pydoc.pager(out[0])
 
@@ -4067,15 +4067,15 @@ def getUsers_and_Devices(dbConfig, showUsers=False, showDevices=False, showBoth=
 	conn.close()
 
 	if showBoth:
-		cmd = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"select u.userid, devicetype from devices d INNER JOIN users u ON d.userid = u.guid;\"" % dbConfig
+		cmd = "PGPASSWORD='%(pass)s' psql -U %(user)s mobility -c \"select u.userid, devicetype from devices d INNER JOIN users u ON d.userid = u.guid;\"" % dbConfig
 		returns['cmd'] = cmd
 
 	if showUsers:
-		cmd = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"select userid from users;\"" % dbConfig
+		cmd = "PGPASSWORD='%(pass)s' psql -U %(user)s mobility -c \"select userid from users;\"" % dbConfig
 		returns['cmd'] = cmd
 
 	if showDevices:
-		cmd = "PGPASSWORD=%(pass)s psql -U %(user)s mobility -c \"select devicetype,description,tstamp from devices where devicetype!='' order by tstamp ASC;\"" % dbConfig
+		cmd = "PGPASSWORD='%(pass)s' psql -U %(user)s mobility -c \"select devicetype,description,tstamp from devices where devicetype!='' order by tstamp ASC;\"" % dbConfig
 		returns['cmd'] = cmd
 
 	return returns
