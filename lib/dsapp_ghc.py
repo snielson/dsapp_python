@@ -1287,9 +1287,9 @@ def ghc_checkUserFDN(dbConfig, XMLconfig ,ldapConfig):
 			ldap_count = 1
 			for row in data:
 				if ldapConfig['secure'] == 'false':
-					cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D %s -w %s -b '%s' -s base cn" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], row['dn'])
+					cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D '%s' -w '%s' -b '%s' -s base cn" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], row['dn'])
 				if ldapConfig['secure'] == 'true':
-					cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D %s -w %s -b '%s' -s base cn" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], row['dn'])
+					cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D '%s' -w '%s' -b '%s' -s base cn" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], row['dn'])
 
 				log_cmd = cmd.replace("-w " + ldapConfig['pass'],"-w *******")
 				logger.debug("LDAP search %s: %s" % (ldap_count, log_cmd))
