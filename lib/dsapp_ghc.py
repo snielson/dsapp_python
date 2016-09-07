@@ -1291,7 +1291,7 @@ def ghc_checkUserFDN(dbConfig, XMLconfig ,ldapConfig):
 				if ldapConfig['secure'] == 'true':
 					cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D '%s' -w '%s' -b '%s' -s base cn" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], row['dn'])
 
-				log_cmd = cmd.replace("-w " + ldapConfig['pass'],"-w *******")
+				log_cmd = cmd.replace("-w '" + ldapConfig['pass'] + "'","-w '*******'")
 				logger.debug("LDAP search %s: %s" % (ldap_count, log_cmd))
 				out = ghc_util_subprocess(cmd, True)
 				if out[1]:
