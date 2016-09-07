@@ -19,6 +19,7 @@ import urllib2
 import readline
 import operator
 import StringIO
+from multiprocessing import Process, Queue
 from tabulate import tabulate
 from urllib2 import urlopen, URLError, HTTPError
 from xml.parsers.expat import ExpatError
@@ -28,7 +29,6 @@ Config = ConfigParser.ConfigParser()
 
 # Unused imports
 # import thread, threading, itertools, atexit, binascii, io
-# from multiprocessing import Process, Queue
 
 # import netifaces after appending to sys.path
 sys.path.append(os.path.dirname(os.path.realpath(__file__)) + '/netifaces-0.10.4-py2.6-linux-x86_64.egg')
@@ -1929,21 +1929,28 @@ def mCleanup(dbConfig, userConfig, fileCleanupNow=True):
 
 	# clean tables with users guid
 	cur.execute("delete from foldermaps where deviceid IN (select deviceid from devices where userid='%s')" % uGuid)
-	logger.debug("DELETE FROM foldermaps..")
+	logger.debug("DELETE FROM foldermaps WHERE deviceid IN (SELECT deviceid FROM devices WHERE userid='%s')" % uGuid)
+
 	cur.execute("delete from deviceimages where userid='%s'" % uGuid)
-	logger.debug("DELETE FROM deviceimages..")
+	logger.debug("DELETE FROM deviceimages WHERE userid='%s'" % uGuid)
+
 	cur.execute("delete from syncevents where userid='%s'" % uGuid)
-	logger.debug("DELETE FROM syncevents..")
+	logger.debug("DELETE FROM syncevents WHERE userid='%s'" % uGuid)
+
 	cur.execute("delete from deviceevents where userid='%s'" % uGuid)
-	logger.debug("DELETE FROM deviceevents..")
+	logger.debug("DELETE FROM deviceevents WHERE userid='%s'" % uGuid)
+
 	cur.execute("delete from devices where userid='%s'" % uGuid)
-	logger.debug("DELETE FROM devices..")
+	logger.debug("DELETE FROM devices WHERE userid='%s'" % uGuid)
+
 	cur.execute("delete from users where guid='%s'" % uGuid)
-	logger.debug("DELETE FROM users..")
+	logger.debug("DELETE FROM users WHERE guid='%s'" % uGuid)
+
 	cur.execute("delete from attachments where attachmentid IN (select attachmentid from attachmentmaps where objectid in (select objectid from deviceimages where userid='%s'))" % uGuid)
-	logger.debug("DELETE FROM attachments where attachmentid..")
+	logger.debug("DELETE FROM attachments WHERE attachmentid IN (SELECT attachmentid FROM attachmentmaps WHERE objectid IN (SELECT objectid FROM deviceimages WHERE userid='%s'))" % uGuid)
+
 	cur.execute("delete from attachments where filestoreid IN (SELECT filestoreid FROM attachments LEFT OUTER JOIN attachmentmaps ON attachments.attachmentid=attachmentmaps.attachmentid WHERE attachmentmaps.attachmentid IS NULL)")
-	logger.debug("DELETE FROM attachments where filestoreid..")
+	logger.debug("DELETE FROM attachments WHERE filestoreid IN (SELECT filestoreid FROM attachments LEFT OUTER JOIN attachmentmaps ON attachments.attachmentid=attachmentmaps.attachmentid WHERE attachmentmaps.attachmentid IS NULL)")
 
 	spinner.stop(); print()
 	cur.close()
@@ -2015,17 +2022,22 @@ def dCleanup(dbConfig, userConfig):
 	spinner.start(); time.sleep(.000001)
 	time1 = time.time()
 	cur.execute("delete FROM \"objectMappings\" WHERE \"objectID\" IN (SELECT \"objectID\" FROM \"objectMappings\" WHERE \"objectID\" ilike '%%|%s' OR \"objectID\" ilike '%%|%s' OR \"objectID\" ilike '%%|%s')" % (psqlAppNameG, psqlAppNameM, userConfig['name']))
-	logger.debug('DELETE FROM objectMappings..')
+	logger.debug("DELETE FROM \"objectMappings\" WHERE \"objectID\" IN (SELECT \"objectID\" FROM \"objectMappings\" WHERE \"objectID\" ilike '%%|%s' OR \"objectID\" ilike '%%|%s' OR \"objectID\" ilike '%%|%s')" % (psqlAppNameG, psqlAppNameM, userConfig['name']))
+
 	cur.execute("delete FROM consumerevents WHERE edata ilike '%%<sourceName>%s</sourceName>%%' OR edata ilike '%%<sourceName>%s</sourceName>%%' OR edata ilike '%%<sourceDN>%s</sourceDN>%%' OR edata ilike '%%<sourceDN>%s</sourceDN>%%'" % (psqlAppNameG, psqlAppNameM, psqlAppNameG, psqlAppNameM))
-	logger.debug('DELETE FROM consumerevents..')
+	logger.debug("DELETE FROM consumerevents WHERE edata ilike '%%<sourceName>%s</sourceName>%%' OR edata ilike '%%<sourceName>%s</sourceName>%%' OR edata ilike '%%<sourceDN>%s</sourceDN>%%' OR edata ilike '%%<sourceDN>%s</sourceDN>%%'" % (psqlAppNameG, psqlAppNameM, psqlAppNameG, psqlAppNameM))
+
 	cur.execute("delete FROM \"folderMappings\" WHERE \"targetDN\" ilike '(%s[.|,].*)$' OR \"targetDN\" ilike '%s'" % (userConfig['name'],uUser))
-	logger.debug('DELETE FROM folderMappings..')
+	logger.debug("DELETE FROM \"folderMappings\" WHERE \"targetDN\" ilike '(%s[.|,].*)$' OR \"targetDN\" ilike '%s'" % (userConfig['name'],uUser))
+
 	cur.execute("delete FROM cache WHERE \"sourceDN\" ilike '(%s[.|,].*)$' OR \"sourceDN\" ilike '%s'" % (userConfig['name'],uUser))
-	logger.debug('DELETE FROM cache..')
+	logger.debug("DELETE FROM cache WHERE \"sourceDN\" ilike '(%s[.|,].*)$' OR \"sourceDN\" ilike '%s'" % (userConfig['name'],uUser))
+
 	cur.execute("delete FROM \"membershipCache\" WHERE (groupdn ilike '(%s[.|,].*)$' OR memberdn ilike '(%s[.|,].*)$') OR (groupdn ilike '%s' OR memberdn ilike '%s')" % (userConfig['name'], userConfig['name'], uUser, uUser))
-	logger.debug('DELETE FROM membershipCache..')
+	logger.debug("DELETE FROM \"membershipCache\" WHERE (groupdn ilike '(%s[.|,].*)$' OR memberdn ilike '(%s[.|,].*)$') OR (groupdn ilike '%s' OR memberdn ilike '%s')" % (userConfig['name'], userConfig['name'], uUser, uUser))
+	
 	cur.execute("delete FROM targets WHERE dn ~* '(\\m%(name)s[.|,].*)$' OR dn ilike '%(name)s' OR \"targetName\" ilike '%(name)s'" % userConfig)
-	logger.debug('DELETE FROM targets..')
+	logger.debug("DELETE FROM targets WHERE dn ~* '(\\m%(name)s[.|,].*)$' OR dn ilike '%(name)s' OR \"targetName\" ilike '%(name)s'" % userConfig)
 	
 	time2 = time.time()
 	logger.info("Removing '%s' from datasync database complete" % userConfig['name'])
@@ -2127,9 +2139,9 @@ def addGroup(dbConfig, ldapConfig):
 	print ("\nGroup Membership:")
 	for group in ldapGroups:
 		if ldapConfig['secure'] == 'false':
-			cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D %s -w %s -b '%s' -s base | grep 'member:' | cut -f2 -d ' '" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], group['dn'])
+			cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D '%s' -w '%s' -b '%s' -s base | grep 'member:' | cut -f2 -d ' '" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], group['dn'])
 		elif ldapConfig['secure'] == 'true':
-			cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D %s -w %s -b '%s' -s base | grep 'member:' | cut -f2 -d ' '" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], group['dn'])
+			cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D '%s' -w '%s' -b '%s' -s base | grep 'member:' | cut -f2 -d ' '" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], group['dn'])
 
 		ldapGroupMembership[group['dn']] = os.popen(cmd).read().strip().split('\n')
 
@@ -2974,14 +2986,14 @@ def checkLDAP(XMLconfig ,ldapConfig, ghc=False):
 
 	if ldapConfig['secure'] == 'false':
 		if 'o=' not in ldapConfig['login']:
-			cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D %s -w %s -b %s" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], ldapConfig['group'][0])
+			cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D '%s' -w '%s' -b '%s'" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], ldapConfig['group'][0])
 		else:
-			cmd = "/usr/bin/ldapsearch -x -H ldap://%(host)s:%(port)s -D %(login)s -w %(pass)s %(login)s" % ldapConfig
+			cmd = "/usr/bin/ldapsearch -x -H ldap://%(host)s:%(port)s -D '%(login)s' -w '%(pass)s' '%(login)s'" % ldapConfig
 	elif ldapConfig['secure'] == 'true':
 		if 'o=' not in ldapConfig['login']:
-			cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D %s -w %s -b %s" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], ldapConfig['group'][0])
+			cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D '%s' -w '%s' -b '%s'" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], ldapConfig['group'][0])
 		else:
-			cmd = "/usr/bin/ldapsearch -x -H ldaps://%(host)s:%(port)s -D %(login)s -w %(pass)s %(login)s" % ldapConfig
+			cmd = "/usr/bin/ldapsearch -x -H ldaps://%(host)s:%(port)s -D '%(login)s' -w '%(pass)s' '%(login)s'" % ldapConfig
 	else:
 		try:
 			logger.warning("ldapConfig['secure'] = %s" % ldapConfig['secure'])
@@ -2992,7 +3004,7 @@ def checkLDAP(XMLconfig ,ldapConfig, ghc=False):
 
 	if cmd is not None:
 		logger.info("Testing LDAP connection")
-		log_cmd = cmd.replace("-w " + ldapConfig['pass'],"-w *******")
+		log_cmd = cmd.replace("-w '" + ldapConfig['pass'] + "'","-w '*******'")
 		logger.debug("LDAP test command: %s" % log_cmd)
 		ldapCheck = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		ldapCheck.wait()
@@ -3001,6 +3013,8 @@ def checkLDAP(XMLconfig ,ldapConfig, ghc=False):
 		logger.warning("Unable to test LDAP connection")
 		return False
 
+	logger.debug("LDAP results out: %s" % out)
+	logger.debug("LDAP results err: %s" % err)
 	if out:
 		logger.info("LDAP tested successfully")
 		return True
@@ -3051,9 +3065,9 @@ def updateFDN(dbConfig, XMLconfig, ldapConfig):
 				userDN = []
 
 				if ldapConfig['secure'] == 'false':
-					cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D %s -w %s -b %s" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], userConfig['dName'])
+					cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D '%s' -w '%s' -b '%s'" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], userConfig['dName'])
 				elif ldapConfig['secure'] == 'true':
-					cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D %s -w %s -b %s" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], userConfig['dName'])
+					cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D '%s' -w '%s' -b '%s'" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], userConfig['dName'])
 
 				tmp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 				out, err = tmp.communicate()
@@ -3070,9 +3084,9 @@ def updateFDN(dbConfig, XMLconfig, ldapConfig):
 						userDN = []
 						for container in ldapConfig['user']:
 							if ldapConfig['secure'] == 'false':
-								cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D %s -w %s -b %s cn=%s" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], container, userConfig['name'])
+								cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D '%s' -w '%s' -b '%s' 'cn=%s'" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], container, userConfig['name'])
 							elif ldapConfig['secure'] == 'true':
-								cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D %s -w %s -b %s cn=%s" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], container, userConfig['name'])
+								cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D '%s' -w '%s' -b '%s' 'cn=%s'" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], container, userConfig['name'])
 							tmp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 							out, err = tmp.communicate()
 							search = re.findall('dn:.*', out)
