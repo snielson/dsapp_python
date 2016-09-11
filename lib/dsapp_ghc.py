@@ -765,6 +765,7 @@ def ghc_checkMemory(dbConfig):
 		logger.debug("No such folder or file: %s" % ghc_file)
 		mem_MB = '---'
 
+	logger.debug("Found system memory: %sMB" % mem_MB)
 	# Get number of devices
 	conn = ds.getConn(dbConfig, 'mobility')
 	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
@@ -881,6 +882,7 @@ def ghc_checkTrustedApp(trustedConfig, gwConfig):
 	if results is None:
 		problem = 'None'
 	elif results['status']['code'] != 0:
+		logger.debug("SOAP results:\n" % results)
 		if 'Invalid key for trusted application' in results['status']['description']:
 			problem = 'bad-key'
 		if 'Requested record not found' in results['status']['description']:
@@ -1186,7 +1188,6 @@ def ghc_checkPSQLConfig():
 
 	# /var/lib/pgsql/data/postgresql.conf
 	
-
 	search = "grep -iw %s %s"
 
 	with open(ghcLog, 'a') as log:
@@ -1258,7 +1259,7 @@ def ghc_checkDiskIO():
 	cmd = "hdparm -t `df -P /var | tail -1 | cut -d ' ' -f1`"
 	out = ghc_util_subprocess(cmd)
 
-	logger.debug("Disk IO %s MB/sec" % out[0].split(' ')[-1-1])
+	logger.info("Disk IO %s MB/sec" % out[0].split(' ')[-1-1])
 	if float(out[0].split(' ')[-1-1]) <= 13.33:
 		problem = 'warning'
 
@@ -1582,7 +1583,6 @@ def ghc_verifyCertificates(mobilityConfig, webConfig):
 			else:
 				log.write("Problem with web admin\nUnable to request handshake with %s:%s\n" % (webConfig['ip'], webConfig['port']))
 				problem = 'warning'
-			# log.write('\n')
 
 			# Check for ^M carriage return character
 			if not no_dev and mSecure:
@@ -1605,7 +1605,6 @@ def ghc_verifyCertificates(mobilityConfig, webConfig):
 	elif problem:
 		ghc_util_passFail('failed')
 	elif not problem:
-		# msg = "No problems found with certificates\n"
 		ghc_util_passFail('passed')
 
 	time2 = time.time()
