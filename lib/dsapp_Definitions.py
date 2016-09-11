@@ -3706,12 +3706,13 @@ def getLogs(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedCo
 		serviceCheck = Config.get('Upload URL', 'check.service.address')
 		serviceCheckPort = Config.getint('Upload URL', 'check.service.port')
 		upPath = Config.get('Upload URL', 'address')
+
 		# FTP Send
 		if askYesOrNo("Upload logs to %s" % COMPANY_BU):
 			if DoesServiceExist(serviceCheck, serviceCheckPort):
-				print ("Connecting to ftp..")
+				print ("Connecting to ftp..\n")
 				cmd = "curl -T %s/%s_%s.tgz %s" % (dsappupload ,sr_number, DATE, upPath)
-				out = util_subprocess(cmd,True)
+				out = subprocess.call(cmd,shell=True)
 
 				print ("\nUploaded to %s: %s%s_%s.tgz" % (COMPANY_BU, upPath, sr_number, DATE))
 				logger.info("Uploaded to %s: %s%s_%s.tgz" % (COMPANY_BU, upPath, sr_number, DATE))
