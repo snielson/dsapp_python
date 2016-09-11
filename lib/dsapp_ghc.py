@@ -252,7 +252,7 @@ def ghc_util_NewHeader(header):
 	if not silent:
 		print (COL1.format("\n%s  " % header), end='')
 		sys.stdout.flush()
-	logger.info("GHC : %s" % header)
+	logger.info("[GHC] %s" % header)
 	with open(ghcLog, 'a') as log:
 		log.write("==========================================================\n%s\n==========================================================\n" % header)
 
