@@ -361,8 +361,8 @@ dsHostname = Config.get('Misc', 'hostname')
 if not forceMode:
 	mobilityVersion = ds.getVersion(ds.checkInstall(forceMode, installedConnector), version)
 
-# Only call autoUpdateDsapp() if filename is dsapp.pyc and no args are passed
-if os.path.basename(__file__) == 'dsapp.pyc' and len(sys.argv) == 1:
+# Only call autoUpdateDsapp() if filename is dsapp.py and no args are passed
+if os.path.basename(__file__) == 'dsapp.py' and len(sys.argv) == 1:
 	ds.autoUpdateDsapp()
 
 # Get current working directory
