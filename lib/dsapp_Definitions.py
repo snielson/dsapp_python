@@ -669,7 +669,8 @@ def getDSVersion(forceMode=False):
 		else:
 			with open(version) as f:
 				value = f.read().split('.')[0]
-				
+		
+		logger.info("Version: %s" % value)
 		return int(value)
 
 def setVariables():
@@ -921,6 +922,7 @@ def removeRPM(rpmName):
 			logger.info("%s %s started" % (log, name))
 
 		print ("\nUninstalling %s " % (name), end='')
+		logger.info("Uninstalling %s" % name)
 		spinner.start(); time.sleep(.000001)
 
 		ts.run(runCallback, 1)
@@ -1010,6 +1012,7 @@ def getDecrypted(check_path, tree, pro_path, host=None, force=False):
 
 def isProtected(tree, pro_path):
 	protected = xmlpath(pro_path, tree)
+	logger.debug("Protected = %s" % protected)
 	if protected is None:
 		return False
 	elif int(protected) == 1:
@@ -1276,7 +1279,9 @@ def verify_clean_database(dbConfig):
 
 	for d in databases:
 		if d in check:
+			logger.info("Found database %s" % d)
 			return False
+	logger.info("No databases found")
 	return True
 
 def createDatabases(dbConfig):
@@ -1506,6 +1511,7 @@ def cleanLog():
 			os.popen("sed -i 's|maxage.*|maxage %s|g' /etc/logrotate.d/datasync-*" % logMaxage).read()
 			os.popen("sed -i 's|maxage.*|maxage %s|g' /etc/logrotate.d/dsapp" % dsappLogMaxage).read()
 			print('Completed setting log maxage to %s' % logMaxage)
+			logger.info('Completed setting log maxage to %s' % logMaxage)
 
 def rcDS(status, op=None, show_spinner=True, show_print=True):
 	setVariables()
@@ -1703,6 +1709,7 @@ def get_username(userConfig_List):
 	print ("Enter 'q' to cancel")
 	while username == "":
 		username = raw_input("User/Group ID: ")
+		logger.info("Input: %s" % username)
 		if username == 'q' or username == 'Q':
 			userConfig = {'name': None}
 			userConfig_List.append(userConfig)
@@ -1844,6 +1851,7 @@ def setUserState(dbConfig, state):
 		conn = getConn(dbConfig, 'mobility')
 		cur = conn.cursor()
 		cur.execute(cmd)
+		logger.debug("Running PSQL command:\n%s" % cmd)
 		cur.close()
 		conn.close()
 
@@ -4118,7 +4126,7 @@ def getUserPAB(dbConfig):
 	with open(dsapptmp + '/userPab.txt', 'w') as pabFile:
 		pabFile.write("%s '%s' PAB contacts in GAL\n" % (objectType.capitalize(), userConfig['name']))
 		pabFile.write("\nAddress Book | Name | Email | Home Phone | Mobile Phone | Office Phone\n")
-		pabFile.write("------------------------------\n")
+		pabFile.write("----------------------------------------------------------------------\n")
 		for row in data:
 			addressBook = ''
 			firstname = ''
