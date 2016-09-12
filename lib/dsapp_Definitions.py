@@ -2646,31 +2646,36 @@ def pre_signCert():
 	file_path = autoCompleteInput("Enter directory path for certificate files (ie. /root/certificates): ")
 	file_path = file_path.rstrip('/')
 	if os.path.isdir(file_path):
-		os.chdir(file_path)
-		cmd = "ls --format=single-column | column"
-		if askYesOrNo("List files"):
-			subprocess.call(cmd, shell=True)
-			print ()
+		if os.path.isdir(file_path):
+			os.chdir(file_path)
+			cmd = "ls --format=single-column | column"
+			if askYesOrNo("List files"):
+				subprocess.call(cmd, shell=True)
+				print ()
+		else:
+			print ("No such directory: %s" % path)
+			logger.warning("No such directory: %s" % path)
+			return
+
+		csr_path = autoCompleteInput("Certificate signing request (CSR): ")
+		if not os.path.isfile(csr_path):
+			print ("No such file: %s" % csr_path)
+			logger.error("No such file: %s" % csr_path)
+			return
+		key_path = autoCompleteInput("Private key: ")
+		if not os.path.isfile(key_path):
+			print ("No such file: %s" % key_path)
+			logger.error("No such file: %s" % key_path)
+			return
+
+		cn = getCommonName(csr_path)
+		if cn is None:
+			return
+		signCert(path = file_path, csr = csr_path, key = key_path, commonName = cn)
 	else:
-		print ("No such directory: %s" % path)
-		logger.warning("No such directory: %s" % path)
+		print ("No such directory: %s" % file_path)
+		logger.warning("No such directory: %s" % file_path)
 		return
-
-	csr_path = autoCompleteInput("Certificate signing request (CSR): ")
-	if not os.path.isfile(csr_path):
-		print ("No such file: %s" % csr_path)
-		logger.error("No such file: %s" % csr_path)
-		return
-	key_path = autoCompleteInput("Private key: ")
-	if not os.path.isfile(key_path):
-		print ("No such file: %s" % key_path)
-		logger.error("No such file: %s" % key_path)
-		return
-
-	cn = getCommonName(csr_path)
-	if cn is None:
-		return
-	signCert(path = file_path, csr = csr_path, key = key_path, commonName = cn)
 
 def newCertPass():
 	keyPass = getpass.getpass("Enter password for private key: ")
