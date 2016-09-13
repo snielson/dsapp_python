@@ -2277,10 +2277,12 @@ def getMobilityISO():
 			print ("\n     q. Back")
 
 			choice = get_choice(available)
+			logger.debug("Selected choice: %s" % choice)
 			if choice == None or choice == '':
 				return None
 			else:
 				isoPath = isoPath + "/" + fileList[choice]
+				logger.debug("ISO path: %s" % isoPath)
 
 		else:
 			print ("\nNo ISOs found at: %s" % isoPath)
@@ -2290,6 +2292,8 @@ def getMobilityISO():
 		print ("No such directory or file: %s" % isoPath)
 		logger.warning("No such directory or file: %s" % isoPath)
 		return None
+		
+	return isoPath
 
 def checkISO_content(isoPath):
 	# Verify ISO is mobility iso
