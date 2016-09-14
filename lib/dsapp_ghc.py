@@ -1100,7 +1100,7 @@ def ghc_checkManualMaintenance(dbConfig):
 	if ds_allNone is None and mo_allNone is None:
 		problem = 'empty'
 	elif ds_allNone is None or mo_allNone is None:
-		problem = 'not-ran'
+		problem = True
 
 	if problem == 'empty':
 		if delta_days:
@@ -1113,9 +1113,6 @@ def ghc_checkManualMaintenance(dbConfig):
 		else:
 			msg = "No manual maintenance in over %s days.\nSuggestion: TID 7009453\n" % dbMaintTolerance
 			ghc_util_passFail('failed', msg)
-	elif problem == 'not-ran':
-		msg = "No manual maintenance in over %s days.\nSuggestion: TID 7009453\n" % dbMaintTolerance
-		ghc_util_passFail('failed', msg)
 	elif problem:
 		msg = "No manual maintenance in over %s days.\nSuggestion: TID 7009453\n" % dbMaintTolerance
 		ghc_util_passFail('failed', msg)
