@@ -402,8 +402,6 @@ def userIssue_menu():
 			ds.updateFDN(dbConfig, XMLconfig, ldapConfig)
 		elif choice == '7':
 			ds.whereDidIComeFromAndWhereAmIGoingOrWhatHappenedToMe(dbConfig)
-		elif choice == '8':
-			pass
 		elif choice == '0':
 			loop = False
 			main_menu()
