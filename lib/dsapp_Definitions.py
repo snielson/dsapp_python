@@ -2152,43 +2152,52 @@ def addGroup(dbConfig, ldapConfig):
 	print ("\nGroup Membership:")
 	for group in ldapGroups:
 		if ldapConfig['secure'] == 'false':
-			cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D '%s' -w '%s' -b '%s' -s base | grep 'member:' | cut -f2 -d ' '" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], group['dn'])
+			cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D '%s' -w '%s' -l 5 -b '%s' -s base | grep 'member:' | cut -f2 -d ' '" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], group['dn'])
 		elif ldapConfig['secure'] == 'true':
-			cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D '%s' -w '%s' -b '%s' -s base | grep 'member:' | cut -f2 -d ' '" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], group['dn'])
+			cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D '%s' -w '%s' -l 5 -b '%s' -s base | grep 'member:' | cut -f2 -d ' '" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], group['dn'])
 
-		ldapGroupMembership[group['dn']] = os.popen(cmd).read().strip().split('\n')
+		try:
+			ldapGroupMembership[group['dn']] = os.popen(cmd).read().strip().split('\n')
+		except:
+			pass
 
 	# build memberdn,groupdn list
-	for group in ldapGroupMembership:
-		for member in ldapGroupMembership[group]:
-			member_and_group.append('"%s","%s"' % (member.strip(), group.strip()))
+	if len(ldapGroupMembership) >= 1:
+		for group in ldapGroupMembership:
+			for member in ldapGroupMembership[group]:
+				member_and_group.append('"%s","%s"' % (member.strip(), group.strip()))
 
-	# print memberdn, groupdn list & create list to import
-	with open(dsapptmp + '/ldapGroupMembership.dsapp' , 'a') as f:
-		f.write("memberdn,groupdn\n")
-		for i in xrange(len(member_and_group)):
-			print (member_and_group[i])
-			f.write(member_and_group[i] + '\n')
+		# print memberdn, groupdn list & create list to import
+		with open(dsapptmp + '/ldapGroupMembership.dsapp' , 'a') as f:
+			f.write("memberdn,groupdn\n")
+			for i in xrange(len(member_and_group)):
+				print (member_and_group[i])
+				f.write(member_and_group[i] + '\n')
 
-	if askYesOrNo("\nDoes the above appear correct"):
-		copy_cmd = "copy \"membershipCache\" (memberdn,groupdn) from STDIN WITH DELIMITER ',' CSV HEADER"
-		cur.execute("delete from \"membershipCache\"")
-		logger.info('Removing old memberhipCache data')
+		if askYesOrNo("\nDoes the above appear correct"):
+			copy_cmd = "copy \"membershipCache\" (memberdn,groupdn) from STDIN WITH DELIMITER ',' CSV HEADER"
+			cur.execute("delete from \"membershipCache\"")
+			logger.info('Removing old memberhipCache data')
 
-		with open(dsapptmp + '/ldapGroupMembership.dsapp' ,'r') as f:
-			logger.info("Updating membershipCache with current data")
-			cur.copy_expert(sql=copy_cmd, file=f)
-			
-		print ("\nGroup Membership has been updated\n")
-		logger.info("Group membership has been updated")
+			with open(dsapptmp + '/ldapGroupMembership.dsapp' ,'r') as f:
+				logger.info("Updating membershipCache with current data")
+				cur.copy_expert(sql=copy_cmd, file=f)
+				
+			print ("\nGroup Membership has been updated\n")
+			logger.info("Group membership has been updated")
 
-		removed_disabled(dbConfig)
-		print ()
-		fix_referenceCount(dbConfig)
+			removed_disabled(dbConfig)
+			print ()
+			fix_referenceCount(dbConfig)
+
+		cur.close()
+		conn.close()
+	else:
+		print ("No results from LDAP")
+		logger.warning("No results from LDAP")
 
 	os.remove (dsapptmp + '/ldapGroupMembership.dsapp')
-	cur.close()
-	conn.close()
+	
 
 def updateMobilityFTP():
 	datasyncBanner(dsappversion)
@@ -3008,14 +3017,14 @@ def checkLDAP(XMLconfig ,ldapConfig, ghc=False):
 
 	if ldapConfig['secure'] == 'false':
 		if 'o=' not in ldapConfig['login']:
-			cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D '%s' -w '%s' -b '%s'" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], ldapConfig['group'][0])
+			cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D '%s' -w '%s' -l 5 -b '%s'" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], ldapConfig['group'][0])
 		else:
-			cmd = "/usr/bin/ldapsearch -x -H ldap://%(host)s:%(port)s -D '%(login)s' -w '%(pass)s' '%(login)s'" % ldapConfig
+			cmd = "/usr/bin/ldapsearch -x -H ldap://%(host)s:%(port)s -D '%(login)s' -w '%(pass)s' -l 5 '%(login)s'" % ldapConfig
 	elif ldapConfig['secure'] == 'true':
 		if 'o=' not in ldapConfig['login']:
-			cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D '%s' -w '%s' -b '%s'" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], ldapConfig['group'][0])
+			cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D '%s' -w '%s' -l 5 -b '%s'" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], ldapConfig['group'][0])
 		else:
-			cmd = "/usr/bin/ldapsearch -x -H ldaps://%(host)s:%(port)s -D '%(login)s' -w '%(pass)s' '%(login)s'" % ldapConfig
+			cmd = "/usr/bin/ldapsearch -x -H ldaps://%(host)s:%(port)s -D '%(login)s' -w '%(pass)s' -l 5 '%(login)s'" % ldapConfig
 	else:
 		try:
 			logger.warning("ldapConfig['secure'] = %s" % ldapConfig['secure'])
@@ -3087,9 +3096,9 @@ def updateFDN(dbConfig, XMLconfig, ldapConfig):
 				userDN = []
 
 				if ldapConfig['secure'] == 'false':
-					cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D '%s' -w '%s' -b '%s'" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], userConfig['dName'])
+					cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D '%s' -w '%s' -l 5 -b '%s'" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], userConfig['dName'])
 				elif ldapConfig['secure'] == 'true':
-					cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D '%s' -w '%s' -b '%s'" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], userConfig['dName'])
+					cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D '%s' -w '%s' -l 5 -b '%s'" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], userConfig['dName'])
 
 				tmp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 				out, err = tmp.communicate()
@@ -3106,9 +3115,9 @@ def updateFDN(dbConfig, XMLconfig, ldapConfig):
 						userDN = []
 						for container in ldapConfig['user']:
 							if ldapConfig['secure'] == 'false':
-								cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D '%s' -w '%s' -b '%s' 'cn=%s'" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], container, userConfig['name'])
+								cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D '%s' -w '%s' -l 5 -b '%s' 'cn=%s'" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], container, userConfig['name'])
 							elif ldapConfig['secure'] == 'true':
-								cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D '%s' -w '%s' -b '%s' 'cn=%s'" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], container, userConfig['name'])
+								cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D '%s' -w '%s' -l 5 -b '%s' 'cn=%s'" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], container, userConfig['name'])
 							tmp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 							out, err = tmp.communicate()
 							search = re.findall('dn:.*', out)
