@@ -367,19 +367,23 @@ def install_settings():
 	print ("\nSetting up mobility repository..")
 	logger.info("Setting up mobility repository")
 	cmd = "zypper rr mobility"
+	logger.debug("Running: %s" % cmd)
 	out = ds.util_subprocess(cmd, True)
 
 	cmd = "zypper addrepo 'iso:///?iso=%s&url=file://%s' mobility" % (os.path.basename(isoPath), os.path.dirname(isoPath))
+	logger.debug("Running: %s" % cmd)
 	out = ds.util_subprocess(cmd, True)
 
 	# Refresh Repo
 	print ("Refreshing mobility repository")
 	logger.info("Refreshing mobility repository")
 	cmd = "zypper --gpg-auto-import-keys ref -f mobility"
+	logger.debug("Running: %s" % cmd)
 	out = ds.util_subprocess(cmd, True)
 
 	# Install mobility pattern
 	cmd = "zypper -x pt --repo mobility"
+	logger.debug("Running: %s" % cmd)
 	out = ds.util_subprocess(cmd, True)
 	try:
 		patternName = out[0].split('pattern name=')[1].split('"')[1]
@@ -392,6 +396,7 @@ def install_settings():
 	print ("Installing Mobility pattern: %s" % patternName)
 	logger.info("Installing Mobility pattern: %s" % patternName)
 	cmd = "zypper --non-interactive install -t pattern %s" % patternName
+	logger.debug("Running: %s" % cmd)
 	out = ds.util_subprocess(cmd, True)
 
 	# Get version of GMS installed
@@ -418,15 +423,19 @@ def install_settings():
 	# Run through install with all setups
 	print ("\nConfiguring and extending database..")
 	logger.info("Configuring and extending database..")
+	logger.debug("Running: %s" % setup_one)
 	out = ds.util_subprocess(setup_one, True)
+	logger.debug("Running: %s" % setup_twp)
 	out = ds.util_subprocess(setup_two, True)
 
 	print ("Configuring GroupWise Mobility Service..")
 	logger.info("Configuring GroupWise Mobility Service..")
+	logger.debug("Running: %s" % setup_three)
 	out = ds.util_subprocess(setup_three, True)
 
 	print ("Enabling and Starting GroupWise Mobility Service..")
 	logger.info("Enabling and Starting GroupWise Mobility Service..")
+	logger.debug("Running: %s" % setup_four)
 	out = ds.util_subprocess(setup_four, True)
 
 	# Manually start mobility as the init script will detect a running [p]ython pid, and fail to start
@@ -434,14 +443,17 @@ def install_settings():
 
 	print ("Configuring Device Sync Agent..")
 	logger.info("Configuring Device Sync Agent..")
+	logger.debug("Running: %s" % setup_five)
 	out = ds.util_subprocess(setup_five, True)
 
 	print ("Configuring GroupWise Sync Agent..")
 	logger.info("Configuring GroupWise Sync Agent..")
+	logger.debug("Running: %s" % setup_six)
 	out = ds.util_subprocess(setup_six, True)
 
 	print ("Starting Sync Agents..")
 	logger.info("Starting Sync Agents..")
+	logger.debug("Running: %s" % setup_seven)
 	out = ds.util_subprocess(setup_seven, True)
 
 	# Prompt to match backup ldap settings

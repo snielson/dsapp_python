@@ -572,17 +572,22 @@ def dlfile(url,path=None, print_url=True, print_warn=True):
 		if print_url:
 			spinner.stop(); print()
 
-def updateDsapp(publicVersion):
-	print ('Updating dsapp to v%s' % (publicVersion))
-	logger.info('Updating dsapp to v%s' % (publicVersion))
-	Config.read(dsappSettings)
-	dlPath = Config.get('dsapp URL', 'download.address')
-	fileName = Config.get('dsapp URL', 'download.filename')
+def updateDsapp(publicVersion, rpmFileLocation=None):
+	if rpmFileLocation is None:
+		print ('Updating dsapp to v%s' % (publicVersion))
+		logger.info('Updating dsapp to v%s' % (publicVersion))
+		Config.read(dsappSettings)
+		dlPath = Config.get('dsapp URL', 'download.address')
+		fileName = Config.get('dsapp URL', 'download.filename')
 
-	# Download new version & extract
-	dlfile('%s%s' % (dlPath, fileName))
-	print ()
+		# Download new version & extract
+		dlfile('%s%s' % (dlPath, fileName))
+		print ()
+	else:
+		fileName = rpmFileLocation
+
 	files = file_content(fileName)
+	logger.debug("File content: %s" % files)
 	rpmFile = None
 	for file in files:
 		if 'rpm' in file:
