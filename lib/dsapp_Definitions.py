@@ -453,7 +453,6 @@ def setXML (elem, tree, value, filePath, hideValue=False):
 		except:
 			logger.warning('Unable to set %s at %s in %s' % (logValue, elem, filePath))
 
-
 def askYesOrNo(question, default=None):
 
     valid = {"yes": True, "y": True, "ye": True,
@@ -2195,6 +2194,7 @@ def addGroup(dbConfig, ldapConfig):
 	else:
 		print ("No results from LDAP")
 		logger.warning("No results from LDAP")
+		eContinue()
 
 	os.remove (dsapptmp + '/ldapGroupMembership.dsapp')
 	
@@ -2739,7 +2739,7 @@ def signCert(path, csr, key, commonName, keyPass = None, sign = False):
 		print ("Unable to locate certificate files")
 
 	if askYesOrNo("\nApply certificates (Generate PEM) now"):
-		createPEM(sign, commonName, keyPass, key, crt, path)
+		createPEM(True, commonName, keyPass, key, crt, path)
 
 def createCSRKey(sign = False):
 	datasyncBanner(dsappversion)
@@ -2829,24 +2829,24 @@ def createPEM(sign = None, commonName = None, keyPass = None, key = None, crt = 
 			logger.warning("No such directory: %s" % path)
 			return
 
-		# Check if private key is passwordless
-		cmd = "openssl rsa -in %s/%s -check -noout -passin pass:" % (path,key)
+	# Check if private key is passwordless
+	cmd = "openssl rsa -in %s/%s -check -noout -passin pass:" % (path,key)
+	chk = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+	valid, error = chk.communicate()
+	if error:
+		# Check the private key password
+		keyPass = getpass.getpass("Private key passphrase: ")
+		cmd = "openssl rsa -in %s/%s -check -noout -passin pass:%s" % (path,key,keyPass)
 		chk = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		valid, error = chk.communicate()
-		if error:
-			# Check the private key password
-			keyPass = getpass.getpass("Private key passphrase: ")
-			cmd = "openssl rsa -in %s/%s -check -noout -passin pass:%s" % (path,key,keyPass)
-			chk = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-			out, err = chk.communicate()
-			if err:
-				print ("Incorrect passphrase on %s/%s" % (path,key))
-				logger.warning("Incorrect passphrase on %s" % key)
-				return
-			logger.info("Valid passphrase for private key %s" % key)
-		else:
-			logger.debug("Private key %s has no password" % key)
-			keyPass=""
+		out, err = chk.communicate()
+		if err:
+			print ("Incorrect passphrase on %s/%s" % (path,key))
+			logger.warning("Incorrect passphrase on %s" % key)
+			return
+		logger.info("Valid passphrase for private key %s" % key)
+	else:
+		logger.debug("Private key %s has no password" % key)
+		keyPass=""
 
 	# Check if public certifiate and private key match
 	if not verifyCertifiateMatch(key, keyPass, crt, path):
