@@ -1206,6 +1206,7 @@ def dumpTable(dbConfig, database, tableName, targetSave):
 
 	logger.info("Dumping %s table from %s database to %s" % (tableName, database, filePath))
 	cmd = "PGPASSWORD='%s' pg_dump --inserts -U %s %s -a -t '\"%s\"' > %s" % (dbConfig['pass'], dbConfig['user'], database, tableName, filePath)
+	logger.debug("Running command: %s" % cmd)
 	dump = subprocess.call(cmd, shell=True)
 
 def dropDatabases(dbConfig):
@@ -1989,7 +1990,7 @@ def mCleanup(dbConfig, userConfig, fileCleanupNow=True):
 				lines_seen.add(line)
 				count += 1
 		outfile.close()
-		spinner.stop(); print()
+		spinner.stop(); print();time.sleep(.000001)
 
 	if fileCleanupNow:
 		file_mCleanup_run(count)

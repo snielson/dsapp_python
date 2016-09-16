@@ -111,6 +111,7 @@ def getConfigs(db, ldap, mobility, gw, trustedapp, xml, conf_files, web, auth):
 
 def show_menu(menu_call):
 	ds.datasyncBanner(dsappversion)
+	logger.debug("Showing menu options: %s" % menu_call)
 
 	for i in xrange(len(menu_call)):
 		print "     %s" % menu_call[i]
@@ -124,13 +125,16 @@ def get_choice(available, special=None):
 		choice = getch()
 		if special is not None and choice == special:
 			print
+			logger.debug("Selected option: %s" % choice)
 			return special
 		elif choice in available or choice == 'q' or choice == 'Q':
 			if choice == '0' or choice == 'q' or choice == 'Q':
 				print
+				logger.debug("Selected option: 0")
 				return '0'
 			else:
 				print
+				logger.debug("Selected option: %s" % choice)
 				return choice
 
 def build_avaialbe(menu):
