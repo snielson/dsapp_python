@@ -57,7 +57,6 @@ if (os.getuid() != 0):
 
 # Start up variables
 installedConnector = "/etc/init.d/datasync-connectors"
-isInstalled = False
 
 # Folder variables
 dsappDirectory = "/opt/novell/datasync/tools/dsapp"
@@ -365,9 +364,6 @@ if not forceMode:
 # if os.path.basename(__file__) == 'dsapp.py' and len(sys.argv) == 1:
 if len(sys.argv) == 1:
 	ds.autoUpdateDsapp()
-
-# Get current working directory
-cPWD = os.getcwd()
 
 ##################################################################################################
 #	Initialization

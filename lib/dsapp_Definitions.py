@@ -221,11 +221,13 @@ def announceNewFeature():
 		logger.debug('Prompt feature')
 		print ("New feature for GMS shared folders.\nCheck users shared folders, and total all users shares.\n\nOptions can be found at (5. User Issues, 2. GroupWise checks options)\nCounting all users shares can run about 8-10 users per minute.\n")
 		eContinue()
-	Config.read(dsappSettings)
-	Config.set('Settings', 'new.feature', False)
-	with open(dsappSettings, 'wb') as cfgfile:
-		logger.debug("Writing: [Settings] new.feature = %s" % 'False')
-		Config.write(cfgfile)
+		Config.read(dsappSettings)
+		Config.set('Settings', 'new.feature', False)
+		with open(dsappSettings, 'wb') as cfgfile:
+			logger.debug("Writing: [Settings] new.feature = %s" % 'False')
+			Config.write(cfgfile)
+	else:
+		logger.debug("New feature is set to False")
 
 def check_pid(pid):        
   try:
@@ -1102,6 +1104,10 @@ def update_xml_encrypt(XMLconfig, config_files, old_host, new_host):
 	logger.info("Encryption has been updated in config files")
 
 def promptVerifyPath(path):
+	if path is None or path is "":
+		print ("Not a valid path")
+		logger.warning("Not a valid path: %s" % path)
+		return False
 	if not os.path.exists(path):
 		if askYesOrNo("Path does not exist, would you like to create it now"):
 			logger.info('Creating folder: %s' % (path))
