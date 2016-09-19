@@ -459,6 +459,8 @@ def setXML (elem, tree, value, filePath, hideValue=False):
 			logger.debug("Set '%s' at %s in %s" % (logValue, elem, filePath))
 		except:
 			logger.warning('Unable to set %s at %s in %s' % (logValue, elem, filePath))
+	else:
+		logger.error("Value is None")
 
 def insertXML (elem, tree, value, filePath, hideValue=False):
 	"""
@@ -480,6 +482,8 @@ def insertXML (elem, tree, value, filePath, hideValue=False):
 			logger.debug("Inserting '%s' at %s in %s" % (logValue, elem, filePath))
 		except:
 			logger.warning('Unable to insert %s at %s in %s' % (logValue, elem, filePath))
+	else:
+		logger.error("Value is None")
 
 def askYesOrNo(question, default=None):
 

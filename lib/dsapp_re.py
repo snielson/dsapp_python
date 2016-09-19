@@ -459,7 +459,62 @@ def install_settings():
 	# Prompt to match backup ldap settings
 	if ldapConfig['enabled'] == 'true':
 		if ds.askYesOrNo("Restore LDAP settings"):
-			print ("No settings restored - Work in progress") # TODO
+
+			# Restore groups
+			print ("Restoring group container(s)..")
+			logger.info("Restoring group container(s)..")
+			if len(ldapConfig['group']) == 1:
+				ds.setXML('.//configengine/ldap/groupContainer', XMLconfig['ceconf'],ldapConfig['group'][0], config_files['ceconf'])
+			elif len(ldapConfig['group'] > 1:
+				ds.setXML('.//configengine/ldap/groupContainer', XMLconfig['ceconf'],ldapConfig['group'][0], config_files['ceconf'])
+				groups = iter(ldapConfig['group'])
+				next(groups, None)
+				for group in groups:
+					ds.insertXML('.//configengine/ldap/groupContainer', XMLconfig['ceconf'],'<groupContainer>' + group + '</groupContainer>', config_files['ceconf'])
+			else:
+				logger.warning("No group container(s)")
+
+			# Restore users
+			print ("Restoring user container(s)..")
+			logger.info("Restoring user container(s)..")
+			if len(ldapConfig['user']) == 1:
+				ds.setXML('.//configengine/ldap/userContainer', XMLconfig['ceconf'],ldapConfig['user'][0], config_files['ceconf'])
+			elif len(ldapConfig['user'] > 1:
+				ds.setXML('.//configengine/ldap/userContainer', XMLconfig['ceconf'],ldapConfig['user'][0], config_files['ceconf'])
+				users = iter(ldapConfig['user'])
+				next(users, None)
+				for user in users:
+					ds.insertXML('.//configengine/ldap/userContainer', XMLconfig['ceconf'],'<userContainer>' + user + '</userContainer>', config_files['ceconf'])
+			else:
+				logger.warning("No user container(s)")
+
+			# Restore admins
+			print ("Restoring admin(s)..")
+			logger.info("Restoring admin(s)..")
+			if len(ldapConfig['admins']) == 1:
+				ds.setXML('.//configengine/ldap/admins/dn', XMLconfig['ceconf'],ldapConfig['admins'][0], config_files['ceconf'])
+			elif len(ldapConfig['admins'] > 1:
+				ds.setXML('.//configengine/ldap/admins/dn', XMLconfig['ceconf'],ldapConfig['admins'][0], config_files['ceconf'])
+				admins = iter(ldapConfig['admins'])
+				next(admins, None)
+				for admin in admins:
+					ds.insertXML('.//configengine/ldap/admins/dn', XMLconfig['ceconf'],'<admins>' + admin + '</admins>', config_files['ceconf'])
+			else:
+				logger.warning("No admin(s)")
+
+			# Server settings
+			print ("Restoring server settings..")
+			logger.info("Restoring server settings..")
+			ds.setXML('.//configengine/ldap/secure', XMLconfig['ceconf'],ldapConfig['secure'], config_files['ceconf'])
+			ds.setXML('.//configengine/ldap/enabled', XMLconfig['ceconf'],ldapConfig['enabled'], config_files['ceconf'])
+			ds.setXML('.//configengine/ldap/host', XMLconfig['ceconf'],ldapConfig['host'], config_files['ceconf'])
+			ds.setXML('.//configengine/ldap/login/dn', XMLconfig['ceconf'],ldapConfig['login'], config_files['ceconf'])
+			ds.setXML('.//configengine/ldap/login/protected', XMLconfig['ceconf'],'1', config_files['ceconf'])
+			cmd = 'hostname -f'
+			hostname = subprocess.Popen(cmd,shell=True, stdout=subprocess.PIPE).communicate()[0].strip()
+			ldapPass = ds.getEncrypted(ldapConfig['pass'], XMLconfig['ceconf'], './/configengine/ldap/login/protected', hostname)
+			ds.setXML('.//configengine/ldap/login/password', XMLconfig['ceconf'],ldapPass, config_files['ceconf'])
+
 
 	# Prompt for users and group to be imported
 	if ds.askYesOrNo("Restore users and groups"):
