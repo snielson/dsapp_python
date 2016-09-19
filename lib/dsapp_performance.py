@@ -279,9 +279,9 @@ def getDeviceCommands(log):
 	pydoc.pager(out)
 
 	if ds.askYesOrNo("Output results to CSV"):
-		select_cmd = "sqlite3 -csv -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\", cmd as \"Command\", count(cmd) as \"Count\" from data group by userKey, cmd order by \"Count\" desc;' > %s/query_string.csv" % (environ_db, dsappdata)
+		select_cmd = "sqlite3 -csv -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\", cmd as \"Command\", count(cmd) as \"Count\" from data group by userKey, cmd order by \"Count\" desc;' > %s/device_requests.csv" % (environ_db, dsappdata)
 		out = ds.util_subprocess(select_cmd)
-		print ("Data exported to %s/query_string.csv" % dsappdata)
+		print ("Data exported to %s/device_requests.csv" % dsappdata)
 	print()
 	
 
@@ -299,7 +299,7 @@ def getPinglessDevices(log):
 	pydoc.pager(out)
 
 	if ds.askYesOrNo("Output results to CSV"):
-		select_cmd ="sqlite3 -csv -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\" from data where deviceid not in (select deviceid from data where cmd=\"Ping\") group by deviceid;' > %s/ping-less_devices.csv" % (environ_db, dsappdata)
+		select_cmd ="sqlite3 -csv -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\" from data where deviceid not in (select deviceid from data where cmd=\"Ping\") group by deviceid;' > %s/manualSync_devices.csv" % (environ_db, dsappdata)
 		out = ds.util_subprocess(select_cmd)
-		print ("Data exported to %s/query_string.csv" % dsappdata)
+		print ("Data exported to %s/manualSync_devices.csv" % dsappdata)
 	print()

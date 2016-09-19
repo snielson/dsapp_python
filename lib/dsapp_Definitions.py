@@ -407,8 +407,9 @@ def print_there(x, y, text):
      sys.stdout.flush()
 
 def getXMLTree(filePath):
+	parser = etree.XMLParser(remove_blank_text=True)
 	try:
-		return etree.parse(filePath)
+		return etree.parse(filePath, parser)
 		logger.debug(filePath + " loaded as XML tree")
 	except IOError:
 		print (ERROR_MSG)
@@ -440,6 +441,10 @@ def xmlpath_findall(elem, tree):
 		return None
 
 def setXML (elem, tree, value, filePath, hideValue=False):
+	"""
+	Example to use:
+	setXML('.//configengine/ldap/groupContainer', XMLconfig['ceconf'],"o=testgroup", config_files['ceconf'])
+	"""
 	if hideValue:
 		logValue = "*******"
 	else:
@@ -454,6 +459,27 @@ def setXML (elem, tree, value, filePath, hideValue=False):
 			logger.debug("Set '%s' at %s in %s" % (logValue, elem, filePath))
 		except:
 			logger.warning('Unable to set %s at %s in %s' % (logValue, elem, filePath))
+
+def insertXML (elem, tree, value, filePath, hideValue=False):
+	"""
+	Example to use:
+	insertXML('.//configengine/ldap/groupContainer', XMLconfig['ceconf'],"<groupContainer>o=testgroup</groupContainer>", config_files['ceconf'])
+	"""
+	if hideValue:
+		logValue = "*******"
+	else:
+		logValue = value
+
+	root = tree.getroot()
+	path = root.find(elem)
+	parent = path.getparent()
+	if value is not None:
+		parent.insert(parent.index(path)+1, etree.fromstring(value))
+		try:
+			etree.ElementTree(root).write(filePath, pretty_print=True)
+			logger.debug("Inserting '%s' at %s in %s" % (logValue, elem, filePath))
+		except:
+			logger.warning('Unable to insert %s at %s in %s' % (logValue, elem, filePath))
 
 def askYesOrNo(question, default=None):
 

@@ -565,7 +565,7 @@ def checksQueries_menu():
 
 ### Start ### Sub menu performance_menu ###
 def performance_menu():
-	menu = ['1. Total query strings','2. Check manual syncing devices', '\n     0. Back']
+	menu = ['1. Top device requests','2. Check manual syncing devices', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -574,7 +574,7 @@ def performance_menu():
 		choice = get_choice(available)
 		if choice == '1':
 			ds.datasyncBanner(dsappversion)
-			if ds.askYesOrNo("Parse debug log for query strings"):
+			if ds.askYesOrNo("Parse debug log for top device requests"):
 				log = ds.getFilePath("Enter path to mobility-agent log file: ")
 				if log is None:
 					return
