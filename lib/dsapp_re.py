@@ -465,7 +465,7 @@ def install_settings():
 			logger.info("Restoring group container(s)..")
 			if len(ldapConfig['group']) == 1:
 				ds.setXML('.//configengine/ldap/groupContainer', XMLconfig['ceconf'],ldapConfig['group'][0], config_files['ceconf'])
-			elif len(ldapConfig['group'] > 1:
+			elif len(ldapConfig['group']) > 1:
 				ds.setXML('.//configengine/ldap/groupContainer', XMLconfig['ceconf'],ldapConfig['group'][0], config_files['ceconf'])
 				groups = iter(ldapConfig['group'])
 				next(groups, None)
@@ -479,7 +479,7 @@ def install_settings():
 			logger.info("Restoring user container(s)..")
 			if len(ldapConfig['user']) == 1:
 				ds.setXML('.//configengine/ldap/userContainer', XMLconfig['ceconf'],ldapConfig['user'][0], config_files['ceconf'])
-			elif len(ldapConfig['user'] > 1:
+			elif len(ldapConfig['user']) > 1:
 				ds.setXML('.//configengine/ldap/userContainer', XMLconfig['ceconf'],ldapConfig['user'][0], config_files['ceconf'])
 				users = iter(ldapConfig['user'])
 				next(users, None)
@@ -493,7 +493,7 @@ def install_settings():
 			logger.info("Restoring admin(s)..")
 			if len(ldapConfig['admins']) == 1:
 				ds.setXML('.//configengine/ldap/admins/dn', XMLconfig['ceconf'],ldapConfig['admins'][0], config_files['ceconf'])
-			elif len(ldapConfig['admins'] > 1:
+			elif len(ldapConfig['admins']) > 1:
 				ds.setXML('.//configengine/ldap/admins/dn', XMLconfig['ceconf'],ldapConfig['admins'][0], config_files['ceconf'])
 				admins = iter(ldapConfig['admins'])
 				next(admins, None)
