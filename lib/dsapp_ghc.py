@@ -1573,7 +1573,7 @@ def ghc_verifyCertificates(mobilityConfig, webConfig):
 				cmd = "echo 'QUIT' | openssl s_client -connect %s:%s -CAfile %s" % (webConfig['ip'], webConfig['port'], webCert)
 				out = ghc_util_subprocess(cmd,True)
 				if 'return code: 0 (ok)' not in out[0]:
-					log.write("Handshake Failed: Return code: 0 (ok) not found\nAttempt made to: %s:%s\nCA file: %s\n" % (webConfig['ip'], webConfig['port'], devCert))
+					log.write("Handshake Failed: Return code: 0 (ok) not found\nAttempt made to: %s:%s\nCA file: %s\n" % (webConfig['ip'], webConfig['port'], webCert))
 					problem = 'warning'
 				else:
 					log.write("Handshake Successful\nConnect: %s:%s\nCA File: %s\n" % (webConfig['ip'], webConfig['port'], webCert))

@@ -451,10 +451,13 @@ def setXML (elem, tree, value, filePath, hideValue=False):
 		logValue = value
 
 	root = tree.getroot()
-	path = root.xpath(elem)
+	# path = root.xpath(elem)
+	path = root.find(elem)
 	if value is not None:
-		path[0].text = value
+		path.clear()
+		path.text = value
 		try:
+			# print (etree.tostring(root, pretty_print=True))
 			etree.ElementTree(root).write(filePath, pretty_print=True)
 			logger.debug("Set '%s' at %s in %s" % (logValue, elem, filePath))
 		except:
@@ -478,12 +481,42 @@ def insertXML (elem, tree, value, filePath, hideValue=False):
 	if value is not None:
 		parent.insert(parent.index(path)+1, etree.fromstring(value))
 		try:
+			# print (etree.tostring(root, pretty_print=True))
 			etree.ElementTree(root).write(filePath, pretty_print=True)
 			logger.debug("Inserting '%s' at %s in %s" % (logValue, elem, filePath))
 		except:
 			logger.warning('Unable to insert %s at %s in %s' % (logValue, elem, filePath))
 	else:
 		logger.error("Value is None")
+
+def createXML_tag(elem, tree, tag, filePath, value=None, hideValue=False):
+	"""
+	Example to use:
+	createXML_tag('.//configengine/ldap', XMLconfig['ceconf'],"users", config_files['ceconf'], value="o=novell")
+	"""
+	if hideValue:
+		logValue = "*******"
+	else:
+		logValue = value
+
+	root = tree.getroot()
+	path = root.find(elem)
+	if tag is not None:
+		if value is not None:
+			logger.debug("Adding '%s' to tag" % value)
+			etree.SubElement(path, tag).text = value
+		else:
+			etree.SubElement(path, tag)
+
+		try:
+			# print (etree.tostring(root, pretty_print=True))
+			etree.ElementTree(root).write(filePath, pretty_print=True)
+			logger.debug("Creating tag '%s' at %s in %s" % (tag, elem, filePath))
+		except:
+			logger.warning("Unable to create tag '%s' at %s in %s" % (tag, elem, filePath))
+	else:
+		logger.error("Tag is None")
+
 
 def askYesOrNo(question, default=None):
 
@@ -720,25 +753,36 @@ def setVariables():
 
 def dsUpdate(repo):
 	spinner = set_spinner()
+	logger.info("Starting Mobility update using repository '%s'" % repo)
+	print ("Refreshing repository..")
+	logger.info("Refreshing repository..")
+	cmd = "zypper --gpg-auto-import-keys ref -f %s" % repo
+	logger.debug("Running command: %s" % cmd)
+	out = util_subprocess(cmd)
+	logger.info("Done refreshing")
 
-	ref = subprocess.Popen(['zypper', 'ref', '-f', repo], stdout=subprocess.PIPE)
-	ref.wait()
-	zLU = subprocess.Popen(['zypper', 'lu', '-r', repo], stdout=subprocess.PIPE).communicate()
-	if 'No updates found' in zLU[0]:
+	logger.info("Checking for repository updates..")
+	cmd ="zypper lu -r %s" % repo
+	logger.debug("Running command: %s" % cmd)
+	out = util_subprocess(cmd)
+	if 'No updates found' in out[0]:
 		print ("\nMobility is already this version, or newer")
 		logger.info('Unable to update mobility. Same version or newer')
+
 		if askYesOrNo('List %s packages' % repo):
-			pkg = subprocess.Popen(['zypper', 'pa', '-ir', '%s' % repo])
-			pkg.wait()
-			logger.info('Listing %s packages' % repo)
+			cmd = "zypper pa -ir %s" % repo
+			logger.debug("Running command: %s" % cmd)
+			print (subprocess.Popen(cmd, shell=True).communicate()[0])
 			print ()
+
 			if askYesOrNo("Force install %s packages" % repo):
 				print ("Force updating Mobility.. ", end='')
 				logger.info('Force updating Mobility..')
 				spinner.start(); time.sleep(.000001)
 				time1 = time.time()
-				install = subprocess.Popen(['zypper', '--non-interactive', 'install', '--force', '%s:' % repo], stdout=subprocess.PIPE)
-				install.wait()
+				cmd = "zypper --non-interactive install --force %s:" % repo
+				logger.debug("Running command: %s" % cmd)
+				out = util_subprocess(cmd)
 				spinner.stop(); print ()
 				time2 = time.time()
 				logger.info("Foce update Mobility package complete")
@@ -749,8 +793,9 @@ def dsUpdate(repo):
 		logger.info('Updating Mobility started')
 		spinner.start(); time.sleep(.000001)
 		time1 = time.time()
-		install = subprocess.Popen(['zypper', '--non-interactive', 'update', '--force', '-r', '%s' % repo], stdout=subprocess.PIPE)
-		install.wait()
+		cmd = "zypper --non-interactive update --force -r %s" % repo
+		logger.debug("Running command: %s" % cmd)
+		out = util_subprocess(cmd)
 		spinner.stop(); print ()
 		time2 = time.time()
 		logger.info("Updating Mobility package complete")
@@ -785,8 +830,8 @@ def dsUpdate(repo):
 		logger.info("Updating Mobility schema complete")
 		logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
-		p = subprocess.Popen(['rcpostgresql', 'stop'], stdout=subprocess.PIPE)
-		p.wait()
+		cmd ="rcpostgresql stop"
+		out = util_subprocess(cmd, True)
 		pids = get_pid(python_Directory)
 		for pid in pids:
 			kill_pid(int(pid), 9)
@@ -799,8 +844,8 @@ def dsUpdate(repo):
 			logger.debug("Writing: [Misc] mobility.version = %s" % dsVersion)
 			Config.write(cfgfile)
 
-		p = subprocess.Popen(['rcpostgresql', 'start'], stdout=subprocess.PIPE)
-		p.wait()
+		cmd ="rcpostgresql start"
+		out = util_subprocess(cmd, True)
 		rcDS('start')
 
 		with open(dirOptMobility + '/version') as v:
@@ -1581,12 +1626,12 @@ def rcDS(status, op=None, show_spinner=True, show_print=True):
 			cmd = '%s%s start' % (initScripts, agent)
 			logger.debug("Running '%s'" % cmd)
 			out = util_subprocess(cmd, True)
-			if out[1]:
+			if out[1] and 'redirecting to system' not in out[1]:
 				logger.error("Problem running '%s'" % cmd)
 		cmd = 'rccron start'
 		logger.debug("Running '%s'" % cmd)
 		out = util_subprocess(cmd, True)
-		if out[1]:
+		if out[1] and 'redirecting to system' not in out[1]:
 			logger.error("Problem running '%s'" % cmd)
 		if show_spinner:
 			spinner.stop()
@@ -1603,7 +1648,7 @@ def rcDS(status, op=None, show_spinner=True, show_print=True):
 			cmd = '%s%s start' % (initScripts, agent)
 			logger.debug("Running '%s'" % cmd)
 			out = util_subprocess(cmd, True)
-			if out[1]:
+			if out[1] and 'redirecting to system' not in out[1]:
 				logger.error("Problem running '%s'" % cmd)
 		if show_spinner:
 			spinner.stop()
@@ -1621,12 +1666,12 @@ def rcDS(status, op=None, show_spinner=True, show_print=True):
 			cmd = '%s%s stop' % (initScripts, agent)
 			logger.debug("Running '%s'" % cmd)
 			out = util_subprocess(cmd, True)
-			if out[1]:
+			if out[1] and 'redirecting to system' not in out[1]:
 				logger.error("Problem running '%s'" % cmd)
 		cmd = 'rccron stop'
 		logger.debug("Running '%s'" % cmd)
 		out = util_subprocess(cmd, True)
-		if out[1]:
+		if out[1] and 'redirecting to system' not in out[1]:
 			logger.error("Problem running '%s'" % cmd)
 		pids = get_pid(python_Directory)
 		cpids = get_pid('cron')
@@ -1649,7 +1694,7 @@ def rcDS(status, op=None, show_spinner=True, show_print=True):
 			cmd = '%s%s stop' % (initScripts, agent)
 			logger.debug("Running '%s'" % cmd)
 			out = util_subprocess(cmd, True)
-			if out[1]:
+			if out[1] and 'redirecting to system' not in out[1]:
 				logger.error("Problem running '%s'" % cmd)
 		pids = get_pid(python_Directory)
 		for pid in pids:
@@ -1669,12 +1714,12 @@ def rcDS(status, op=None, show_spinner=True, show_print=True):
 			cmd = '%s%s stop' % (initScripts, agent)
 			logger.debug("Running '%s'" % cmd)
 			out = util_subprocess(cmd, True)
-			if out[1]:
+			if out[1] and 'redirecting to system' not in out[1]:
 				logger.error("Problem running '%s'" % cmd)
 		cmd = 'rccron stop'
 		logger.debug("Running '%s'" % cmd)
 		out = util_subprocess(cmd, True)
-		if out[1]:
+		if out[1] and 'redirecting to system' not in out[1]:
 			logger.error("Problem running '%s'" % cmd)
 
 		pids = get_pid(python_Directory)
@@ -1689,12 +1734,12 @@ def rcDS(status, op=None, show_spinner=True, show_print=True):
 			cmd = '%s%s start' % (initScripts, agent)
 			logger.debug("Running '%s'" % cmd)
 			out = util_subprocess(cmd, True)
-			if out[1]:
+			if out[1] and 'redirecting to system' not in out[1]:
 				logger.error("Problem running '%s'" % cmd)
 		cmd = 'rccron start'
 		logger.debug("Running '%s'" % cmd)
 		out = util_subprocess(cmd, True)
-		if out[1]:
+		if out[1] and 'redirecting to system' not in out[1]:
 			logger.error("Problem running '%s'" % cmd)
 		if show_spinner:
 			spinner.stop()
@@ -2286,6 +2331,7 @@ def updateMobilityISO():
 	if not checkISO_content(isoPath):
 		return
 
+	if askYesOrNo("Updated with %s" % os.path.dirname(isoPath))
 	# All checks paasses - Add isoPath as 'mobility' repo
 	datasyncBanner(dsappversion)
 	print ("Setting up mobility repository..")
@@ -2302,7 +2348,7 @@ def updateMobilityISO():
 	dsUpdate('mobility')
 
 def getMobilityISO():
-	isoPath = autoCompleteInput("Path to ISO directory or file: ")
+	isoPath = autoCompleteInput("Path to Mobility ISO directory or file: ")
 	if os.path.isfile(isoPath):
 		if not os.path.basename(isoPath).endswith('.iso'):
 			print ("\nIncorrect extension type\nPlease select a ISO file")

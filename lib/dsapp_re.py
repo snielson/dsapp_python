@@ -14,6 +14,7 @@ import shutil
 import traceback
 import tarfile
 import socket
+import time
 import contextlib
 import logging, logging.config
 import cPickle as pickle
@@ -48,14 +49,23 @@ logging.config.fileConfig('%s/logging.cfg' % (dsappConf))
 logger = logging.getLogger('dsapp_Definitions')
 excep_logger = logging.getLogger('exceptions_log')
 
-def my_handler(type, value, tb):
+# Configuration File
+config_files = dict()
+config_files['mconf'] = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/mobility/connector.xml"
+config_files['gconf'] = "/etc/datasync/configengine/engines/default/pipelines/pipeline1/connectors/groupwise/connector.xml"
+config_files['ceconf'] = "/etc/datasync/configengine/configengine.xml"
+config_files['econf'] = "/etc/datasync/configengine/engines/default/engine.xml"
+config_files['wconf'] = "/etc/datasync/webadmin/server.xml"
+
+
+def exception_handler(type, value, tb):
 	tmp = traceback.format_exception(type, value, tb)
 	logger.error("EXCEPTION: See exception.log")
 	excep_logger.error("Uncaught exception:\n%s" % ''.join(tmp).strip())
 	print (''.join(tmp).strip())
 
 # Install exception handler
-sys.excepthook = my_handler
+sys.excepthook = exception_handler
 
 # Read Config
 Config.read(dsappSettings)
@@ -67,10 +77,11 @@ ldapConfig = None
 mobilityConfig = None
 gwConfig = None
 trustedConfig = None
-XMLconfig = None
 config_files = None
 webConfig = None
 authConfig = None
+
+XMLconfig = dict()
 
 def tarSettings(path):
 	backup_name = os.path.basename(path)
@@ -425,7 +436,7 @@ def install_settings():
 	logger.info("Configuring and extending database..")
 	logger.debug("Running: %s" % setup_one)
 	out = ds.util_subprocess(setup_one, True)
-	logger.debug("Running: %s" % setup_twp)
+	logger.debug("Running: %s" % setup_two)
 	out = ds.util_subprocess(setup_two, True)
 
 	print ("Configuring GroupWise Mobility Service..")
@@ -456,9 +467,26 @@ def install_settings():
 	logger.debug("Running: %s" % setup_seven)
 	out = ds.util_subprocess(setup_seven, True)
 
+	# Build XMLconfigs
+	logger.info('Building XML trees started')
+	time1 = time.time()
+	logger.debug('Building %s tree from: %s' % ('mconfXML', config_files['mconf']))
+	XMLconfig['mconf'] = ds.getXMLTree(config_files['mconf'])
+	logger.debug('Building %s tree from: %s' % ('econfXML', config_files['econf']))
+	XMLconfig['econf'] = ds.getXMLTree(config_files['econf'])
+	logger.debug('Building %s tree from: %s' % ('ceconfXML', config_files['ceconf']))
+	XMLconfig['ceconf'] = ds.getXMLTree(config_files['ceconf'])
+	logger.debug('Building %s tree from: %s' % ('wconfXML', config_files['wconf']))
+	XMLconfig['wconf'] = ds.getXMLTree(config_files['wconf'])
+	logger.debug('Building %s tree from: %s' % ('gconfXML', config_files['gconf']))
+	XMLconfig['gconf'] = ds.getXMLTree(config_files['gconf'])
+	time2 = time.time()
+	logger.info('Building XML trees complete')
+	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
+
 	# Prompt to match backup ldap settings
 	if ldapConfig['enabled'] == 'true':
-		if ds.askYesOrNo("Restore LDAP settings"):
+		if ds.askYesOrNo("\nRestore LDAP settings"):
 
 			# Restore groups
 			print ("Restoring group container(s)..")
@@ -477,6 +505,10 @@ def install_settings():
 			# Restore users
 			print ("Restoring user container(s)..")
 			logger.info("Restoring user container(s)..")
+
+			# Create base userContainer to insert into
+			ds.createXML_tag('.//configengine/ldap', XMLconfig['ceconf'],"userContainer", config_files['ceconf'], value="o=GroupWise")
+
 			if len(ldapConfig['user']) == 1:
 				ds.setXML('.//configengine/ldap/userContainer', XMLconfig['ceconf'],ldapConfig['user'][0], config_files['ceconf'])
 			elif len(ldapConfig['user']) > 1:
@@ -507,22 +539,21 @@ def install_settings():
 			logger.info("Restoring server settings..")
 			ds.setXML('.//configengine/ldap/secure', XMLconfig['ceconf'],ldapConfig['secure'], config_files['ceconf'])
 			ds.setXML('.//configengine/ldap/enabled', XMLconfig['ceconf'],ldapConfig['enabled'], config_files['ceconf'])
-			ds.setXML('.//configengine/ldap/host', XMLconfig['ceconf'],ldapConfig['host'], config_files['ceconf'])
+			ds.setXML('.//configengine/ldap/hostname', XMLconfig['ceconf'],ldapConfig['host'], config_files['ceconf'])
+			ds.setXML('.//configengine/ldap/port', XMLconfig['ceconf'],ldapConfig['port'], config_files['ceconf'])
 			ds.setXML('.//configengine/ldap/login/dn', XMLconfig['ceconf'],ldapConfig['login'], config_files['ceconf'])
-			ds.setXML('.//configengine/ldap/login/protected', XMLconfig['ceconf'],'1', config_files['ceconf'])
-			cmd = 'hostname -f'
-			hostname = subprocess.Popen(cmd,shell=True, stdout=subprocess.PIPE).communicate()[0].strip()
+			hostname = os.popen('echo `hostname -f`').read().rstrip()
 			ldapPass = ds.getEncrypted(ldapConfig['pass'], XMLconfig['ceconf'], './/configengine/ldap/login/protected', hostname)
 			ds.setXML('.//configengine/ldap/login/password', XMLconfig['ceconf'],ldapPass, config_files['ceconf'])
 
 
 	# Prompt for users and group to be imported
-	if ds.askYesOrNo("Restore users and groups"):
+	if ds.askYesOrNo("\nRestore users and groups"):
 		print ("No settings restored - Work in progress") # TODO
 
 	# TODO : Check current hostname, and validate if backup certificates common name will work on new server
 	# Pass warning if common name != install hostname
 
 	# Prompt for backup certs to be applied
-	if ds.askYesOrNo("Restore backup certificates"):
+	if ds.askYesOrNo("\nRestore backup certificates"):
 		print ("No settings restored - Work in progress") # TODO
