@@ -8,7 +8,8 @@ See original at: <https://github.com/tdharris/dsapp><br />
 dsapp wiki: <https://github.com/snielson/dsapp_python/wiki>
 
 ##### Notes
-dsapp 227 is the last build of the bash version. Progress will continue under this repo for python.
+dsapp 227 is the last build created in bash shell. Progress will continue under this repo for python.<br />
+Please see https://github.com/snielson/dsapp_python/releases for the latest build.
 
 ##### Changes
 * Added Logging
