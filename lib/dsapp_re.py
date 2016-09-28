@@ -485,7 +485,9 @@ def install_settings():
 	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
 	# Prompt to match backup ldap settings
+	finalChange = False
 	if ldapConfig['enabled'] == 'true':
+		finalChange = True
 		if ds.askYesOrNo("\nRestore LDAP settings"):
 
 			# Restore groups
@@ -542,18 +544,32 @@ def install_settings():
 			ds.setXML('.//configengine/ldap/hostname', XMLconfig['ceconf'],ldapConfig['host'], config_files['ceconf'])
 			ds.setXML('.//configengine/ldap/port', XMLconfig['ceconf'],ldapConfig['port'], config_files['ceconf'])
 			ds.setXML('.//configengine/ldap/login/dn', XMLconfig['ceconf'],ldapConfig['login'], config_files['ceconf'])
+			ds.setXML('.//configengine/source/provisioning', XMLconfig['ceconf'],authConfig['provisioning'], config_files['ceconf'])
+			ds.setXML('.//configengine/source/authentication', XMLconfig['ceconf'],authConfig['authentication'], config_files['ceconf'])
 			hostname = os.popen('echo `hostname -f`').read().rstrip()
 			ldapPass = ds.getEncrypted(ldapConfig['pass'], XMLconfig['ceconf'], './/configengine/ldap/login/protected', hostname)
-			ds.setXML('.//configengine/ldap/login/password', XMLconfig['ceconf'],ldapPass, config_files['ceconf'])
+			ds.setXML('.//configengine/ldap/login/password', XMLconfig['ceconf'],ldapPass, config_files['ceconf'], hideValue=True)
 
 
 	# Prompt for users and group to be imported
 	if ds.askYesOrNo("\nRestore users and groups"):
-		print ("No settings restored - Work in progress") # TODO
+		finalChange = True
+		sqlPath = dsapptmp + '/' + fileName + '/SQLsettings'
+		conn = ds.getConn(dbConfig, 'datasync')
+		cur = conn.cursor()
+		print ("Restoring users..")
+		cur.execute(open(sqlPath +'/targets.sql', 'r').read())
+		logger.info('Imported targets.sql into datasync database')
+		print ("Restoring groups..")
+		cur.execute(open(sqlPath +'/membershipCache.sql', 'r').read())
+		logger.info('Imported membershipCache.sql into datasync database')
+		cur.close()
+		conn.close()
+		
 
-	# TODO : Check current hostname, and validate if backup certificates common name will work on new server
-	# Pass warning if common name != install hostname
+	# Prompt for backup certs to be applied # TODO: Will this be needed?
+	# if ds.askYesOrNo("\nRestore backup certificates"):
+	# 	finalChange = True
 
-	# Prompt for backup certs to be applied
-	if ds.askYesOrNo("\nRestore backup certificates"):
-		print ("No settings restored - Work in progress") # TODO
+	if finalChange:
+		ds.rcDS('restart', show_spinner=False, show_print=False)

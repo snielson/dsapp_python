@@ -2331,21 +2331,22 @@ def updateMobilityISO():
 	if not checkISO_content(isoPath):
 		return
 
-	if askYesOrNo("Updated with %s" % os.path.dirname(isoPath))
-	# All checks paasses - Add isoPath as 'mobility' repo
-	datasyncBanner(dsappversion)
-	print ("Setting up mobility repository..")
-	logger.info("Setting up mobility repository")
-	cmd = "zypper rr mobility"
-	logger.debug(cmd)
-	zypper = util_subprocess(cmd, True)
+	if askYesOrNo("Update with %s" % os.path.dirname(isoPath)):
+		
+		# All checks paasses - Add isoPath as 'mobility' repo
+		datasyncBanner(dsappversion)
+		print ("Setting up mobility repository..")
+		logger.info("Setting up mobility repository")
+		cmd = "zypper rr mobility"
+		logger.debug(cmd)
+		zypper = util_subprocess(cmd, True)
 
-	logger.info("Adding mobility repo")
-	cmd = "zypper addrepo 'iso:///?iso=%s&url=file://%s' mobility" % (os.path.basename(isoPath), os.path.dirname(isoPath))
-	logger.debug(cmd)
-	zypper = util_subprocess(cmd, True)
+		logger.info("Adding mobility repo")
+		cmd = "zypper addrepo 'iso:///?iso=%s&url=file://%s' mobility" % (os.path.basename(isoPath), os.path.dirname(isoPath))
+		logger.debug(cmd)
+		zypper = util_subprocess(cmd, True)
 
-	dsUpdate('mobility')
+		dsUpdate('mobility')
 
 def getMobilityISO():
 	isoPath = autoCompleteInput("Path to Mobility ISO directory or file: ")
