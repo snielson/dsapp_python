@@ -725,7 +725,8 @@ def autoUpdateDsapp(skip=False):
 				print ('dsapp is current at v%s' % dsappversion)
 				logger.info('dsapp is current at v%s' % dsappversion)
 		else:
-			logger.warning("Unable to check for update")
+			print ("Unable to reach %s:%s\n" % (serviceCheck, serviceCheckPort))
+			logger.warning("Unable to reach %s:%s" % (serviceCheck, serviceCheckPort))
 
 def getDSVersion(forceMode=False):
 	if checkInstall(forceMode, installedConnector):
@@ -2332,7 +2333,7 @@ def updateMobilityISO():
 		return
 
 	if askYesOrNo("Update with %s" % os.path.dirname(isoPath)):
-		
+
 		# All checks paasses - Add isoPath as 'mobility' repo
 		datasyncBanner(dsappversion)
 		print ("Setting up mobility repository..")
