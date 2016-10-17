@@ -138,7 +138,7 @@ if not os.path.isfile(dsappSettings):
 		Config.set('Misc', 'dsapp.version', dsappversion)
 		Config.set('Misc', 'hostname', dsHostname)
 		Config.set('Settings', 'auto.update', True)
-		Config.set('Settings', 'new.feature', True)
+		Config.set('Settings', 'new.feature', False)
 		Config.set('Log', 'nightly.logs', 5)
 		Config.set('Log', 'datasync.log.maxage', 14)
 		Config.set('Log', 'dsapp.log.maxage', 14)
