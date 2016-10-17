@@ -2811,7 +2811,7 @@ def signCert(path, csr, key, commonName, keyPass = None, sign = False):
 			certDays = '730'
 
 		crt = "%s.crt" % commonName
-		if keyPass is not None:
+		if keyPass is not None and keyPass:
 			cmd = "openssl x509 -req -sha256 -days %s -in %s/%s -signkey %s/%s -out %s/%s -passin pass:%s &>/dev/null" % (certDays, path, csr, path, key, path, crt, keyPass)
 		else:
 			cmd = "openssl x509 -req -sha256 -days %s -in %s/%s -signkey %s/%s -out %s/%s &>/dev/null" % (certDays, path, csr, path, key, path, crt)
@@ -2839,12 +2839,20 @@ def createCSRKey(sign = False):
 		keyPass = newCertPass()
 		print ()
 
-		cmd = "openssl genrsa -passout pass:%s -des3 -out %s/server.key 2048" % (keyPass, path)
-		logger.info("Creating private key..")
-		key = subprocess.call(cmd, shell=True)
-		cmd = "openssl req -sha256 -new -key %s/server.key -out %s/server.csr -passin pass:%s" % (path, path, keyPass)
-		logger.info("Creating certificate signing request..")
-		csr = subprocess.call(cmd, shell=True)
+		if keyPass:
+			cmd = "openssl genrsa -passout pass:%s -des3 -out %s/server.key 2048" % (keyPass, path)
+			logger.info("Creating private key..")
+			key = subprocess.call(cmd, shell=True)
+			cmd = "openssl req -sha256 -new -key %s/server.key -out %s/server.csr -passin pass:%s" % (path, path, keyPass)
+			logger.info("Creating certificate signing request..")
+			csr = subprocess.call(cmd, shell=True)
+		else:
+			cmd = "openssl genrsa -out %s/server.key 2048" % (path)
+			logger.info("Creating private key..")
+			key = subprocess.call(cmd, shell=True)
+			cmd = "openssl req -sha256 -new -key %s/server.key -out %s/server.csr " % (path, path)
+			logger.info("Creating certificate signing request..")
+			csr = subprocess.call(cmd, shell=True)
 		
 		csr = '%s/server.csr' % path
 		commonName = getCommonName(csr)
@@ -2920,7 +2928,8 @@ def createPEM(sign = None, commonName = None, keyPass = None, key = None, crt = 
 	valid, error = chk.communicate()
 	if error:
 		# Check the private key password
-		keyPass = getpass.getpass("Private key passphrase: ")
+		if keyPass is None:
+			keyPass = getpass.getpass("Private key passphrase: ")
 		cmd = "openssl rsa -in %s/%s -check -noout -passin pass:%s" % (path,key,keyPass)
 		chk = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		out, err = chk.communicate()

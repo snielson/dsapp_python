@@ -573,3 +573,6 @@ def install_settings():
 
 	if finalChange:
 		ds.rcDS('restart', show_spinner=False, show_print=False)
+
+	print ("Restore complete")
+	logger.info("Restore complete")
