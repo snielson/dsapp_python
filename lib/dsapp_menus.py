@@ -597,7 +597,7 @@ def performance_menu():
 
 ### Start ### Sub menus checkQueries_menu ###
 def viewAttachments_menu():
-	menu = ['1. View user attachments','2. View total attachment size by users', '3. Check Mobility attachments count', '\n     0. Back']
+	menu = ['1. View user attachments','2. View total attachment size by users', '3. Check Mobility attachments count', '\n     0. Quit']
 
 	available = build_avaialbe(menu)
 	loop = True
