@@ -597,7 +597,7 @@ def performance_menu():
 
 ### Start ### Sub menus checkQueries_menu ###
 def viewAttachments_menu():
-	menu = ['1. View user attachments','2. View total attachment size by users', '3. Check Mobility attachments count', '\n     0. Quit']
+	menu = ['1. View user attachments','2. View total attachment size by users', '3. Check Mobility attachments count', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -622,7 +622,7 @@ def viewAttachments_menu():
 
 # DEBUG MENU
 def debug_menu():
-	menu = ['DEBUG MENU\n','1. SOAP - View user folder list', '2. SOAP - View user address book list', '3. SOAP - getUserListRequest', '4. View verifyUser data', '5. View variables', '\n     0. Back']
+	menu = ['DEBUG MENU\n','1. SOAP - View user folder list', '2. SOAP - View user address book list', '3. SOAP - getUserListRequest', '4. View verifyUser data', '5. View variables', '\n     0. Quit']
 	logger.info("Running DEBUG menu!")
 
 	available = build_avaialbe(menu)
