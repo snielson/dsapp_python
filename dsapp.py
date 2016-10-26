@@ -499,7 +499,7 @@ if dsVersion >= ds_14x:
 else:
 	gwConfig['gListenAddress'] = ds.xmlpath('.//settings/custom/soapServer', XMLconfig['gconf']).split("://")[-1].split(":")[0]
 logger.debug('Assigning %s from %s' % ('GroupWise connector sPort', 'gconfXML'))
-gwConfig['sPort'] = ds.xmlpath('.//settings/custom/soapServer', XMLconfig['gconf']).split(":")[-1]
+gwConfig['sPort'] = ds.xmlpath('.//settings/custom/soapServer', XMLconfig['gconf']).split(":")[-1].split('/')[0]
 logger.debug('Assigning %s from %s' % ('GroupWise connector sSecure', 'gconfXML'))
 
 if dsVersion >= ds_14x:
