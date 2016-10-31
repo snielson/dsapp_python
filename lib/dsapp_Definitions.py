@@ -2332,7 +2332,7 @@ def updateMobilityISO():
 	if not checkISO_content(isoPath):
 		return
 
-	if askYesOrNo("Update with %s" % os.path.dirname(isoPath)):
+	if askYesOrNo("\nUpdate with %s" % os.path.basename(isoPath)):
 
 		# All checks paasses - Add isoPath as 'mobility' repo
 		datasyncBanner(dsappversion)
@@ -2396,7 +2396,7 @@ def getMobilityISO():
 
 def checkISO_content(isoPath):
 	# Verify ISO is mobility iso
-	cmd = "isoinfo -i %s -x \"/CONTENT.;1\"" % isoPath
+	cmd = "isoinfo -i '%s' -x \"/CONTENT.;1\"" % isoPath
 	out = util_subprocess(cmd,True)
 
 	output = StringIO.StringIO(out[0])
