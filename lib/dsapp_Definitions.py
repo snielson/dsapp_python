@@ -2791,7 +2791,7 @@ def newCertPass():
 	return keyPass
 
 def getCommonName(csrFile):
-	cmd = "openssl req -in %s -text -noout" % csrFile
+	cmd = "openssl req -in '%s' -text -noout" % csrFile
 	out = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
 	out.wait()
 	pout = p = out.communicate()[0]
@@ -2812,9 +2812,9 @@ def signCert(path, csr, key, commonName, keyPass = None, sign = False):
 
 		crt = "%s.crt" % commonName
 		if keyPass is not None and keyPass:
-			cmd = "openssl x509 -req -sha256 -days %s -in %s/%s -signkey %s/%s -out %s/%s -passin pass:%s &>/dev/null" % (certDays, path, csr, path, key, path, crt, keyPass)
+			cmd = "openssl x509 -req -sha256 -days %s -in '%s/%s' -signkey '%s/%s' -out '%s/%s' -passin pass:%s &>/dev/null" % (certDays, path, csr, path, key, path, crt, keyPass)
 		else:
-			cmd = "openssl x509 -req -sha256 -days %s -in %s/%s -signkey %s/%s -out %s/%s &>/dev/null" % (certDays, path, csr, path, key, path, crt)
+			cmd = "openssl x509 -req -sha256 -days %s -in '%s/%s' -signkey '%s/%s' -out '%s/%s' &>/dev/null" % (certDays, path, csr, path, key, path, crt)
 		logger.debug("Signing %s" % csr)
 		signed = subprocess.call(cmd, shell=True)
 
@@ -2833,6 +2833,7 @@ def createCSRKey(sign = False):
 	if path:
 		# Remove '/' from end of path
 		path = path.rstrip('/')
+		logger.debug("Certificate path: %s" % path)
 
 		print ("\nGenerating a private key and certificate signing request (CSR)")
 		logger.info("Generating a private key and CSR")
@@ -2840,17 +2841,17 @@ def createCSRKey(sign = False):
 		print ()
 
 		if keyPass:
-			cmd = "openssl genrsa -passout pass:%s -des3 -out %s/server.key 2048" % (keyPass, path)
+			cmd = "openssl genrsa -passout pass:%s -des3 -out '%s/server.key' 2048" % (keyPass, path)
 			logger.info("Creating private key..")
 			key = subprocess.call(cmd, shell=True)
-			cmd = "openssl req -sha256 -new -key %s/server.key -out %s/server.csr -passin pass:%s" % (path, path, keyPass)
+			cmd = "openssl req -sha256 -new -key '%s/server.key' -out '%s/server.csr' -passin pass:%s" % (path, path, keyPass)
 			logger.info("Creating certificate signing request..")
 			csr = subprocess.call(cmd, shell=True)
 		else:
-			cmd = "openssl genrsa -out %s/server.key 2048" % (path)
+			cmd = "openssl genrsa -out '%s/server.key' 2048" % (path)
 			logger.info("Creating private key..")
 			key = subprocess.call(cmd, shell=True)
-			cmd = "openssl req -sha256 -new -key %s/server.key -out %s/server.csr " % (path, path)
+			cmd = "openssl req -sha256 -new -key '%s/server.key' -out '%s/server.csr'" % (path, path)
 			logger.info("Creating certificate signing request..")
 			csr = subprocess.call(cmd, shell=True)
 		
@@ -2880,11 +2881,10 @@ def createCSRKey(sign = False):
 
 def createPEM(sign = None, commonName = None, keyPass = None, key = None, crt = None, path = None):
 	datasyncBanner(dsappversion)
-	print ("Creating PEM..")
 
 	# Ask for files/path if not self-signed
 	if not sign:
-		print ("Please provide the private key, the public certificate, and any intermediate certificate or bundles.\n")
+		# print (textwrap.fill("Please provide the private key, the public certificate, and any intermediate certificate or bundles.\n", int(WINDOW_SIZE[1])))
 		path = autoCompleteInput("Enter directory path for certificate files (ie. /root/certificates): ")
 		path = path.rstrip('/')
 		if os.path.isdir(path):
@@ -2923,14 +2923,14 @@ def createPEM(sign = None, commonName = None, keyPass = None, key = None, crt = 
 			return
 
 	# Check if private key is passwordless
-	cmd = "openssl rsa -in %s/%s -check -noout -passin pass:" % (path,key)
+	cmd = "openssl rsa -in '%s/%s' -check -noout -passin pass:" % (path,key)
 	chk = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	valid, error = chk.communicate()
 	if error:
 		# Check the private key password
 		if keyPass is None:
 			keyPass = getpass.getpass("Private key passphrase: ")
-		cmd = "openssl rsa -in %s/%s -check -noout -passin pass:%s" % (path,key,keyPass)
+		cmd = "openssl rsa -in '%s/%s' -check -noout -passin pass:%s" % (path,key,keyPass)
 		chk = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		out, err = chk.communicate()
 		if err:
@@ -2962,15 +2962,15 @@ def createPEM(sign = None, commonName = None, keyPass = None, key = None, crt = 
 
 	# dos2unix all intermediate files
 	for caFile in intermediateCAList:
-		cmd = "dos2unix %s/%s &>/dev/null" % (path,caFile)
+		cmd = "dos2unix '%s/%s' &>/dev/null" % (path,caFile)
 		tmp = subprocess.call(cmd, shell=True)
 
 	# dos2unix the public certificate and private key
-	cmd = "dos2unix %s/%s %s/%s &>/dev/null" % (path,key,path,crt)
+	cmd = "dos2unix '%s/%s' '%s/%s' &>/dev/null" % (path,key,path,crt)
 	tmp = subprocess.call(cmd, shell=True)
 
 	# Removing password from Private Key, if it contains one
-	cmd = "openssl rsa -in %s/%s -out %s/nopassword.key -passin pass:%s &>/dev/null" % (path,key,path,keyPass)
+	cmd = "openssl rsa -in '%s/%s' -out '%s/nopassword.key' -passin pass:%s &>/dev/null" % (path,key,path,keyPass)
 	tmp = subprocess.call(cmd, shell=True)
 	logger.debug("Creating %s/nopassword.key for mobility.pem" % path)
 
@@ -2979,6 +2979,7 @@ def createPEM(sign = None, commonName = None, keyPass = None, key = None, crt = 
 		os.remove('%s/mobility.pem' % path)
 		logger.debug("Removing previous %s/mobility.pem" % path)
 
+	print ("\nCreating PEM..")
 	# Create mobility.pem from public certificate, and private
 	with open('%s/mobility.pem' % path, 'a') as openPem:
 		with open('%s/nopassword.key' % path, 'r') as openKey:
@@ -2995,10 +2996,10 @@ def createPEM(sign = None, commonName = None, keyPass = None, key = None, crt = 
 			openPem.write(interCert + '\n')
 	os.remove('%s/nopassword.key' % path)
 
-	print ("\nPEM created at: %s/mobility.pem" % path)
+	print ("PEM created at: %s/mobility.pem" % path)
 	logger.info("PEM created at: %s/mobility.pem" % path)
 
-	if askYesOrNo("Install PEM"):
+	if askYesOrNo("\nInstall PEM"):
 		logger.debug("Running certificate install..")
 		configureMobilityCerts(path)
 
@@ -3066,7 +3067,7 @@ def verifyCertifiateMatch(key = None, keyPass = None, crt = None, path = None):
 			return False
 
 	# MD5 of public certificate
-	cmd = "openssl x509 -noout -modulus -in %s/%s | openssl md5" % (path, crt)
+	cmd = "openssl x509 -noout -modulus -in '%s/%s' | openssl md5" % (path, crt)
 	tmp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	crtMD5_good, crtMD5_err = tmp.communicate()
 	if crtMD5_err:
@@ -3076,9 +3077,9 @@ def verifyCertifiateMatch(key = None, keyPass = None, crt = None, path = None):
 
 	# MD5 of private key
 	if keyPass != None:
-		cmd = "openssl rsa -noout -modulus -in %s/%s -passin pass:%s | openssl md5" % (path, key, keyPass)
+		cmd = "openssl rsa -noout -modulus -in '%s/%s' -passin pass:%s | openssl md5" % (path, key, keyPass)
 	else:
-		cmd = "openssl rsa -noout -modulus -in %s/%s | openssl md5" % (path, key)
+		cmd = "openssl rsa -noout -modulus -in '%s/%s' | openssl md5" % (path, key)
 	tmp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	keyMD5_good, keyMD5_err = tmp.communicate()
 	if keyMD5_err:
