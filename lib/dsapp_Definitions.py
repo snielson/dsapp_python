@@ -27,6 +27,12 @@ import logging, logging.config
 import ConfigParser
 Config = ConfigParser.ConfigParser()
 
+# Import requests as an alternative to urllib
+import requests
+# Hide requests warning (outdated python with GMS)
+import requests.packages.urllib3
+requests.packages.urllib3.disable_warnings()
+
 # Unused imports
 # import thread, threading, itertools, atexit, binascii, io
 
@@ -636,6 +642,37 @@ def dlfile(url,path=None, print_url=True, print_warn=True):
 		if print_url:
 			spinner.stop(); print()
 
+def download_file(url,path=None, print_url=True, print_warn=True):
+	# Credit to Roman Podlinov @ http://stackoverflow.com/questions/16694907/how-to-download-large-file-in-python-with-requests-py
+	spinner = set_spinner()
+	save_path = None
+
+	header = requests.head(url)
+	if header.status_code == 404:
+		print ("%s: %s" % (header.headers['Status'], url))
+		logger.warning("%s: %s" % (header.headers['Status'], url))
+		return False
+
+	if print_url:
+		print ("Downloading %s " % (url), end='')
+		spinner.start(); time.sleep(.000001)
+
+	if path == None:
+		save_path = os.path.basename(url)
+	else:
+		save_path = path + '/' + os.path.basename(url)
+
+	r = requests.get(url, stream=True)
+	with open(save_path, 'wb') as f:
+		for chunk in r.iter_content(chunk_size=1024): 
+			if chunk: # filter out keep-alive new chunks
+				f.write(chunk)
+				# f.flush() commented by recommendation from J.F.Sebastian
+	if print_url:
+		spinner.stop(); print()
+
+	return True
+
 def updateDsapp(publicVersion, rpmFileLocation=None):
 	if rpmFileLocation is None:
 		print ('Updating dsapp to v%s' % (publicVersion))
@@ -645,7 +682,7 @@ def updateDsapp(publicVersion, rpmFileLocation=None):
 		fileName = Config.get('dsapp URL', 'download.filename')
 
 		# Download new version & extract
-		dlfile('%s%s' % (dlPath, fileName))
+		download_file('%s%s' % (dlPath, fileName))
 		print ()
 	else:
 		fileName = rpmFileLocation
@@ -711,8 +748,7 @@ def autoUpdateDsapp(skip=False):
 			logger.info('Checking for a newer version of dsapp')
 			print ('Checking for a newer version of dsapp... ', end='')
 			spinner.start(); time.sleep(.000001)
-			for line in urllib2.urlopen('%s%s' % (dlPath, dsapp_version_file)):
-				publicVersion = line.split("'")[1]
+			publicVersion = requests.get('%s%s' % (dlPath, dsapp_version_file)).text.split("'")[1]
 			spinner.stop(); print ()
 			clear()
 			
