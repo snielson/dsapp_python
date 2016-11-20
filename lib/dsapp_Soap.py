@@ -107,6 +107,60 @@ getAddressBookListRequest = """<?xml version="1.0" encoding="UTF-8"?>
 	</SOAP-ENV:Envelope>
 """
 
+modifyItemRequest = """<?xml version="1.0" encoding="UTF-8"?>
+	<SOAP-ENV:Envelope xmlns:ns0="http://schemas.novell.com/2005/01/GroupWise/types" xmlns:ns1="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns2="http://schemas.novell.com/2005/01/GroupWise/methods" xmlns:tns="http://schemas.novell.com/2005/01/GroupWise/types" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
+		<SOAP-ENV:Header>
+			<tns:session>%s</tns:session>
+		</SOAP-ENV:Header>
+		<SOAP-ENV:Body>
+			<ns0:modifyItemRequest>
+				<id xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">%s</id>
+				<updates xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">
+					<update xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">
+						<parent xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">%s</parent>
+						<sequence xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">0</sequence>
+					</update>
+				</updates>
+			</ns0:modifyItemRequest>
+		</SOAP-ENV:Body>
+	</SOAP-ENV:Envelope>
+"""
+
+modifyItemRequest_Calendar = """<?xml version="1.0" encoding="UTF-8"?>
+	<SOAP-ENV:Envelope xmlns:ns0="http://schemas.novell.com/2005/01/GroupWise/types" xmlns:ns1="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns2="http://schemas.novell.com/2005/01/GroupWise/methods" xmlns:tns="http://schemas.novell.com/2005/01/GroupWise/types" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
+		<SOAP-ENV:Header>
+			<tns:session>%s</tns:session>
+		</SOAP-ENV:Header>
+		<SOAP-ENV:Body>
+			<ns0:modifyItemRequest>
+				<id xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">%s</id>
+				<updates xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">
+					<update xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">
+						<parent xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">%s</parent>
+						<sequence xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">0</sequence>
+						<calSequence xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">0</calSequence>
+					</update>
+				</updates>
+			</ns0:modifyItemRequest>
+		</SOAP-ENV:Body>
+	</SOAP-ENV:Envelope>
+"""
+
+# moveItemRequest = """<?xml version="1.0" encoding="UTF-8"?>
+# 	<SOAP-ENV:Envelope xmlns:ns0="http://schemas.novell.com/2005/01/GroupWise/types" xmlns:ns1="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns2="http://schemas.novell.com/2005/01/GroupWise/methods" xmlns:tns="http://schemas.novell.com/2005/01/GroupWise/types" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
+# 		<SOAP-ENV:Header>
+# 			<tns:session>%s</tns:session>
+# 		</SOAP-ENV:Header>
+# 		<SOAP-ENV:Body>
+# 			<ns0:moveItemRequest>
+# 				<id xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">%s</id>
+# 				<container xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">%s</container>
+# 				<from xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">%s</from>
+# 			</ns0:moveItemRequest>
+# 		</SOAP-ENV:Body>
+# 	</SOAP-ENV:Envelope>
+# """
+
 def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False, ignoreError=False):
 	soapAddr = None
 	# if verifyMobility is True, only check users found in GMS
@@ -210,10 +264,18 @@ def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
 	if userConfig['name'] is None:
 		return
 
+	soap_userConfig = soap_getUserInfo(trustedConfig, gwConfig, userConfig)
+
+	# Set up IDs for fixing structure
+	systemIDs = dict()
+	system_problemIDs = dict()
+	subContact_problemIDs = dict()
+	subCalendar_problemIDs = dict()
+
 	problem = False
 	print ("Getting folder list..")
 	logger.info("Getting folder list..")
-	soap_folderList = soap_getFolderList(trustedConfig, gwConfig, userConfig)
+	soap_folderList = soap_getFolderList(trustedConfig, gwConfig, userConfig, soap_userConfig=soap_userConfig)
 	if soap_folderList == None:
 		logger.debug("SOAP folder list is None")
 		print(); ds.eContinue()
@@ -223,14 +285,19 @@ def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
 	if soap_folderList[0][0][0]['sid'] == 1:
 		root_id = soap_folderList[0][0][0]['id']
 	else:
+		foundRoot = False
 		for folder in soap_folderList[0][0]:
-			if folder['sid'] == 1:
+			if folder['sid'] == 1 or folder['folderType'] == 'Root':
 				root_id = folder['id']
-				break
-			else:
-				print ("Unable to find the root folder for %s" % userConfig['name'])
-				logger.warning("Unable to find the root folder for %s" % userConfig['name'])
-				return
+				foundRoot = True
+
+		if not foundRoot:
+			print ("Unable to find the root folder for %s" % userConfig['name'])
+			logger.warning("Unable to find the root folder for %s" % userConfig['name'])
+			return
+
+	systemIDs['root'] = root_id
+	logger.debug('root {id: %s}' % root_id)
 
 	print ("Checking %s folder structure..\n" % userConfig['name'])
 	logger.info("Checking %s folder structure" % userConfig['name'])
@@ -239,17 +306,25 @@ def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
 		if 'folderType' in folder:
 			if folder['folderType'] in folder_check:
 				if folder['parent'] != root_id:
-					print ("Problem with system folder structure\n%s not found under root of mailbox\n" % folder['folderType'])
-					logger.error("Problem with system folder structure - %s not found under root of mailbox\n" % folder['folderType'])
+					print ("Problem with system folder structure: %s\n%s not found under root\n" % (folder['folderType'], folder['name']))
+					logger.debug("%s {id: %s, parent: %s}" % (folder['name'], folder['id'], folder['parent']))
+					logger.error("Problem with system folder '%s' structure - %s not found under root" % (folder['folderType'], folder['name']))
+					system_problemIDs[folder['folderType']] = {folder['name']: folder['id']}
 					problem = True
-				else:
-					if folder['folderType'] == 'Contacts':
-						if check_subContacts(soap_folderList, folder['id']): problem = True
-					if folder['folderType'] == 'Calendar':
-						if check_subCalendars(soap_folderList, folder['id']): problem = True
+
+				if folder['folderType'] == 'Contacts':
+					systemIDs['Contacts'] = folder['id']
+					if check_subContacts(soap_folderList, folder['id'], subContact_problemIDs): problem = True
+				if folder['folderType'] == 'Calendar':
+					systemIDs['Calendar'] = folder['id']
+					if check_subCalendars(soap_folderList, folder['id'], subCalendar_problemIDs): problem = True
+
 	if not problem:
 		print ("No problems found with GroupWise folder structure")
 		logger.info("No problems found with GroupWise folder structure")
+	else:
+		if ds.askYesOrNo("Fix %s folder structure" % userConfig['name']):
+			fixFolderStructure(soap_userConfig, systemIDs, system_problemIDs, subCalendar_problemIDs, subContact_problemIDs)
 
 	print(); ds.eContinue()
 
@@ -291,7 +366,7 @@ def soap_getUserList(trustedConfig, gwConfig, noout='true'):
 		results = None
 	return results
 
-def check_subCalendars(folderList, parent_id):
+def check_subCalendars(folderList, parent_id, subCalendar_problemIDs):
 	logger.info("Checking sub calendars..")
 	logger.debug("Calendar id = %s" % parent_id)
 	problem = False
@@ -303,16 +378,17 @@ def check_subCalendars(folderList, parent_id):
 			if 'isSystemFolder' not in folder or folder['isSystemFolder'] == 'False':
 				if folder['calendarAttribute'] and folderType != 'Proxy':
 					if folder['parent'] != parent_id:
-						print ("Folder structure problem with calendar: %s" % folder['name'])
+						print ("Problem with sub calendar: %s\n" % folder['name'])
 						logger.warning("Folder structure problem with calendar: %s" % folder['name'])
 						logger.debug("%s parent id = %s" % (folder['name'], folder['parent']))
+						subCalendar_problemIDs[folder['name']] = folder['id']
 						problem = True
 		except:
 			pass
 
 	return problem
 
-def check_subContacts(folderList, parent_id):
+def check_subContacts(folderList, parent_id, subContact_problemIDs):
 	logger.info("Checking sub contacts..")
 	logger.debug("Contact id = %s" % parent_id)
 	problem = False
@@ -321,9 +397,10 @@ def check_subContacts(folderList, parent_id):
 			if 'isSystemFolder' not in folder or folder['isSystemFolder'] == 'False':
 				if folder['folderType'] == 'UserContacts':
 					if folder['parent'] != parent_id:
-						print ("Folder structure problem with address book: %s" % folder['name'])
+						print ("Problem with sub address book: %s\n" % folder['name'])
 						logger.warning("Folder structure problem with address book: %s" % folder['name'])
 						logger.debug("%s parent id = %s" % (folder['name'], folder['parent']))
+						subContact_problemIDs[folder['name']] = folder['id']
 						problem = True
 		except:
 			pass
@@ -449,3 +526,51 @@ def soap_checkAddressBookListTEST(trustedConfig, gwConfig, userConfig):
 
 	return soap_AdddressBookList
 	
+
+def moveFolder(soap_userConfig, sourceID, targetID, ignoreError=False, moveType='folder'):
+	# if soap_userConfig is None:
+	# 	soap_userConfig = soap_getUserInfo(trustedConfig, gwConfig, userConfig, ignoreError=ignoreError)
+	# 	if soap_userConfig == None:
+	# 		return
+
+	if moveType == 'folder':
+		# Vaiables to be sent in : User session ID, ID of folder to move, ID of target
+		soap = modifyItemRequest % (soap_userConfig['session'],sourceID, targetID)
+		logger.debug("Modify parent id %s to id %s" % (sourceID, targetID))
+	elif moveType == 'calendar':
+		# Vaiables to be sent in : User session ID, ID of folder to move, ID of target
+		soap = modifyItemRequest_Calendar % (soap_userConfig['session'], sourceID, targetID)
+		logger.debug("Modify parent id %s to id %s" % (sourceID, targetID))
+	else:
+		logger.error("Wrong moveType: %s" % moveType)
+		return 0
+
+	soapClient = suds.client.Client(WSDL, location='%(soapAddr)s' % soap_userConfig)
+	results = soapClient.service.modifyItemRequest(__inject={'msg': soap})
+	return results
+
+def fixFolderStructure(soap_userConfig, systemIDs, system_problemIDs, subCalendar_problemIDs, subContact_problemIDs):
+	print()
+	# Check and move sub contacts
+	if len(subContact_problemIDs) >= 1:
+		for key, value in subContact_problemIDs.iteritems():
+			print ("Moving sub address book: %s to system address book.." % key)
+			logger.info("Moving sub address book: %s to system address book.." % key)
+			moveFolder(soap_userConfig, value, systemIDs['Contacts'])
+
+	# Check and move sub calendars
+	if len(subCalendar_problemIDs) >= 1:
+		for key, value in subCalendar_problemIDs.iteritems():
+			print ("Moving sub calendar: %s to system calendar.." % key)
+			logger.info("Moving sub calendar: %s to system calendar.." % key)
+			moveFolder(soap_userConfig, value, systemIDs['Calendar'], moveType='calendar')
+
+	# Check and move system folders
+	if len(system_problemIDs) >= 1:
+		for key, value in system_problemIDs.iteritems():
+			print ("Moving system [%s] %s to root.." % (key, system_problemIDs[key].keys()[0]))
+			logger.info("Moving system [%s] %s to root.." % (key, system_problemIDs[key].keys()[0]))
+			moveFolder(soap_userConfig, system_problemIDs[key].values()[0], systemIDs['root'])
+
+	print ("\nFix folder structure complete")
+	logger.info("Fix folder structure complete")

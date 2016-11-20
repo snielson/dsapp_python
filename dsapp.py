@@ -646,7 +646,11 @@ if args.clear:
 
 DEBUG_ENABLED = False
 if DEBUG_ENABLED:
-	pass
+	import dsapp_Soap as dsSOAP
+	userConfig = ds.verifyUser(dbConfig)[0]
+	if userConfig['name'] is not None:
+		soap_userConfig = dsSOAP.soap_getUserInfo(trustedConfig, gwConfig, userConfig, ignoreError=ignoreError)
+		print dsSOAP.moveFolder(soap_userConfig, '1B.Dom.po2.100.0.1.0.1@32"', '6.Dom.po2.100.0.1.0.1@15', ignoreError=False, soap_userConfig=None)
 
 	sys.exit(0)
 
