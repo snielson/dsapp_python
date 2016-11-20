@@ -371,7 +371,8 @@ def check_subCalendars(folderList, parent_id, subCalendar_problemIDs):
 						problem = True
 		except:
 			pass
-	print ()
+	if problem:
+		print ()
 
 	return problem
 
@@ -391,7 +392,8 @@ def check_subContacts(folderList, parent_id, subContact_problemIDs):
 						problem = True
 		except:
 			pass
-	print ()
+	if problem:
+		print ()
 
 	return problem
 
