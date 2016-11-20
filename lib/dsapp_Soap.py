@@ -146,21 +146,6 @@ modifyItemRequest_Calendar = """<?xml version="1.0" encoding="UTF-8"?>
 	</SOAP-ENV:Envelope>
 """
 
-# moveItemRequest = """<?xml version="1.0" encoding="UTF-8"?>
-# 	<SOAP-ENV:Envelope xmlns:ns0="http://schemas.novell.com/2005/01/GroupWise/types" xmlns:ns1="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns2="http://schemas.novell.com/2005/01/GroupWise/methods" xmlns:tns="http://schemas.novell.com/2005/01/GroupWise/types" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
-# 		<SOAP-ENV:Header>
-# 			<tns:session>%s</tns:session>
-# 		</SOAP-ENV:Header>
-# 		<SOAP-ENV:Body>
-# 			<ns0:moveItemRequest>
-# 				<id xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">%s</id>
-# 				<container xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">%s</container>
-# 				<from xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">%s</from>
-# 			</ns0:moveItemRequest>
-# 		</SOAP-ENV:Body>
-# 	</SOAP-ENV:Envelope>
-# """
-
 def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False, ignoreError=False):
 	soapAddr = None
 	# if verifyMobility is True, only check users found in GMS
@@ -306,12 +291,13 @@ def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
 		if 'folderType' in folder:
 			if folder['folderType'] in folder_check:
 				if folder['parent'] != root_id:
-					print ("Problem with system folder structure: %s\n%s not found under root\n" % (folder['folderType'], folder['name']))
+					print ("Problem with system folder structure [%s]\n%s not found under root\n" % (folder['folderType'], folder['name']))
 					logger.debug("%s {id: %s, parent: %s}" % (folder['name'], folder['id'], folder['parent']))
-					logger.error("Problem with system folder '%s' structure - %s not found under root" % (folder['folderType'], folder['name']))
+					logger.error("Problem with system folder [%s] structure - %s not found under root" % (folder['folderType'], folder['name']))
 					system_problemIDs[folder['folderType']] = {folder['name']: folder['id']}
 					problem = True
 
+				# Check sub folders
 				if folder['folderType'] == 'Contacts':
 					systemIDs['Contacts'] = folder['id']
 					if check_subContacts(soap_folderList, folder['id'], subContact_problemIDs): problem = True
@@ -378,13 +364,14 @@ def check_subCalendars(folderList, parent_id, subCalendar_problemIDs):
 			if 'isSystemFolder' not in folder or folder['isSystemFolder'] == 'False':
 				if folder['calendarAttribute'] and folderType != 'Proxy':
 					if folder['parent'] != parent_id:
-						print ("Problem with sub calendar: %s\n" % folder['name'])
+						print ("Problem with sub calendar: %s" % folder['name'])
 						logger.warning("Folder structure problem with calendar: %s" % folder['name'])
 						logger.debug("%s parent id = %s" % (folder['name'], folder['parent']))
 						subCalendar_problemIDs[folder['name']] = folder['id']
 						problem = True
 		except:
 			pass
+	print ()
 
 	return problem
 
@@ -397,13 +384,14 @@ def check_subContacts(folderList, parent_id, subContact_problemIDs):
 			if 'isSystemFolder' not in folder or folder['isSystemFolder'] == 'False':
 				if folder['folderType'] == 'UserContacts':
 					if folder['parent'] != parent_id:
-						print ("Problem with sub address book: %s\n" % folder['name'])
+						print ("Problem with sub address book: %s" % folder['name'])
 						logger.warning("Folder structure problem with address book: %s" % folder['name'])
 						logger.debug("%s parent id = %s" % (folder['name'], folder['parent']))
 						subContact_problemIDs[folder['name']] = folder['id']
 						problem = True
 		except:
 			pass
+	print ()
 
 	return problem
 
@@ -528,11 +516,6 @@ def soap_checkAddressBookListTEST(trustedConfig, gwConfig, userConfig):
 	
 
 def moveFolder(soap_userConfig, sourceID, targetID, ignoreError=False, moveType='folder'):
-	# if soap_userConfig is None:
-	# 	soap_userConfig = soap_getUserInfo(trustedConfig, gwConfig, userConfig, ignoreError=ignoreError)
-	# 	if soap_userConfig == None:
-	# 		return
-
 	if moveType == 'folder':
 		# Vaiables to be sent in : User session ID, ID of folder to move, ID of target
 		soap = modifyItemRequest % (soap_userConfig['session'],sourceID, targetID)
@@ -546,11 +529,17 @@ def moveFolder(soap_userConfig, sourceID, targetID, ignoreError=False, moveType=
 		return 0
 
 	soapClient = suds.client.Client(WSDL, location='%(soapAddr)s' % soap_userConfig)
-	results = soapClient.service.modifyItemRequest(__inject={'msg': soap})
+	try:
+		results = soapClient.service.modifyItemRequest(__inject={'msg': soap})
+	except:
+		print ("Failed moving folder")
+		logger.error("Failed moving folder")
+
 	return results
 
 def fixFolderStructure(soap_userConfig, systemIDs, system_problemIDs, subCalendar_problemIDs, subContact_problemIDs):
 	print()
+
 	# Check and move sub contacts
 	if len(subContact_problemIDs) >= 1:
 		for key, value in subContact_problemIDs.iteritems():
