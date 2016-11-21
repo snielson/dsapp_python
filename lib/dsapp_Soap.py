@@ -563,5 +563,5 @@ def fixFolderStructure(soap_userConfig, systemIDs, system_problemIDs, subCalenda
 			logger.info("Moving system [%s] %s to root.." % (key, system_problemIDs[key].keys()[0]))
 			moveFolder(soap_userConfig, system_problemIDs[key].values()[0], systemIDs['root'])
 
-	print ("\nFix folder structure complete")
+	print ("\nFix folder structure complete\nPlease reinitialize %s in mobility" % soap_userConfig['userid'])
 	logger.info("Fix folder structure complete")
