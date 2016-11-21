@@ -517,13 +517,13 @@ def soap_checkAddressBookListTEST(trustedConfig, gwConfig, userConfig):
 	return soap_AdddressBookList
 	
 
-def moveFolder(soap_userConfig, sourceID, targetID, ignoreError=False, moveType='folder'):
+def moveFolder(soap_userConfig, sourceID, targetID, moveType='folder'):
 	if moveType == 'folder':
-		# Vaiables to be sent in : User session ID, ID of folder to move, ID of target
+		# Variables to be sent in : User session ID, ID of folder to move, ID of target
 		soap = modifyItemRequest % (soap_userConfig['session'],sourceID, targetID)
 		logger.debug("Modify parent id %s to id %s" % (sourceID, targetID))
 	elif moveType == 'calendar':
-		# Vaiables to be sent in : User session ID, ID of folder to move, ID of target
+		# Variables to be sent in : User session ID, ID of folder to move, ID of target
 		soap = modifyItemRequest_Calendar % (soap_userConfig['session'], sourceID, targetID)
 		logger.debug("Modify parent id %s to id %s" % (sourceID, targetID))
 	else:
@@ -563,5 +563,5 @@ def fixFolderStructure(soap_userConfig, systemIDs, system_problemIDs, subCalenda
 			logger.info("Moving system [%s] %s to root.." % (key, system_problemIDs[key].keys()[0]))
 			moveFolder(soap_userConfig, system_problemIDs[key].values()[0], systemIDs['root'])
 
-	print ("\nFix folder structure complete\nPlease reinitialize %s in mobility" % soap_userConfig['userid'])
+	print ("\nFix folder structure complete\nReinitialize %s in mobility suggested" % soap_userConfig['userid'])
 	logger.info("Fix folder structure complete")
