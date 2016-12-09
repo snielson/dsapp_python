@@ -825,6 +825,8 @@ def dsUpdate(repo):
 				logger.info("Foce update Mobility package complete")
 				logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 				print ("\nPlease run 'sh %s/update.sh' to complete the upgrade" % dirOptMobility)
+			else: print ()
+		else: print ()
 	else:
 		print ("Updating Mobility.. ", end='')
 		logger.info('Updating Mobility started')
@@ -832,7 +834,16 @@ def dsUpdate(repo):
 		time1 = time.time()
 		cmd = "zypper --non-interactive update --force -r %s" % repo
 		logger.debug("Running command: %s" % cmd)
-		out = util_subprocess(cmd)
+		out = util_subprocess(cmd, True)
+		if out[1]:
+			spinner.stop();print ()
+			print ("Failed to update Mobility")
+			logger.error("Failed to update Mobility")
+			print (out[0])
+			print (out[1])
+			print ("Run the following commands to update manually:\n1. zypper update --force -r %s\n2. /opt/novell/datasync/update.sh\n" % repo)
+			return
+
 		spinner.stop(); print ()
 		time2 = time.time()
 		logger.info("Updating Mobility package complete")
@@ -859,10 +870,14 @@ def dsUpdate(repo):
 		os.environ["FEEDBACK"] = ""
 		os.environ["LOGGER"] = ""
 
+		spinner2 = set_spinner()
 		logger.info('Updating Mobility schema started')
+		print ("Updating Mobility database schema.. ", end='')
+		spinner2.start(); time.sleep(.000001)
 		time1 = time.time()
 		cmd = "python %s/common/lib/upgrade.pyc" % dirOptMobility
 		out = util_subprocess(cmd)
+		spinner2.stop(); print ()
 		time2 = time.time()
 		logger.info("Updating Mobility schema complete")
 		logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
@@ -3781,7 +3796,7 @@ def getLogs(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedCo
 			if '.xml' in fname:
 				compress_it.append(dirName + '/' + fname)
 
-	#Sync status
+	# Sync status
 	print ("Checking sync status..")
 	stdout = sys.stdout
 	with open(dsappupload + '/sync-status.txt', 'w') as sys.stdout:
@@ -3824,6 +3839,11 @@ def getLogs(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedCo
 	message_log = Config.getint('Upload Logs', 'messages')
 	postgres_log = Config.getint('Upload Logs', 'postgres')
 
+	# Get any folderStructure logs
+	if os.path.exists(dsappLogs + '/folderStructure'):
+		files = sorted(glob.glob(dsappLogs + '/folderStructure/*_folderStructure.log'))
+		for file in files:
+			compress_it.append(file)
 
 	files = sorted(glob.glob(log +'/connectors/mobility-agent.*'), key=os.path.getctime)
 	for file in files[-mob_agent_Log:]:
@@ -3969,7 +3989,7 @@ def list_deviceInfo(dbConfig):
 
 def list_usersAndEmails(dbConfig):
 	datasyncBanner(dsappversion)
-	cmd = "PGPASSWORD='%(pass)s' psql -U %(user)s mobility -c \"select g.displayname, g.firstname, g.lastname, u.userid, g.emailaddress from gal g INNER JOIN users u ON (g.alias = u.name);\"" % dbConfig
+	cmd = "PGPASSWORD='%(pass)s' psql -U %(user)s mobility -c \"select g.displayname, g.firstname, g.lastname, u.userid, g.emailaddress from gal g INNER JOIN users u ON (LOWER(g.alias) = LOWER(u.name));\"" % dbConfig
 	logger.info("Listing all users and emails")
 	out = util_subprocess(cmd)
 	pydoc.pager(out[0].rstrip('\n'))

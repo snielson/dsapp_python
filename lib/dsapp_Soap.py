@@ -16,6 +16,7 @@ import dsapp_Definitions as ds
 # Global paths
 dsappDirectory = "/opt/novell/datasync/tools/dsapp"
 dsappConf = dsappDirectory + "/conf"
+dsappLogs = dsappDirectory + "/logs"
 
 WSDL = 'file://%s/wsdl/GW2012/groupwise.wsdl' % os.path.dirname(os.path.realpath(__file__))
 
@@ -172,7 +173,12 @@ def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False
 	soap = loginRequest % (userid, trustedConfig['name'], trustedConfig['key'])
 	soapClient = suds.client.Client(WSDL, location='%(sSecure)s://%(gListenAddress)s:%(sPort)s/soap' % gwConfig)
 	soapAddr = '%(sSecure)s://%(gListenAddress)s:%(sPort)s/soap' % gwConfig
-	results = soapClient.service.loginRequest(__inject={'msg': soap})
+	try:
+		results = soapClient.service.loginRequest(__inject={'msg': soap})
+	except:
+		print ("Unable to communicate with GroupWise server:\n%s" % soapAddr)
+		logger.warning("Unable to communicate with GroupWise server: %s" % soapAddr)
+		return
 
 	# Check for invalid soap name / key
 	if  'description' in results['status']:
@@ -185,13 +191,13 @@ def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False
 	# Check and fix for redirection / http vs https
 	if  'description' in results['status']:
 		if "Redirect user" in results['status']['description']:
-			logger.debug("SOAP redirection to %s://%s:%s/soap" % (secureOrder[0] ,results['redirectToHost'][0]['ipAddress'], results['redirectToHost'][0]['port']))
+			logger.info("SOAP redirection to %s://%s:%s/soap" % (secureOrder[0] ,results['redirectToHost'][0]['ipAddress'], results['redirectToHost'][0]['port']))
 			soapClient = suds.client.Client(WSDL, location='%s://%s:%s/soap' % (secureOrder[0], results['redirectToHost'][0]['ipAddress'], results['redirectToHost'][0]['port']))
 			soapAddr = '%s://%s:%s/soap' % (secureOrder[0], results['redirectToHost'][0]['ipAddress'], results['redirectToHost'][0]['port'])
 		try:
 			results = soapClient.service.loginRequest(__inject={'msg': soap})
 		except:
-			logger.debug("SOAP redirection to %s://%s:%s/soap" % (secureOrder[1] ,results['redirectToHost'][0]['ipAddress'], results['redirectToHost'][0]['port']))
+			logger.info("SOAP redirection to %s://%s:%s/soap" % (secureOrder[1] ,results['redirectToHost'][0]['ipAddress'], results['redirectToHost'][0]['port']))
 			soapClient = suds.client.Client(WSDL, location='%s://%s:%s/soap' % (secureOrder[1], results['redirectToHost'][0]['ipAddress'], results['redirectToHost'][0]['port']))
 			soapAddr = '%s://%s:%s/soap' % (secureOrder[1], results['redirectToHost'][0]['ipAddress'], results['redirectToHost'][0]['port'])
 			try:
@@ -251,6 +257,9 @@ def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
 
 	soap_userConfig = soap_getUserInfo(trustedConfig, gwConfig, userConfig)
 
+	# Log output for users folder structure
+	folderStructure_Log = dsappLogs + '/folderStructure/%s_folderStructure.log' % userConfig['name']
+
 	# Set up IDs for fixing structure
 	systemIDs = dict()
 	system_problemIDs = dict()
@@ -265,6 +274,12 @@ def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
 		logger.debug("SOAP folder list is None")
 		print(); ds.eContinue()
 		return
+
+	# Write folder list to log
+	if not os.path.exists(dsappLogs + '/folderStructure'):
+		os.makedirs(dsappLogs + '/folderStructure')
+	with open(folderStructure_Log, 'w') as file:
+		file.write(str(soap_folderList))
 
 	# Get root folder ID
 	if soap_folderList[0][0][0]['sid'] == 1:
