@@ -123,6 +123,7 @@ dsappSettings = dsappConf + "/setting.cfg"
 dsappLogSettings = dsappConf + "/logging.cfg"
 dsappLog = dsappLogs + "/dsapp.log"
 ghcLog = dsappLogs + "/generalHealthCheck.log"
+soapDebugLog = dsappLogs + '/soapResults.log'
 
 # Log Settings
 logging.config.fileConfig('%s/logging.cfg' % (dsappConf))
@@ -3816,6 +3817,7 @@ def getLogs(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedCo
 
 	print ("\nCompressing logs for upload..")
 	compress_it.append(dsappLog)
+	compress_it.append(soapDebugLog)
 	compress_it.append(exceptionLog)
 	compress_it.append(performanceLog)
 	compress_it.append(sudslog)
