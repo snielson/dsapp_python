@@ -397,7 +397,7 @@ def soap_getUserList(trustedConfig, gwConfig, noout='true'):
 	if logLevel == 'DEBUG':
 		with open (soapDebugLog, 'a') as soapLog:
 			DATE = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
-			soapLog.write(DATE + ' [getUserListRequest] sending to: (%s)\n' % soap_userConfig['soapAddr'] + str(results) + '\n')
+			soapLog.write(DATE + ' [getUserListRequest] sending to: (%s)\n' % gw_location + str(results) + '\n')
 	return results
 
 def check_subCalendars(folderList, parent_id, subCalendar_problemIDs):
