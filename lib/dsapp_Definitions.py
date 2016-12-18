@@ -1175,6 +1175,8 @@ def backup_config_files(list, fname=None):
 
 def check_hostname(old_host, XMLconfig, config_files, forceFix=False):
 	new_host = os.popen('echo `hostname -f`').read().rstrip()
+	logger.debug("Current hostname: %s" % new_host)
+	logger.debug("Stored hostname: %s" % old_host)
 	if old_host != new_host:
 		if not forceFix:
 			print ("Hostname %s does not match configured %s" % (new_host, old_host))

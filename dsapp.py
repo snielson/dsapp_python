@@ -268,17 +268,19 @@ parser.add_argument('-db', '--database', action='store_true', dest='db', help='C
 parser.add_argument('-cl', '--clear', action='store_true', dest='clear', help='Remove encryption from XMLs')
 parser.add_argument('--config', dest='re', choices=['backup', 'restore'], help='Backup settings or install Mobility with backup')
 parser.add_argument('--setlog', dest='loglevel', choices=['debug','info','warning'], help='Set the logging level')
-parser.add_argument('--debugMenu', action='store_true', dest='debugMenu', help=argparse.SUPPRESS)
+parser.add_argument('--debugMenu', action='store_true', dest='debugMenu', help='Show debug menu for dsapp')
 args = parser.parse_args()
 logger.debug("Switches: %s" % args)
 
 if args.re == 'restore':
+	logger.info("Running switch: restore")
 	import dsapp_re
 	dsapp_re.install_settings()
 	print; ds.eContinue()
 	sys.exit(0)
 
 if args.bug:
+	logger.info("Running switch: bug")
 	ds.datasyncBanner(dsappversion)
 	print "Report issues to: https://github.com/snielson/dsapp_python/issues\n"
 	print "Useful logs can be located at:\n/opt/novell/datasync/tools/dsapp/logs/\nSet dsapp logs into debug for more information `dsapp --setlog debug`\n"
@@ -286,12 +288,14 @@ if args.bug:
 	sys.exit(0)
 
 if args.dsUpdate:
+	logger.info("Running switch: updateDsapp")
 	ds.autoUpdateDsapp(True)
 	ds.eContinue()
 	sys.exit(0)
 
 # Set logs if loglevel switch passed in
 if args.loglevel:
+	logger.info("Running switch: setlog")
 	Config.read(dsappLogSettings)
 	Config.set('logger___main__', 'level', args.loglevel.upper())
 	Config.set('logger_dsapp_Definitions', 'level', args.loglevel.upper())
@@ -302,6 +306,7 @@ if args.loglevel:
 	sys.exit(0)
 
 if args.autoUpdate:
+	logger.info("Running switch: autoUpdate")
 	Config.read(dsappSettings)
 	temp = Config.getboolean('Settings', 'auto.update')
 	temp = not temp
@@ -314,6 +319,8 @@ if args.autoUpdate:
 	sys.exit(0)
 
 # Check / set force mode
+if args.force:
+	logger.info("Running switch: force")
 forceMode = args.force
 
 if args.clear or args.db:
@@ -404,6 +411,7 @@ logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
 # Check current hostname with stored hostname
 if args.host:
+	logger.info("Running switch: changeHost")
 	print ("This should only be used if the hostname encryption is not detected by dsapp")
 	if ds.askYesOrNo("Continue to fix encryption"):
 		old_host = raw_input("Previous hostname: ")
@@ -541,6 +549,7 @@ if not forceMode:
 ##################################################################################################
 # Debug menu
 if args.debugMenu:
+	logger.info("Running switch: debugMenu")
 	import dsapp_menus as dsMenu
 	dsMenu.getConfigs(dbConfig, ldapConfig, mobilityConfig, gwConfig, trustedConfig, XMLconfig, config_files, webConfig, authConfig)
 	dsMenu.debug_menu()
@@ -548,12 +557,14 @@ if args.debugMenu:
 
 # Change db pass
 if args.db:
+	logger.info("Running switch: database")
 	ds.changeDBPass(config_files, XMLconfig)
 	ds.eContinue()
 	sys.exit(0)
 
 # Run health check
 if args.ghc:
+	logger.info("Running switch: gHealthCheck")
 	import dsapp_ghc as ghc
 	ghc.generalHealthCheck(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedConfig, config_files, webConfig)
 	print; ds.eContinue()
@@ -561,33 +572,39 @@ if args.ghc:
 
 # Get / upload mobility logs
 if args.upload:
+	logger.info("Running switch: uploadLogs")
 	ds.getLogs(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedConfig, config_files, webConfig)
 	print; ds.eContinue()
 	sys.exit(0)
 
 # Run nightly maintenance
 if args.check:
+	logger.info("Running switch: check")
 	print ds.checkNightlyMaintenance(config_files, mobilityConfig)['output']
 	print; ds.eContinue()
 	sys.exit(0)
 
 # Show sync status
 if args.status:
+	logger.info("Running switch: status")
 	ds.showStatus(dbConfig)
 	print; ds.eContinue()
 	sys.exit(0)
 
 # Update mobility URL
 if args.update:
+	logger.info("Running switch: update")
 	ds.updateMobilityFTP()
 	ds.eContinue()
 	sys.exit(0)
 
 # Vacuum db
 if args.vacuum:
+	logger.info("Running switch: vacuum")
 	ds.rcDS('stop')
 	ds.vacuumDB(dbConfig)
 	if args.index:
+		logger.info("Running switch: index")
 		ds.indexDB(dbConfig)
 	ds.rcDS('start')
 	ds.eContinue()
@@ -595,9 +612,11 @@ if args.vacuum:
 
 # Index db
 if args.index:
+	logger.info("Running switch: index")
 	ds.rcDS('stop')
 	ds.indexDB(dbConfig)
 	if args.vacuum:
+		logger.info("Running switch: vacuum")
 		ds.vacuumDB(dbConfig)
 	ds.rcDS('start')
 	ds.eContinue()
@@ -605,7 +624,9 @@ if args.index:
 
 # Show Users
 if args.users:
+	logger.info("Running switch: users")
 	if args.devices:
+		logger.info("Running switch: devices")
 		data = ds.getUsers_and_Devices(dbConfig, showBoth=True)
 		count_out = "Number of users: %s\nCount of devices: %s\n" % (data['userCount'][0]['count'], data['deviceCount'][0]['count'])
 	else:
@@ -618,7 +639,9 @@ if args.users:
 
 # Show Devices
 if args.devices:
+	logger.info("Running switch: devices")
 	if args.users:
+		logger.info("Running switch: users")
 		data = ds.getUsers_and_Devices(dbConfig, showBoth=True)
 		count_out = "Number of users: %s\nCount of devices: %s\n" % (data['userCount'][0]['count'], data['deviceCount'][0]['count'])
 	else:
@@ -631,6 +654,7 @@ if args.devices:
 
 # Load restore menu
 if args.re == 'backup':
+	logger.info("Running switch: config")
 	import dsapp_re
 	dsapp_re.dumpConfigs(dbConfig, ldapConfig, mobilityConfig, gwConfig, trustedConfig, config_files, webConfig, authConfig)
 	print; ds.eContinue()
@@ -638,11 +662,13 @@ if args.re == 'backup':
 
 # Remove all encryption from XMLs
 if args.clear:
+	logger.info("Running switch: clear")
 	ds.clearTextEncryption(config_files, XMLconfig, ldapConfig, authConfig)
 	sys.exit(0)
 
 # Reinit all users
 if args.reinit:
+	logger.info("Running switch: reinit")
 	ds.reinitAllUsers(dbConfig, True)
 	sys.exit(0)
 
