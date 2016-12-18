@@ -263,6 +263,7 @@ parser.add_argument('-u', '--users', action='store_true', dest='users', help='Pr
 parser.add_argument('-d', '--devices', action='store_true', dest='devices', help='Print list of all devices with count')
 parser.add_argument('-ch', '--changeHost', action='store_true', dest='host', help='Fix mobility encryption with old hostname')
 parser.add_argument('-f', '--force', action='store_true', dest='force', help='Force runs dsapp')
+parser.add_argument('-r', '--reinit', action='store_true', dest='reinit', help='Reinitialize all users')
 parser.add_argument('-db', '--database', action='store_true', dest='db', help='Change database password')
 parser.add_argument('-cl', '--clear', action='store_true', dest='clear', help='Remove encryption from XMLs')
 parser.add_argument('--config', dest='re', choices=['backup', 'restore'], help='Backup settings or install Mobility with backup')
@@ -638,6 +639,11 @@ if args.re == 'backup':
 # Remove all encryption from XMLs
 if args.clear:
 	ds.clearTextEncryption(config_files, XMLconfig, ldapConfig, authConfig)
+	sys.exit(0)
+
+# Reinit all users
+if args.reinit:
+	ds.reinitAllUsers(dbConfig, True)
 	sys.exit(0)
 
 ##################################################################################################

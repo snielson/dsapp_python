@@ -2757,19 +2757,30 @@ def changeAppName(dbConfig):
 
 	print(); eContinue()
 
-def reinitAllUsers(dbConfig):
-	datasyncBanner(dsappversion)
-	print (textwrap.fill("Note: During the reinitialize, users will not be able to log in. This may take some time.", int(WINDOW_SIZE[1])))
-	if askYesOrNo("Are you sure you want to reinitialize all the users"):
+def reinitAllUsers(dbConfig, switch=False):
+	if switch:
 		conn = getConn(dbConfig, 'mobility')
 		cur = conn.cursor()
+		print ("Setting all users to reinitialize")
 		logger.info("Setting all users to reinitialize")
 		cur.execute("update users set state = '7'")
-
 		cur.close()
 		conn.close()
-		print ("\nAll users have been set to reinitialize")
+		print ("All users have been set to reinitialize")
 		logger.info("All users have been set to reinitialize")
+	else:
+		datasyncBanner(dsappversion)
+		print (textwrap.fill("Note: During the reinitialize, users will not be able to log in. This may take some time.", int(WINDOW_SIZE[1])))
+		if askYesOrNo("Are you sure you want to reinitialize all the users"):
+			conn = getConn(dbConfig, 'mobility')
+			cur = conn.cursor()
+			logger.info("Setting all users to reinitialize")
+			cur.execute("update users set state = '7'")
+
+			cur.close()
+			conn.close()
+			print ("\nAll users have been set to reinitialize")
+			logger.info("All users have been set to reinitialize")
 
 def reinitAllFailedUsers(dbConfig):
 	datasyncBanner(dsappversion)
