@@ -683,7 +683,7 @@ def updateDsapp(publicVersion, rpmFileLocation=None):
 		fileName = Config.get('dsapp URL', 'download.filename')
 
 		# Download new version & extract
-		download_file('%s%s' % (dlPath, fileName))
+		if not download_file('%s%s' % (dlPath, fileName)): return
 		print ()
 	else:
 		fileName = rpmFileLocation
@@ -736,6 +736,7 @@ def autoUpdateDsapp(skip=False):
 	serviceCheckPort = Config.getint('dsapp URL', 'check.service.port')
 	dlPath = Config.get('dsapp URL', 'download.address')
 	dsapp_version_file = Config.get('dsapp URL', 'version.download.filename')
+	warning = False
 
 	# Variable declared above autoUpdate=true
 	if skip:
@@ -749,9 +750,17 @@ def autoUpdateDsapp(skip=False):
 			logger.info('Checking for a newer version of dsapp')
 			print ('Checking for a newer version of dsapp... ', end='')
 			spinner.start(); time.sleep(.000001)
-			publicVersion = requests.get('%s%s' % (dlPath, dsapp_version_file)).text.split("'")[1]
+			try:
+				publicVersion = requests.get('%s%s' % (dlPath, dsapp_version_file)).text.split("'")[1]
+			except:
+				warning = True
+
 			spinner.stop(); print ()
 			clear()
+			if warning:
+				print ("Unable to check latest version")
+				logger.warning("Unable to check latest version") 
+				return
 			
 			# Download if newer version is available
 			if dsappversion < publicVersion and publicVersion is not None:
