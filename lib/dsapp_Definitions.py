@@ -2860,7 +2860,7 @@ def newCertPass():
 	if keyPass != confirmPass:
 		print ("\nPasswords do not match")
 		logger.warning("Passwords do not match")
-		return
+		return None
 	logger.info("Private key password created")
 	return keyPass
 
@@ -2912,6 +2912,8 @@ def createCSRKey(sign = False):
 		print ("\nGenerating a private key and certificate signing request (CSR)")
 		logger.info("Generating a private key and CSR")
 		keyPass = newCertPass()
+		if keyPass is None:
+			return
 		print ()
 
 		if keyPass:
