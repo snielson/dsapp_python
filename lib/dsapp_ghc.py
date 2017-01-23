@@ -1295,8 +1295,11 @@ def ghc_checkUserFDN(dbConfig, XMLconfig ,ldapConfig):
 				log_cmd = cmd.replace("-w '" + ldapConfig['pass'] + "'","-w '*******'")
 				logger.debug("LDAP search %s: %s" % (ldap_count, log_cmd))
 				out = ghc_util_subprocess(cmd, True)
-				if out[1]:
-					logger.debug("LDAP error %s: %s" % (ldap_count, out[1]))
+				if out[1] or 'dn:' not in out[0]:
+					if not out[1]:
+						logger.debug("LDAP error %s: User not found!" % ldap_count)
+					else:
+						logger.debug("LDAP error %s: %s" % (ldap_count, out[1]))
 				else:
 					logger.debug("LDAP results %s: Found %s" % (ldap_count, row['dn']))
 				# 	logger.debug("LDAP results: %s" % out[0])

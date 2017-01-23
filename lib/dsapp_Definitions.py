@@ -19,6 +19,7 @@ import urllib2
 import readline
 import operator
 import StringIO
+import tempfile
 from multiprocessing import Process, Queue
 from tabulate import tabulate
 from urllib2 import urlopen, URLError, HTTPError
@@ -3214,14 +3215,14 @@ def checkLDAP(XMLconfig ,ldapConfig, ghc=False):
 
 	if ldapConfig['secure'] == 'false':
 		if 'o=' not in ldapConfig['login']:
-			cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D '%s' -w '%s' -l 5 -b '%s'" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], ldapConfig['group'][0])
+			cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D '%s' -w '%s' -l 5 -b '%s' cn" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], ldapConfig['group'][0])
 		else:
-			cmd = "/usr/bin/ldapsearch -x -H ldap://%(host)s:%(port)s -D '%(login)s' -w '%(pass)s' -l 5 '%(login)s'" % ldapConfig
+			cmd = "/usr/bin/ldapsearch -x -H ldap://%(host)s:%(port)s -D '%(login)s' -w '%(pass)s' -l 5 '%(login)s' cn" % ldapConfig
 	elif ldapConfig['secure'] == 'true':
 		if 'o=' not in ldapConfig['login']:
-			cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D '%s' -w '%s' -l 5 -b '%s'" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], ldapConfig['group'][0])
+			cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D '%s' -w '%s' -l 5 -b '%s' cn" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], ldapConfig['group'][0])
 		else:
-			cmd = "/usr/bin/ldapsearch -x -H ldaps://%(host)s:%(port)s -D '%(login)s' -w '%(pass)s' -l 5 '%(login)s'" % ldapConfig
+			cmd = "/usr/bin/ldapsearch -x -H ldaps://%(host)s:%(port)s -D '%(login)s' -w '%(pass)s' -l 5 '%(login)s' cn" % ldapConfig
 	else:
 		try:
 			logger.warning("ldapConfig['secure'] = %s" % ldapConfig['secure'])
@@ -3231,12 +3232,17 @@ def checkLDAP(XMLconfig ,ldapConfig, ghc=False):
 		cmd = None
 
 	if cmd is not None:
+		# Create tempfile for large data
+		name = tempfile.TemporaryFile(mode='w+b')
+
 		logger.info("Testing LDAP connection")
 		log_cmd = cmd.replace("-w '" + ldapConfig['pass'] + "'","-w '*******'")
 		logger.debug("LDAP test command: %s" % log_cmd)
-		ldapCheck = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		ldapCheck = subprocess.Popen(cmd, shell=True, stdout=name, stderr=subprocess.PIPE)
 		ldapCheck.wait()
-		out, err = ldapCheck.communicate()
+		name.seek(0)
+		out = name.read()
+		err = ldapCheck.communicate()[1]
 	else:
 		logger.warning("Unable to test LDAP connection")
 		return False
