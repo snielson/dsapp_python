@@ -1213,6 +1213,7 @@ def check_hostname(old_host, XMLconfig, config_files, forceFix=False):
 def update_xml_encrypt(XMLconfig, config_files, old_host, new_host):
 	# Attempt to get all encrypted in clear text using old_host
 	before = {}
+	logger.debug("Attempting to decrypt with hostname: %s" % old_host)
 	before['smtp'] = getDecrypted('.//configengine/notification/smtpPassword', XMLconfig['ceconf'], './/configengine/notification/protected', old_host)
 	before['ldap'] = getDecrypted('.//configengine/ldap/login/password', XMLconfig['ceconf'], './/configengine/ldap/login/protected', old_host)
 	before['key'] = getDecrypted('.//settings/custom/trustedAppKey', XMLconfig['gconf'], './/settings/custom/protected', old_host)
@@ -1221,6 +1222,7 @@ def update_xml_encrypt(XMLconfig, config_files, old_host, new_host):
 	before['econf_db'] = getDecrypted('.//settings/database/password', XMLconfig['econf'], './/settings/database/protected', old_host)
 	
 	after = {}
+	logger.debug("Getting new encryption with hostname: %s" % new_host)
 	after['smtp'] = getEncrypted(before['smtp'], XMLconfig['ceconf'], './/configengine/notification/protected', new_host)
 	after['ldap'] = getEncrypted(before['ldap'], XMLconfig['ceconf'], './/configengine/ldap/login/protected', new_host)
 	after['key'] = getEncrypted(before['key'], XMLconfig['gconf'], './/settings/custom/protected', new_host)
@@ -1257,11 +1259,16 @@ def promptVerifyPath(path):
 	
 def checkYaST():
 	# Check if YaST is running
+	results = False
 	yast_runnning = get_pid('yast')
+	if len(yast_runnning) <= 0:
+		logger.debug("YaST not running")
+		results = True
+
 	for pid in yast_runnning:
 		pid = int(pid)
 		if check_pid(pid):
-			print ('YaST is running. Close YaST before proceeding')
+			print ('\nYaST is running. Close YaST before proceeding')
 			if askYesOrNo('Attempt to close YaST now'):
 				logger.info('Attempting to kill YaST [%s]' % (pid))
 				kill_pid(pid)
@@ -1275,12 +1282,18 @@ def checkYaST():
 						if not check_pid(pid):
 							print('Failed to force close YaST. Aborting')
 							logger.warning('Unable to force kill YaST. Aborting')
-							return False
+							results = False
+						else:
+							print ("Successfully force closed YaST")
+							logger.info("Successfully force closed YaST")
+							results = True
 					else:
-						return False
+						results = False
 			else:
-				return False
-	return True
+				print ("Successfully closed YaST")
+				logger.info("Successfully closed YaST")
+
+	return results
 
 #### Postgres Definitions #####
 
@@ -2355,8 +2368,17 @@ def updateMobilityFTP():
 	if DoesServiceExist(serviceCheck, serviceCheckPort):
 		print ("Mobility will restart during the upgrade")
 		if askYesOrNo("Continue with update"):
+
+			# Check if yast is opened
+			if not checkYaST():
+				return
+
 			# Check URL connectivity
 			ds = raw_input("Filename: ")
+			if not ds:
+				print ("\nNo input entered")
+				return
+
 			dbuild = ds.split('.')[0]
 			os.chdir('/root/Downloads')
 			if dlfile('%s%s' % (dlPath, ds)):
@@ -2382,6 +2404,10 @@ def updateMobilityISO():
 	datasyncBanner(dsappversion)
 	print ("Mobility will restart during the upgrade")
 	if not askYesOrNo("Continue"):
+		return
+
+	# Check if yast is opened
+	if not checkYaST():
 		return
 
 	# Get path / file

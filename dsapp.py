@@ -176,7 +176,7 @@ import dsapp_Definitions as ds
 logging.config.fileConfig(dsappLogSettings)
 excep_logger = logging.getLogger('exceptions_log')
 logger = logging.getLogger(__name__)
-logger.info('------------- Starting dsapp -------------')
+logger.info('------------- Starting dsapp v%s -------------' % dsappversion)
 if not sys.stdout.isatty():
 	logger.info('Running in CRON')
 
@@ -200,7 +200,7 @@ def exit_cleanup():
 	# Reset terminal (for blank text bug on Ctrl + C)
 	os.system('stty sane')
 	
-	logger.info('------------- Successfully shutdown dsapp -------------')
+	logger.info('------------- Exiting dsapp v%s -------------' % dsappversion)
 
 def signal_handler_SIGINT(signal, frame):
 	# Clean up dsapp
