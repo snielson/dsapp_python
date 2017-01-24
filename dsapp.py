@@ -14,7 +14,7 @@ __credits__ = "Tyler Harris"
 __maintainer__ = "Shane Nielson"
 __email__ = "snielson@projectuminfinitas.com"
 
-dsappversion='243'
+dsappversion='244'
 
 ##################################################################################################
 #	Imports
