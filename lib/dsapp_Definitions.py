@@ -2100,29 +2100,37 @@ def mCleanup(dbConfig, userConfig, fileCleanupNow=True):
 	time1 = time.time()
 
 	# clean tables with users guid
-	cur.execute("delete from foldermaps where deviceid IN (select deviceid from devices where userid='%s')" % uGuid)
-	logger.debug("DELETE FROM foldermaps WHERE deviceid IN (SELECT deviceid FROM devices WHERE userid='%s')" % uGuid)
+	cmd = "DELETE from foldermaps where deviceid IN (select deviceid from devices where userid='%s')" % uGuid
+	cur.execute(cmd)
+	logger.debug("cmd: %s" % cmd)
 
-	cur.execute("delete from deviceimages where userid='%s'" % uGuid)
-	logger.debug("DELETE FROM deviceimages WHERE userid='%s'" % uGuid)
+	cmd = "DELETE from deviceimages where userid='%s'" % uGuid
+	cur.execute(cmd)
+	logger.debug("cmd: %s" % cmd)
 
-	cur.execute("delete from syncevents where userid='%s'" % uGuid)
-	logger.debug("DELETE FROM syncevents WHERE userid='%s'" % uGuid)
+	cmd = "DELETE from syncevents where userid='%s'" % uGuid
+	cur.execute(cmd)
+	logger.debug("cmd: %s" % cmd)
 
-	cur.execute("delete from deviceevents where userid='%s'" % uGuid)
-	logger.debug("DELETE FROM deviceevents WHERE userid='%s'" % uGuid)
+	cmd = "DELETE from deviceevents where userid='%s'" % uGuid
+	cur.execute(cmd)
+	logger.debug("cmd: %s" % cmd)
 
-	cur.execute("delete from devices where userid='%s'" % uGuid)
-	logger.debug("DELETE FROM devices WHERE userid='%s'" % uGuid)
+	cmd = "DELETE from devices where userid='%s'" % uGuid
+	cur.execute(cmd)
+	logger.debug("cmd: %s" % cmd)
 
-	cur.execute("delete from users where guid='%s'" % uGuid)
-	logger.debug("DELETE FROM users WHERE guid='%s'" % uGuid)
+	cmd = "DELETE from users where guid='%s'" % uGuid
+	cur.execute(cmd)
+	logger.debug("cmd: %s" % cmd)
 
-	cur.execute("delete from attachments where attachmentid IN (select attachmentid from attachmentmaps where objectid in (select objectid from deviceimages where userid='%s'))" % uGuid)
-	logger.debug("DELETE FROM attachments WHERE attachmentid IN (SELECT attachmentid FROM attachmentmaps WHERE objectid IN (SELECT objectid FROM deviceimages WHERE userid='%s'))" % uGuid)
+	cmd = "DELETE from attachments where attachmentid IN (select attachmentid from attachmentmaps where objectid in (select objectid from deviceimages where userid='%s'))" % uGuid
+	cur.execute(cmd)
+	logger.debug("cmd: %s" % cmd)
 
-	cur.execute("delete from attachments where filestoreid IN (SELECT filestoreid FROM attachments LEFT OUTER JOIN attachmentmaps ON attachments.attachmentid=attachmentmaps.attachmentid WHERE attachmentmaps.attachmentid IS NULL)")
-	logger.debug("DELETE FROM attachments WHERE filestoreid IN (SELECT filestoreid FROM attachments LEFT OUTER JOIN attachmentmaps ON attachments.attachmentid=attachmentmaps.attachmentid WHERE attachmentmaps.attachmentid IS NULL)")
+	cmd = "DELETE from attachments where filestoreid IN (SELECT filestoreid FROM attachments LEFT OUTER JOIN attachmentmaps ON attachments.attachmentid=attachmentmaps.attachmentid WHERE attachmentmaps.attachmentid IS NULL)"
+	cur.execute(cmd)
+	logger.debug("cmd: %s" % cmd)
 
 	spinner.stop(); print()
 	cur.close()
@@ -2193,23 +2201,30 @@ def dCleanup(dbConfig, userConfig):
 
 	spinner.start(); time.sleep(.000001)
 	time1 = time.time()
-	cur.execute("delete FROM \"objectMappings\" WHERE \"objectID\" IN (SELECT \"objectID\" FROM \"objectMappings\" WHERE \"objectID\" ilike '%%|%s' OR \"objectID\" ilike '%%|%s' OR \"objectID\" ilike '%%|%s')" % (psqlAppNameG, psqlAppNameM, userConfig['name']))
-	logger.debug("DELETE FROM \"objectMappings\" WHERE \"objectID\" IN (SELECT \"objectID\" FROM \"objectMappings\" WHERE \"objectID\" ilike '%%|%s' OR \"objectID\" ilike '%%|%s' OR \"objectID\" ilike '%%|%s')" % (psqlAppNameG, psqlAppNameM, userConfig['name']))
 
-	cur.execute("delete FROM consumerevents WHERE edata ilike '%%<sourceName>%s</sourceName>%%' OR edata ilike '%%<sourceName>%s</sourceName>%%' OR edata ilike '%%<sourceDN>%s</sourceDN>%%' OR edata ilike '%%<sourceDN>%s</sourceDN>%%'" % (psqlAppNameG, psqlAppNameM, psqlAppNameG, psqlAppNameM))
-	logger.debug("DELETE FROM consumerevents WHERE edata ilike '%%<sourceName>%s</sourceName>%%' OR edata ilike '%%<sourceName>%s</sourceName>%%' OR edata ilike '%%<sourceDN>%s</sourceDN>%%' OR edata ilike '%%<sourceDN>%s</sourceDN>%%'" % (psqlAppNameG, psqlAppNameM, psqlAppNameG, psqlAppNameM))
+	cmd = "DELETE FROM \"objectMappings\" WHERE \"objectID\" IN (SELECT \"objectID\" FROM \"objectMappings\" WHERE \"objectID\" ilike '%%|%s' OR \"objectID\" ilike '%%|%s' OR \"objectID\" ilike '%%|%s')" % (psqlAppNameG, psqlAppNameM, userConfig['name'])
+	cur.execute(cmd)
+	logger.debug("cmd: %s" % cmd)
 
-	cur.execute("delete FROM \"folderMappings\" WHERE \"targetDN\" ~* '(\\\\m%s[.|,].*)$' OR \"targetDN\" ilike '%s'" % (userConfig['name'],uUser))
-	logger.debug("DELETE FROM \"folderMappings\" WHERE \"targetDN\" ~* '(\\\\m%s[.|,].*)$' OR \"targetDN\" ilike '%s'" % (userConfig['name'],uUser))
+	cmd = "DELETE FROM consumerevents WHERE edata ilike '%%<sourceName>%s</sourceName>%%' OR edata ilike '%%<sourceName>%s</sourceName>%%' OR edata ilike '%%<sourceDN>%s</sourceDN>%%' OR edata ilike '%%<sourceDN>%s</sourceDN>%%'" % (psqlAppNameG, psqlAppNameM, psqlAppNameG, psqlAppNameM)
+	cur.execute(cmd)
+	logger.debug("cmd: %s" % cmd)
 
-	cur.execute("delete FROM cache WHERE \"sourceDN\" ~* '(\\\\m%s[.|,].*)$' OR \"sourceDN\" ilike '%s'" % (userConfig['name'],uUser))
-	logger.debug("DELETE FROM cache WHERE \"sourceDN\" ~* '(\\\\m%s[.|,].*)$' OR \"sourceDN\" ilike '%s'" % (userConfig['name'],uUser))
+	cmd = "DELETE FROM \"folderMappings\" WHERE \"targetDN\" ~* '(\\\\m%s[.|,].*)$' OR \"targetDN\" ilike '%s'" % (uUser, uUser)
+	cur.execute(cmd)
+	logger.debug("cmd: %s" % cmd)
 
-	cur.execute("delete FROM \"membershipCache\" WHERE (groupdn ~* '(\\\\m%s[.|,].*)$' OR memberdn ~* '(\\\\m%s[.|,].*)$') OR (groupdn ilike '%s' OR memberdn ilike '%s')" % (userConfig['name'], userConfig['name'], uUser, uUser))
-	logger.debug("DELETE FROM \"membershipCache\" WHERE (groupdn ~* '(\\\\m%s[.|,].*)$' OR memberdn ilike '(%s[.|,].*)$') OR (groupdn ilike '%s' OR memberdn ilike '%s')" % (userConfig['name'], userConfig['name'], uUser, uUser))
+	cmd = "DELETE FROM cache WHERE \"sourceDN\" ~* '(\\\\m%s[.|,].*)$' OR \"sourceDN\" ilike '%s'" % (uUser, uUser)
+	cur.execute(cmd)
+	logger.debug("cmd: %s" % cmd)
 	
-	cur.execute("delete FROM targets WHERE dn ~* '(\\\\m%(name)s[.|,].*)$' OR dn ilike '%(name)s' OR \"targetName\" ilike '%(name)s'" % userConfig)
-	logger.debug("DELETE FROM targets WHERE dn ~* '(\\\\m%(name)s[.|,].*)$' OR dn ilike '%(name)s' OR \"targetName\" ilike '%(name)s'" % userConfig)
+	cmd = "DELETE FROM \"membershipCache\" WHERE (groupdn ~* '(\\\\m%s[.|,].*)$' OR memberdn ~* '(\\\\m%s[.|,].*)$') OR (groupdn ilike '%s' OR memberdn ilike '%s')" % (uUser, userConfig['name'], uUser, uUser)
+	cur.execute(cmd)
+	logger.debug("cmd: %s" % cmd)
+	
+	cmd = "DELETE FROM targets WHERE dn ~* '(\\\\m%s[.|,].*)$' OR dn ilike '%s' OR \"targetName\" ilike '%s'" % (uUser, userConfig['name'], userConfig['name'])
+	cur.execute(cmd)
+	logger.debug("cmd: %s" % cmd)
 	
 	time2 = time.time()
 	logger.info("Removing '%s' from datasync database complete" % userConfig['name'])
