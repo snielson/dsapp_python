@@ -1829,7 +1829,7 @@ def verifyUserMobilityDB(dbConfig, userConfig):
 	name = {'user': userConfig['name']}
 	conn = getConn(dbConfig, 'mobility')
 	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
-	cur.execute("select distinct userid from users where userid ~* '(\\m%(user)s[.|,].*)$' OR userid ilike '%(user)s' OR name ilike '%(user)s'" % name)
+	cur.execute("select distinct userid from users where userid ~* '(\\\\m%(user)s[.|,].*)$' OR userid ilike '%(user)s' OR name ilike '%(user)s'" % name)
 	validUser = cur.fetchall()
 	cur.close()
 	conn.close()
@@ -1848,7 +1848,7 @@ def verifyUserDataSyncDB(dbConfig, userConfig):
 	name = {'user': userConfig['name']}
 	conn = getConn(dbConfig, 'datasync')
 	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
-	cur.execute("select distinct dn,\"targetType\" from targets where (\"dn\" ~* '(\\m%(user)s[.|,].*)$' OR dn ilike '%(user)s' OR \"targetName\" ilike '%(user)s') AND disabled='0'" % name)
+	cur.execute("select distinct dn,\"targetType\" from targets where (\"dn\" ~* '(\\\\m%(user)s[.|,].*)$' OR dn ilike '%(user)s' OR \"targetName\" ilike '%(user)s') AND disabled='0'" % name)
 	validUser = cur.fetchall()
 	cur.close()
 	conn.close()
