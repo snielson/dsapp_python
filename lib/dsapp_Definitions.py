@@ -2199,17 +2199,17 @@ def dCleanup(dbConfig, userConfig):
 	cur.execute("delete FROM consumerevents WHERE edata ilike '%%<sourceName>%s</sourceName>%%' OR edata ilike '%%<sourceName>%s</sourceName>%%' OR edata ilike '%%<sourceDN>%s</sourceDN>%%' OR edata ilike '%%<sourceDN>%s</sourceDN>%%'" % (psqlAppNameG, psqlAppNameM, psqlAppNameG, psqlAppNameM))
 	logger.debug("DELETE FROM consumerevents WHERE edata ilike '%%<sourceName>%s</sourceName>%%' OR edata ilike '%%<sourceName>%s</sourceName>%%' OR edata ilike '%%<sourceDN>%s</sourceDN>%%' OR edata ilike '%%<sourceDN>%s</sourceDN>%%'" % (psqlAppNameG, psqlAppNameM, psqlAppNameG, psqlAppNameM))
 
-	cur.execute("delete FROM \"folderMappings\" WHERE \"targetDN\" ilike '(%s[.|,].*)$' OR \"targetDN\" ilike '%s'" % (userConfig['name'],uUser))
-	logger.debug("DELETE FROM \"folderMappings\" WHERE \"targetDN\" ilike '(%s[.|,].*)$' OR \"targetDN\" ilike '%s'" % (userConfig['name'],uUser))
+	cur.execute("delete FROM \"folderMappings\" WHERE \"targetDN\" ~* '(\\\\m%s[.|,].*)$' OR \"targetDN\" ilike '%s'" % (userConfig['name'],uUser))
+	logger.debug("DELETE FROM \"folderMappings\" WHERE \"targetDN\" ~* '(\\\\m%s[.|,].*)$' OR \"targetDN\" ilike '%s'" % (userConfig['name'],uUser))
 
-	cur.execute("delete FROM cache WHERE \"sourceDN\" ilike '(%s[.|,].*)$' OR \"sourceDN\" ilike '%s'" % (userConfig['name'],uUser))
-	logger.debug("DELETE FROM cache WHERE \"sourceDN\" ilike '(%s[.|,].*)$' OR \"sourceDN\" ilike '%s'" % (userConfig['name'],uUser))
+	cur.execute("delete FROM cache WHERE \"sourceDN\" ~* '(\\\\m%s[.|,].*)$' OR \"sourceDN\" ilike '%s'" % (userConfig['name'],uUser))
+	logger.debug("DELETE FROM cache WHERE \"sourceDN\" ~* '(\\\\m%s[.|,].*)$' OR \"sourceDN\" ilike '%s'" % (userConfig['name'],uUser))
 
-	cur.execute("delete FROM \"membershipCache\" WHERE (groupdn ilike '(%s[.|,].*)$' OR memberdn ilike '(%s[.|,].*)$') OR (groupdn ilike '%s' OR memberdn ilike '%s')" % (userConfig['name'], userConfig['name'], uUser, uUser))
-	logger.debug("DELETE FROM \"membershipCache\" WHERE (groupdn ilike '(%s[.|,].*)$' OR memberdn ilike '(%s[.|,].*)$') OR (groupdn ilike '%s' OR memberdn ilike '%s')" % (userConfig['name'], userConfig['name'], uUser, uUser))
+	cur.execute("delete FROM \"membershipCache\" WHERE (groupdn ~* '(\\\\m%s[.|,].*)$' OR memberdn ~* '(\\\\m%s[.|,].*)$') OR (groupdn ilike '%s' OR memberdn ilike '%s')" % (userConfig['name'], userConfig['name'], uUser, uUser))
+	logger.debug("DELETE FROM \"membershipCache\" WHERE (groupdn ~* '(\\\\m%s[.|,].*)$' OR memberdn ilike '(%s[.|,].*)$') OR (groupdn ilike '%s' OR memberdn ilike '%s')" % (userConfig['name'], userConfig['name'], uUser, uUser))
 	
-	cur.execute("delete FROM targets WHERE dn ~* '(\\m%(name)s[.|,].*)$' OR dn ilike '%(name)s' OR \"targetName\" ilike '%(name)s'" % userConfig)
-	logger.debug("DELETE FROM targets WHERE dn ~* '(\\m%(name)s[.|,].*)$' OR dn ilike '%(name)s' OR \"targetName\" ilike '%(name)s'" % userConfig)
+	cur.execute("delete FROM targets WHERE dn ~* '(\\\\m%(name)s[.|,].*)$' OR dn ilike '%(name)s' OR \"targetName\" ilike '%(name)s'" % userConfig)
+	logger.debug("DELETE FROM targets WHERE dn ~* '(\\\\m%(name)s[.|,].*)$' OR dn ilike '%(name)s' OR \"targetName\" ilike '%(name)s'" % userConfig)
 	
 	time2 = time.time()
 	logger.info("Removing '%s' from datasync database complete" % userConfig['name'])
