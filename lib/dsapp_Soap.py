@@ -400,6 +400,25 @@ def soap_getUserList(trustedConfig, gwConfig, noout='true'):
 			soapLog.write(DATE + ' [getUserListRequest] sending to: (%s)\n' % gw_location + str(results).decode("ascii", 'ignore') + '\n')
 	return results
 
+def check_parent_system(folderList, parent_id, system_id):
+	logger.info("Checking parent folder")
+	logger.debug("Parent ID: %s" % parent_id)
+	logger.debug("System ID: %s" % system_id)
+	for folder in folderList[0][0]:
+		if folder['id'] == parent_id:
+			try:
+				if folder['folderType'] == 'Root':
+					logger.error("Reached root during search")
+					return False
+			except:
+				pass
+			if folder['parent'] == system_id:
+				logger.info("Found system parent ID")
+				return True
+			else:
+				logger.warning("Parent ID does not match system. Checking new parent ID")
+				return check_parent_system(folderList, folder['parent'], system_id)
+
 def check_subCalendars(folderList, parent_id, subCalendar_problemIDs):
 	logger.info("Checking sub calendars..")
 	logger.debug("Calendar id = %s" % parent_id)
@@ -412,11 +431,13 @@ def check_subCalendars(folderList, parent_id, subCalendar_problemIDs):
 			if 'isSystemFolder' not in folder or folder['isSystemFolder'] == 'False':
 				if folder['calendarAttribute'] and folderType != 'Proxy':
 					if folder['parent'] != parent_id:
-						print ("Problem with sub calendar: %s" % folder['name'])
-						logger.warning("Folder structure problem with calendar: %s" % folder['name'])
-						logger.debug("%s parent id = %s" % (folder['name'], folder['parent']))
-						subCalendar_problemIDs[folder['name']] = folder['id']
-						problem = True
+						logger.warning("Invalid parent ID on '%s'" % folder['name'])
+						if not check_parent_system(folderList, folder['parent'], parent_id):
+							print ("Problem with sub calendar: %s" % folder['name'])
+							logger.warning("Folder structure problem with calendar: %s" % folder['name'])
+							logger.debug("%s parent id = %s" % (folder['name'], folder['parent']))
+							subCalendar_problemIDs[folder['name']] = folder['id']
+							problem = True
 		except:
 			pass
 	if problem:
@@ -433,11 +454,13 @@ def check_subContacts(folderList, parent_id, subContact_problemIDs):
 			if 'isSystemFolder' not in folder or folder['isSystemFolder'] == 'False':
 				if folder['folderType'] == 'UserContacts':
 					if folder['parent'] != parent_id:
-						print ("Problem with sub address book: %s" % folder['name'])
-						logger.warning("Folder structure problem with address book: %s" % folder['name'])
-						logger.debug("%s parent id = %s" % (folder['name'], folder['parent']))
-						subContact_problemIDs[folder['name']] = folder['id']
-						problem = True
+						logger.warning("Invalid parent ID on '%s'" % folder['name'])
+						if not check_parent_system(folderList, folder['parent'], parent_id):
+							print ("Problem with sub address book: %s" % folder['name'])
+							logger.warning("Folder structure problem with address book: %s" % folder['name'])
+							logger.debug("%s parent id = %s" % (folder['name'], folder['parent']))
+							subContact_problemIDs[folder['name']] = folder['id']
+							problem = True
 		except:
 			pass
 	if problem:
