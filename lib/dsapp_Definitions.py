@@ -2371,10 +2371,6 @@ def addGroup(dbConfig, ldapConfig):
 	else:
 		print ("No results from LDAP")
 		logger.warning("No results from LDAP")
-		eContinue()
-
-	
-	
 
 def updateMobilityFTP():
 	datasyncBanner(dsappversion)
