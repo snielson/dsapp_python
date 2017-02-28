@@ -36,7 +36,7 @@ Config = ConfigParser.ConfigParser()
 if not os.path.exists('/opt/novell/datasync/tools/dsapp/logs/'):
 	os.makedirs('/opt/novell/datasync/tools/dsapp/logs/')
 
-sys.path.append(os.path.dirname(os.path.realpath(__file__)) + '/lib')
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)) + '/lib')
 import spin
 import imp
 pydoc = imp.load_source('pydoc', os.path.dirname(os.path.realpath(__file__)) + '/lib/pydoc.py')
