@@ -2366,12 +2366,14 @@ def addGroup(dbConfig, ldapConfig):
 
 		cur.close()
 		conn.close()
+		
+		os.remove (dsapptmp + '/ldapGroupMembership.dsapp')
 	else:
 		print ("No results from LDAP")
 		logger.warning("No results from LDAP")
 		eContinue()
 
-	os.remove (dsapptmp + '/ldapGroupMembership.dsapp')
+	
 	
 
 def updateMobilityFTP():
