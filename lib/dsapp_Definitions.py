@@ -2793,10 +2793,14 @@ def changeAppName(dbConfig):
 				cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
 
 				# pdates users application names with variable entries
-				cur.execute("UPDATE targets set \"targetName\"='%s' where dn ilike '%%%s%%' AND \"connectorID\"='default.pipeline1.mobility'" % (mAppName, userConfig['name']))
+				cmd = "UPDATE targets set \"targetName\"='%s' where dn='%s' AND \"connectorID\"='default.pipeline1.mobility'" % (mAppName, userConfig['dName'])
+				cur.execute(cmd)
 				logger.info("Set mobility application name to: %s" % mAppName)
-				cur.execute("UPDATE targets set \"targetName\"='%s' where dn ilike '%%%s%%' AND \"connectorID\"='default.pipeline1.groupwise'" % (gAppName, userConfig['name']))
+				logger.debug("cmd: %s" % cmd)
+				cmd = "UPDATE targets set \"targetName\"='%s' where dn='%s' AND \"connectorID\"='default.pipeline1.groupwise'" % (gAppName, userConfig['dName'])
+				cur.execute(cmd)
 				logger.info("Set groupwise application name to: %s" % gAppName)
+				logger.debug("cmd: %s" % cmd)
 
 				cur.close()
 				conn.close()
