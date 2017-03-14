@@ -3312,15 +3312,17 @@ def updateFDN(dbConfig, XMLconfig, ldapConfig):
 				userDN = []
 
 				if ldapConfig['secure'] == 'false':
-					cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D '%s' -w '%s' -l 5 -b '%s'" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], userConfig['dName'])
+					cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D '%s' -w '%s' -l 5 -b '%s' -s base" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], userConfig['dName'])
 				elif ldapConfig['secure'] == 'true':
-					cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D '%s' -w '%s' -l 5 -b '%s'" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], userConfig['dName'])
-
+					cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D '%s' -w '%s' -l 5 -b '%s' -s base" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], userConfig['dName'])
+				logger.debug("LDAP cmd: %s" % cmd)
 				tmp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 				out, err = tmp.communicate()
+				logger.debug("LDAP results out: %s" % out)
+				logger.debug("LDAP results err: %s" % err)
 				search = re.search('dn:.*', out)
 				if search:
-					userDN.append((search.group().split(' ')[1]))
+					userDN.append((' '.join(search.group().split(' ')[1:])))
 				if len(userDN) != 0:
 					print (list(set(userDN))[0])
 				else:
@@ -3331,14 +3333,17 @@ def updateFDN(dbConfig, XMLconfig, ldapConfig):
 						userDN = []
 						for container in ldapConfig['user']:
 							if ldapConfig['secure'] == 'false':
-								cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D '%s' -w '%s' -l 5 -b '%s' 'cn=%s'" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], container, userConfig['name'])
+								cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D '%s' -w '%s' -l 5 -b '%s' 'cn=%s' -s base" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], container, userConfig['name'])
 							elif ldapConfig['secure'] == 'true':
-								cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D '%s' -w '%s' -l 5 -b '%s' 'cn=%s'" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], container, userConfig['name'])
+								cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D '%s' -w '%s' -l 5 -b '%s' 'cn=%s' -s base" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], container, userConfig['name'])
+							logger.debug("LDAP cmd: %s" % cmd)
 							tmp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 							out, err = tmp.communicate()
+							logger.debug("LDAP results out: %s" % out)
+							logger.debug("LDAP results err: %s" % err)
 							search = re.findall('dn:.*', out)
 							for dn in search:
-								userDN.append(dn.split(' ')[1])
+								userDN.append((' '.join(search.group().split(' ')[1:])))
 						userDN = list(set(userDN))
 
 						if len(userDN) > 1:
@@ -3353,6 +3358,8 @@ def updateFDN(dbConfig, XMLconfig, ldapConfig):
 							print ("Unable to find LDAP user '%(name)s' with: cn=%(name)s" % userConfig)
 							logger.warning("Unable to find LDAP user '%(name)s' with: cn=%(name)s" % userConfig)
 							return
+					else:
+						return
 
 				# Prompt for new FDN
 				if not multiple:
