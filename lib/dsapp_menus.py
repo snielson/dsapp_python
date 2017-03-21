@@ -10,6 +10,7 @@ import os
 import traceback
 import dsapp_Definitions as ds
 import logging, logging.config
+import signal
 import ConfigParser
 Config = ConfigParser.ConfigParser()
 import getch
@@ -51,6 +52,11 @@ def my_handler(type, value, tb):
 	logger.error("EXCEPTION: See exception.log")
 	excep_logger.error("Uncaught exception:\n%s" % ''.join(tmp).strip())
 	print ''.join(tmp).strip()
+
+def preexec_function():
+	# Ignore the SIGINT signal by setting the handler to the standard
+	# signal handler SIG_IGN.
+	signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 # Install exception handler
 sys.excepthook = my_handler
@@ -167,7 +173,7 @@ def main_menu():
 		logger.debug("Entering datasync database")
 		cmd = "PGPASSWORD='%(pass)s' psql -U %(user)s datasync" % dbConfig
 		ds.clear()
-		p = subprocess.Popen(cmd, shell=True)
+		p = subprocess.Popen(cmd, shell=True, preexec_fn = preexec_function)
 		p.wait()
 		main_menu()
 	else:
@@ -385,7 +391,7 @@ def certificate_menu():
 			main_menu()
 
 def userIssue_menu():
-	menu = ['1. Monitor user sync options...', '2. GroupWise checks options...', '3. Remove & reinitialize users options...', '\n     4. User authentication issues', '5. Change user application name', '6. Change user FDN', '7. What deleted this (contact, email, folder, calendar)?', '\n     0. Back']
+	menu = ['1. Monitor user sync options...', '2. GroupWise checks options...', '3. Remove & reinitialize users options...', '\n     4. User authentication issues', '5. Change user application name', '6. Change user FDN', '7. What deleted this (contact, email, folder, calendar)?', '8. Remove devices', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -406,9 +412,35 @@ def userIssue_menu():
 			ds.updateFDN(dbConfig, XMLconfig, ldapConfig)
 		elif choice == '7':
 			ds.whereDidIComeFromAndWhereAmIGoingOrWhatHappenedToMe(dbConfig)
+		elif choice == '8':
+			remove_device_menu()
 		elif choice == '0':
 			loop = False
 			main_menu()
+
+### Start ### Sub menus remove_device_menu ###
+def remove_device_menu():
+	menu = ['1. Remove all devices', '2. Remove user devices', '\n     0. Back']
+
+	available = build_avaialbe(menu)
+	loop = True
+	while loop:
+		show_menu(menu)
+		choice = get_choice(available)
+		if choice == '1':
+			ds.datasyncBanner(dsappversion)
+			if ds.askYesOrNo("Remove all users devices"):
+				ds.removeDevice(dbConfig)
+		elif choice == '2':
+			userConfig = ds.verifyUser(dbConfig)[0]
+			if ds.confirm_user(userConfig, 'mobility'):
+				if ds.askYesOrNo("Remove all devices for %s" % userConfig['name']):
+					ds.removeDevice(dbConfig, userConfig)
+			else:
+				ds.eContinue()
+		elif choice == '0':
+			loop = False
+			return
 
 ### Start ### Sub menus userIssue_menu ###
 def monitorUser_menu():

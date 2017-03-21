@@ -497,6 +497,24 @@ def insertXML (elem, tree, value, filePath, hideValue=False):
 	else:
 		logger.error("Value is None")
 
+def deleteXML_elem(elem, tree):
+	"""
+	Example to use:
+	setXML('.//configengine/ldap/groupContainer', XMLconfig['ceconf'],"o=testgroup", config_files['ceconf'])
+	"""
+	root = tree.getroot()
+	# path = root.xpath(elem)
+	path = root.find(elem)
+	root.remote(path)
+
+	print (root)
+		# try:
+		# 	# print (etree.tostring(root, pretty_print=True))
+		# 	etree.ElementTree(root).write(filePath, pretty_print=True)
+		# 	logger.debug("Set '%s' at %s in %s" % (logValue, elem, filePath))
+		# except:
+		# 	logger.warning('Unable to set %s at %s in %s' % (logValue, elem, filePath))
+
 def createXML_tag(elem, tree, tag, filePath, value=None, hideValue=False):
 	"""
 	Example to use:
@@ -4521,3 +4539,119 @@ def getMobilityUserList(dbConfig):
 	for row in data:
 		userList.append(row['name'])
 	return userList
+
+def removeDevice(dbConfig, userConfig = None):
+	lastGUIDS = []
+	parser = etree.XMLParser(remove_blank_text=True)
+
+	conn = getConn(dbConfig, 'mobility')
+	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+
+	# Remove device for specific user
+	if userConfig is not None:
+		print ("\nRemoving all devices for %s.." % userConfig['name'])
+		logger.info("Removing all devices for %s" % userConfig['name'])
+		cur.execute("SELECT guid FROM users WHERE userid='%s'" % userConfig['mName'])
+		guids = cur.fetchall()
+
+	# Remove device for all users
+	else:
+		print ("\nRemoving all devices for all users..")
+		logger.info("Removing all devices for all users")
+		# Get a list of all users GUID
+		cur.execute("SELECT guid FROM users")
+		guids = cur.fetchall()
+
+	# Loop through guid list
+	for guid in guids:
+		# Get devices
+		cur.execute("SELECT deviceid FROM devices WHERE userid='%s'" % guid['guid'])
+		devices = cur.fetchall()
+		if len(devices) <= 1:
+			lastGUIDS.append(devices[0]['deviceid'])
+		else:
+			lastGUIDS.append(devices.pop()['deviceid'])
+
+			deleteGUIDS = []
+			for device in devices:
+				deleteGUIDS.append(device['deviceid'])
+
+			if len(deleteGUIDS) >= 1:
+				logger.info("Removing guids: %s" % deleteGUIDS)
+
+				cmd = "DELETE FROM foldermaps WHERE deviceid IN (%s)" % deleteGUIDS
+				cur.execute("DELETE FROM foldermaps WHERE deviceid = ANY(%s)", (deleteGUIDS,))
+				logger.debug("cmd: %s" % cmd)
+
+				cmd = "DELETE FROM syncevents WHERE deviceid IN (%s)" % deleteGUIDS
+				cur.execute("DELETE FROM syncevents WHERE deviceid = ANY(%s)", (deleteGUIDS,))
+				logger.debug("cmd: %s" % cmd)
+
+				cmd = "DELETE FROM deviceevents WHERE deviceid IN (%s)" % deleteGUIDS
+				cur.execute("DELETE FROM deviceevents WHERE deviceid = ANY(%s)", (deleteGUIDS,))
+				logger.debug("cmd: %s" % cmd)
+
+				cmd = "DELETE FROM deviceimages WHERE deviceid IN (%s)" % deleteGUIDS
+				cur.execute("DELETE FROM deviceimages WHERE deviceid = ANY(%s)", (deleteGUIDS,))
+				logger.debug("cmd: %s" % cmd)
+
+				cmd = "DELETE FROM devices WHERE deviceid IN (%s)" % deleteGUIDS
+				cur.execute("DELETE FROM devices WHERE deviceid = ANY(%s)", (deleteGUIDS,))
+				logger.debug("cmd: %s" % cmd)
+
+	# Set last devices blank
+	for guid in lastGUIDS:
+		logger.info("Setting default blank value to guid: %s" % guid)
+
+		# TODO : DEBUG logging for every execute
+		cmd = "UPDATE devices SET identifierstring='', description='', state='0', statedata='{}' WHERE deviceid='%s'" % guid
+		cur.execute(cmd)
+		logger.debug("cmd: %s" % cmd)
+
+		cmd = "UPDATE deviceimages SET synckey='0' WHERE deviceid='%s' AND state<>'1000'" % guid
+		cur.execute(cmd)
+		logger.debug("cmd: %s" % cmd)
+
+		cmd = "UPDATE foldermaps SET synckey='1' WHERE deviceid='%s'" % guid
+		cur.execute(cmd)
+		logger.debug("cmd: %s" % cmd)
+
+		cmd = "UPDATE foldermaps SET synckey='0' WHERE deviceid='%s' AND folderid='0'" % guid
+		cur.execute(cmd)
+		logger.debug("cmd: %s" % cmd)
+
+		cmd = "DELETE FROM deviceevents WHERE deviceid='%s'" % guid
+		cur.execute(cmd)
+		logger.debug("cmd: %s" % cmd)
+
+		cmd = "DELETE FROM syncevents WHERE deviceid='%s'" % guid
+		cur.execute(cmd)
+		logger.debug("cmd: %s" % cmd)
+
+		cmd = "SELECT deviceconfig FROM devices WHERE deviceid='%s'" % guid
+		cur.execute(cmd)
+		logger.debug("cmd: %s" % cmd)
+
+		deviceconfig = cur.fetchall()
+
+		if len(deviceconfig) > 0:
+			tree = etree.fromstring(deviceconfig[0]['deviceconfig'], parser)
+			path = tree.find('aggregateContacts')
+			if path is not None:
+				tree.remove(path)
+				logger.debug("Found XML path: %s" % path)
+			path = tree.find('aggregateCalendars')
+			if path is not None:
+				tree.remove(path)
+				logger.debug("Found XML path: %s" % path)
+
+			cmd = "UPDATE devices SET deviceconfig='%s' WHERE deviceid='%s'" % (etree.tostring(tree, pretty_print=False), guid)
+			cur.execute(cmd)
+			logger.debug("cmd: %s" % cmd)
+
+
+	cur.close()
+	conn.close()
+
+	print ("Removal complete\n")
+	eContinue()

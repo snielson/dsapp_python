@@ -678,8 +678,7 @@ if args.reinit:
 
 DEBUG_ENABLED = False
 if DEBUG_ENABLED:
-	pass
-	
+	pass	
 	sys.exit(0)
 
 ##################################################################################################
