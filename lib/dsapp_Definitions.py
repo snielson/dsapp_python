@@ -88,7 +88,7 @@ ds_2x = 2
 ds_14x = 14
 mobilityVersion = 0
 version = "/opt/novell/datasync/version"
-python_Directory = '/usr/bin/python'
+python_Directory = '/usr/bin/python /opt/novell/datasync'
 INIT_NAME = 'datasync-'
 OS_VERSION_FILE = '/etc/issue'
 
@@ -246,7 +246,7 @@ def check_pid(pid):
     return True
 
 def get_pid(name):
-	return os.popen('pgrep -f %s' % (name)).read().split()
+	return os.popen("pgrep -f '%s' "% (name)).read().split()
 
 def kill_pid(pid, sig=1):
 	try:
