@@ -187,7 +187,8 @@ def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False
 		if logLevel == 'DEBUG':
 			with open (soapDebugLog, 'a') as soapLog:
 				DATE = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
-				soapLog.write(DATE + ' [loginRequest][userid: %s] sending to: (%s)\n' % (userid,soapAddr) + str(results).decode("ascii", 'ignore') + '\n')
+				soapLog.write(DATE + ' [loginRequest][userid: %s] sending to: (%s)\n' % (userid,soapAddr) + '\n' + soap + '\n' + str(results).decode("ascii", 'ignore') + '\n')
+
 	except:
 		print ("Unable to communicate with GroupWise server:\n%s" % soapAddr)
 		logger.warning("Unable to communicate with GroupWise server: %s" % soapAddr)
@@ -212,7 +213,7 @@ def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False
 			if logLevel == 'DEBUG':
 				with open (soapDebugLog, 'a') as soapLog:
 					DATE = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
-					soapLog.write(DATE + ' [loginRequest][userid: %s] sending to: (%s)\n' % (userid,soapAddr) + str(results).decode("ascii", 'ignore') + '\n')
+					soapLog.write(DATE + ' [loginRequest][userid: %s] sending to: (%s)\n' % (userid,soapAddr) + '\n' + soap + '\n' + str(results).decode("ascii", 'ignore') + '\n')
 		except:
 			logger.info("SOAP redirection to %s://%s:%s/soap" % (secureOrder[1] ,results['redirectToHost'][0]['ipAddress'], results['redirectToHost'][0]['port']))
 			soapClient = suds.client.Client(WSDL, location='%s://%s:%s/soap' % (secureOrder[1], results['redirectToHost'][0]['ipAddress'], results['redirectToHost'][0]['port']))
@@ -222,7 +223,7 @@ def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False
 				if logLevel == 'DEBUG':
 					with open (soapDebugLog, 'a') as soapLog:
 						DATE = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
-						soapLog.write(DATE + ' [loginRequest][userid: %s] sending to: (%s)\n' % (userid,soapAddr) + str(results).decode("ascii", 'ignore') + '\n')
+						soapLog.write(DATE + ' [loginRequest][userid: %s] sending to: (%s)\n' % (userid,soapAddr) + '\n' + soap + '\n' + str(results).decode("ascii", 'ignore') + '\n')
 			except:
 				if not ignoreError:
 					print ("Unable to return results for %s" % userid)
@@ -262,7 +263,16 @@ def soap_getFolderList(trustedConfig, gwConfig, userConfig, ignoreError=False, s
 	if logLevel == 'DEBUG':
 		with open (soapDebugLog, 'a') as soapLog:
 			DATE = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
-			soapLog.write(DATE + ' [getFolderListRequest] sending to: (%s)\n' % soap_userConfig['soapAddr'] + str(results).decode("ascii", 'ignore') + '\n')
+			soapLog.write(DATE + ' [getFolderListRequest] sending to: (%s)\n' % soap_userConfig['soapAddr'] + '\n' + soap + '\n' + str(results).decode("ascii", 'ignore') + '\n')
+
+	soap = logoutRequest % (soap_userConfig['session'])
+	soapClient = suds.client.Client(WSDL, location='%(soapAddr)s' % soap_userConfig)
+	logout_results = soapClient.service.logoutRequest(__inject={'msg': soap})
+	if logLevel == 'DEBUG':
+		with open (soapDebugLog, 'a') as soapLog:
+			DATE = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
+			soapLog.write(DATE + ' [logoutRequest] sending to: (%s)\n' % soap_userConfig['soapAddr'] + '\n' + soap + '\n' + str(logout_results).decode("ascii", 'ignore') + '\n')
+
 	return results
 
 def soap_getAddressBookList(trustedConfig, gwConfig, userConfig, ignoreError=False, soap_userConfig=None):
@@ -277,7 +287,16 @@ def soap_getAddressBookList(trustedConfig, gwConfig, userConfig, ignoreError=Fal
 	if logLevel == 'DEBUG':
 		with open (soapDebugLog, 'a') as soapLog:
 			DATE = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
-			soapLog.write(DATE + ' [getAddressBookListRequest] sending to: (%s)\n' % soap_userConfig['soapAddr'] + str(results).decode("ascii", 'ignore') + '\n')
+			soapLog.write(DATE + ' [getAddressBookListRequest] sending to: (%s)\n' % soap_userConfig['soapAddr'] + '\n' + soap + '\n' + str(results).decode("ascii", 'ignore') + '\n')
+
+	soap = logoutRequest % (soap_userConfig['session'])
+	soapClient = suds.client.Client(WSDL, location='%(soapAddr)s' % soap_userConfig)
+	logout_results = soapClient.service.logoutRequest(__inject={'msg': soap})
+	if logLevel == 'DEBUG':
+		with open (soapDebugLog, 'a') as soapLog:
+			DATE = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
+			soapLog.write(DATE + ' [logoutRequest] sending to: (%s)\n' % soap_userConfig['soapAddr'] + '\n' + soap + '\n' + str(logout_results).decode("ascii", 'ignore') + '\n')
+
 	return results
 
 def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
@@ -377,6 +396,14 @@ User Name: %(name)s
 User Email: %(email)s 
 User GroupWise ID: %(userid)s 
 User File ID: %(fid)s """ % soap_userConfig
+
+	soap = logoutRequest % (soap_userConfig['session'])
+	soapClient = suds.client.Client(WSDL, location='%(soapAddr)s' % soap_userConfig)
+	logout_results = soapClient.service.logoutRequest(__inject={'msg': soap})
+	if logLevel == 'DEBUG':
+		with open (soapDebugLog, 'a') as soapLog:
+			DATE = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
+			soapLog.write(DATE + ' [logoutRequest] sending to: (%s)\n' % soap_userConfig['soapAddr'] + '\n' + soap + '\n' + str(logout_results).decode("ascii", 'ignore') + '\n')
 
 	print (results)
 
@@ -574,19 +601,16 @@ def soap_checkFolderListTEST(trustedConfig, gwConfig, userConfig):
 	soap_folderList = soap_getFolderList(trustedConfig, gwConfig, userConfig)
 	if soap_folderList == None:
 		return
-
 	return soap_folderList
 
 def soap_checkAddressBookListTEST(trustedConfig, gwConfig, userConfig):
 	problem = False
-	print ("Getting folder list..")
-	logger.info("Getting folder list..")
+	print ("Getting address book list..")
+	logger.info("Getting address book list..")
 	soap_AdddressBookList = soap_getAddressBookList(trustedConfig, gwConfig, userConfig)
 	if soap_AdddressBookList == None:
 		return
-
 	return soap_AdddressBookList
-	
 
 def moveFolder(soap_userConfig, sourceID, targetID, moveType='folder'):
 	if moveType == 'folder':
@@ -611,7 +635,7 @@ def moveFolder(soap_userConfig, sourceID, targetID, moveType='folder'):
 	if logLevel == 'DEBUG':
 		with open (soapDebugLog, 'a') as soapLog:
 			DATE = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
-			soapLog.write(DATE + ' [modifyItemRequest] sending to: (%s)\n' % soap_userConfig['soapAddr'] + str(results).decode("ascii", 'ignore') + '\n')
+			soapLog.write(DATE + ' [modifyItemRequest] sending to: (%s)\n' % soap_userConfig['soapAddr'] + '\n' + soap + '\n' + str(results).decode("ascii", 'ignore') + '\n')
 	return results
 
 def fixFolderStructure(soap_userConfig, systemIDs, system_problemIDs, subCalendar_problemIDs, subContact_problemIDs):
