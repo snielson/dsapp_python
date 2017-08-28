@@ -1915,7 +1915,8 @@ def get_username(userConfig_List):
 			userConfig = {'name': None}
 			userConfig_List.append(userConfig)
 		else:
-			userConfig = {'name': name.strip()}
+			# userConfig = {'name': name.strip()} ## Strip space off the end?
+			userConfig = {'name': name.lstrip()}
 			userConfig_List.append(userConfig)
 
 	return True
@@ -1947,10 +1948,55 @@ def verifyUser(dbConfig):
 				logger.debug("Skipping verifyUserMobilityDB. Type='%s'" % userConfig['type'])
 
 			userConfig['verify'] = verifyCount
-			userConfig = getApplicationNames(userConfig, dbConfig)
+			if userConfig['type'] != 'group':
+				userConfig = getApplicationNames(userConfig, dbConfig)
+			else:
+				userConfig['mAppName'] = None
+				userConfig['gAppName'] = None
 
 	datasyncBanner(dsappversion)
 	return userConfig_List
+
+def buildUserDBArray(userConfig_list, dbConfig):
+	userArray = dict()
+	default = []
+	mobile = []
+	mapping = []
+	users = []
+
+	for user in userConfig_list:
+		if user['name'] is not None:
+			users.append(user['name'])
+			default.append('\\y%s\\y' % user['name'])
+			mobile.append('\\y%s\\y' % user['name'])
+			mapping.append('\\y%s\\y' % user['name'])
+			mapping.append('(sourceName>)(\\y%s\\y)(</sourceName>)' % user['dName'])
+		if user['dName'] is not None:
+			default.append(user['dName'])
+			mobile.append(user['dName'])
+			mapping.append('(sourceDN>)(\\y%s\\y)(</sourceDN>)' % user['dName'])
+		if user['mAppName'] is not None:
+			if '\\y%s\\y' % user['gAppName'] not in default:
+				default.append('\\y%s\\y' % user['gAppName'])
+		if user['gAppName'] is not None:
+			if '\\y%s\\y' % user['mAppName'] not in default:
+				default.append('\\y%s\\y' % user['mAppName'])
+
+	# Get GUIDs for users in mobility database
+	conn = getConn(dbConfig, 'mobility')
+	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
+	cur.execute("select guid from users where userid ~* ANY(%s)", (default,))
+	guids = cur.fetchall()
+	for guid in guids:
+		mobile.append(guid['guid'])
+
+	userArray['users'] = users
+	userArray['mobile'] = mobile
+	userArray['default'] = default
+	userArray['mapping'] = mapping
+
+	logger.debug("userArray: %s" % userArray)
+	return userArray
 
 def confirm_user(userConfig, database = None):
 	if userConfig['name'] == None:
@@ -2074,32 +2120,22 @@ def file_mCleanup_run(count):
 	p = Process(target=file_mCleanup, args=(filePath, count,))
 	p.start()
 
-def mCleanup(dbConfig, userConfig, fileCleanupNow=True):
-	print ("Mobility database cleanup:")
+def mCleanup(dbConfig, userArray, fileCleanupNow=True):
+	print ("\nMobility database cleanup:")
 	spinner = set_spinner()
 	uGuid = ""
 	
 	conn = getConn(dbConfig, 'mobility')
 	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
 
-	# Get users mobility guid
-	cur.execute("select guid from users where userid ~* '(%(name)s[.|,].*)$' OR name ilike '%(name)s' OR userid ilike '%(name)s'" % userConfig)
-	data = cur.fetchall()
-	for row in data:
-		logger.debug("Found user guid: %s" % row['guid'])
-		uGuid = row['guid']
-
-	if uGuid == '':
-		logger.debug("%s not found in user guid" % userConfig['name'])
-		uGuid = userConfig['name']
-	logger.debug("uGuid assigned '%s'" % uGuid)
-
-	print ("Removing %s attachment maps from mobility.." % userConfig['name'])
-	logger.info("Removing '%s' attachmentmaps from mobility" % userConfig['name'])
+	# print ("Removing %s attachment maps from mobility.." % userConfig['name'])
+	print ("Removing attachment maps from mobility for users(s): %s" % ', '.join(userArray['users']))
+	logger.info("Removing attachment maps from mobility for users(s): %s" % ', '.join(userArray['users']))
 
 	# Delete attachmentmaps
-	cur.execute("delete from attachmentmaps where userid='%s'" % uGuid)
-	logger.debug("DELETE FROM attachmentmaps..")
+	cur.execute("delete from attachmentmaps where userid ~* ANY(%s)", (userArray['mobile'],))
+	logger.debug("Query: %s" % cur.query)
+	logger.debug("Results: %s" % cur.statusmessage)
 
 	# Get filestoreIDs that are safe to delete
 	print ("Obtaining list of file store IDs to remove..")
@@ -2112,43 +2148,51 @@ def mCleanup(dbConfig, userConfig, fileCleanupNow=True):
 		for line in fileID:
 			f.write(line['filestoreid']  + '\n')
 
-	print ("Removing %s from mobility database.. " % userConfig['name'], end='')
-	logger.info("Removing '%s' from mobility database started" % userConfig['name'])
+	print ("Removing user(s) from mobility database: %s " % ', '.join(userArray['users']), end='')
+	logger.info("Removing user(s) from mobility database: %s" % ', '.join(userArray['users']))
 	spinner.start(); time.sleep(.000001)
 	time1 = time.time()
 
 	# clean tables with users guid
-	cmd = "DELETE from foldermaps where deviceid IN (select deviceid from devices where userid='%s')" % uGuid
-	cur.execute(cmd)
-	logger.debug("cmd: %s" % cmd)
+	#cmd = "DELETE from foldermaps where deviceid IN (select deviceid from devices where userid ~* ANY(%s))"
+	cur.execute("DELETE from foldermaps where deviceid IN (select deviceid from devices where userid ~* ANY(%s))", (userArray['mobile'],))
+	logger.debug("Query: %s" % cur.query)
+	logger.debug("Results: %s" % cur.statusmessage)
 
-	cmd = "DELETE from deviceimages where userid='%s'" % uGuid
-	cur.execute(cmd)
-	logger.debug("cmd: %s" % cmd)
+	#cmd = "DELETE from deviceimages where userid='%s'" % uGuid
+	cur.execute("DELETE from deviceimages where userid ~* ANY(%s)", (userArray['mobile'],))
+	logger.debug("Query: %s" % cur.query)
+	logger.debug("Results: %s" % cur.statusmessage)
 
-	cmd = "DELETE from syncevents where userid='%s'" % uGuid
-	cur.execute(cmd)
-	logger.debug("cmd: %s" % cmd)
+	#cmd = "DELETE from syncevents where userid='%s'" % uGuid
+	cur.execute("DELETE from syncevents where userid ~* ANY(%s)", (userArray['mobile'],))
+	logger.debug("Query: %s" % cur.query)
+	logger.debug("Results: %s" % cur.statusmessage)
 
-	cmd = "DELETE from deviceevents where userid='%s'" % uGuid
-	cur.execute(cmd)
-	logger.debug("cmd: %s" % cmd)
+	#cmd = "DELETE from deviceevents where userid='%s'" % uGuid
+	cur.execute("DELETE from deviceevents where userid ~* ANY(%s)", (userArray['mobile'],))
+	logger.debug("Query: %s" % cur.query)
+	logger.debug("Results: %s" % cur.statusmessage)
 
-	cmd = "DELETE from devices where userid='%s'" % uGuid
-	cur.execute(cmd)
-	logger.debug("cmd: %s" % cmd)
+	# cmd = "DELETE from devices where userid='%s'" % uGuid
+	cur.execute("DELETE from devices where userid ~* ANY(%s)", (userArray['mobile'],))
+	logger.debug("Query: %s" % cur.query)
+	logger.debug("Results: %s" % cur.statusmessage)
 
-	cmd = "DELETE from users where guid='%s'" % uGuid
-	cur.execute(cmd)
-	logger.debug("cmd: %s" % cmd)
+	# cmd = "DELETE from users where guid='%s'" % uGuid
+	cur.execute("DELETE from users where guid ~* ANY(%s)", (userArray['mobile'],))
+	logger.debug("Query: %s" % cur.query)
+	logger.debug("Results: %s" % cur.statusmessage)
 
-	cmd = "DELETE from attachments where attachmentid IN (select attachmentid from attachmentmaps where objectid in (select objectid from deviceimages where userid='%s'))" % uGuid
-	cur.execute(cmd)
-	logger.debug("cmd: %s" % cmd)
+	# cmd = "DELETE from attachments where attachmentid IN (select attachmentid from attachmentmaps where objectid in (select objectid from deviceimages where userid='%s'))" % uGuid
+	cur.execute("DELETE from attachments where attachmentid IN (select attachmentid from attachmentmaps where objectid in (select objectid from deviceimages where userid ~* ANY(%s)))", (userArray['mobile'],))
+	logger.debug("Query: %s" % cur.query)
+	logger.debug("Results: %s" % cur.statusmessage)
 
-	cmd = "DELETE from attachments where filestoreid IN (SELECT filestoreid FROM attachments LEFT OUTER JOIN attachmentmaps ON attachments.attachmentid=attachmentmaps.attachmentid WHERE attachmentmaps.attachmentid IS NULL)"
-	cur.execute(cmd)
-	logger.debug("cmd: %s" % cmd)
+	# cmd = "DELETE from attachments where filestoreid IN (SELECT filestoreid FROM attachments LEFT OUTER JOIN attachmentmaps ON attachments.attachmentid=attachmentmaps.attachmentid WHERE attachmentmaps.attachmentid IS NULL)"
+	cur.execute("DELETE from attachments where filestoreid IN (SELECT filestoreid FROM attachments LEFT OUTER JOIN attachmentmaps ON attachments.attachmentid=attachmentmaps.attachmentid WHERE attachmentmaps.attachmentid IS NULL)")
+	logger.debug("Query: %s" % cur.query)
+	logger.debug("Results: %s" % cur.statusmessage)
 
 	spinner.stop(); print()
 	cur.close()
@@ -2175,43 +2219,18 @@ def mCleanup(dbConfig, userConfig, fileCleanupNow=True):
 		file_mCleanup_run(count)
 
 	time2 = time.time()
-	logger.info("Removing '%s' from mobility database complete" % userConfig['name'])
+	logger.info("Removal complete for user(s): %s" % ', '.join(userArray['users']))
 	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
 	if not fileCleanupNow:
 		return count
 
-def dCleanup(dbConfig, userConfig):
-	print ("Datasync database cleanup:")
+def dCleanup(dbConfig, userArray):
+	print ("\nDatasync database cleanup:")
 	spinner = set_spinner()
 
-	# Assign uUser from userConfig
-	if userConfig['dName'] is None:
-		logger.debug("%s not found in targets" % userConfig['name'])
-		uUser = userConfig['name']
-	else:
-		uUser = userConfig['dName']
-
-	# Assign psqlAppNameG from userConfig
-	if userConfig['gAppName'] is None:
-		logger.debug("%s not found in groupwise appname" % userConfig['name'])
-		psqlAppNameG = userConfig['name']
-	else:
-		psqlAppNameG = userConfig['gAppName']
-
-	# Assign psqlAppNameM from userConfig
-	if userConfig['mAppName'] is None:
-		logger.debug("%s not found in mobility appname" % userConfig['name'])
-		psqlAppNameM = userConfig['name']
-	else:
-		psqlAppNameM = userConfig['mAppName']
-
-	logger.debug("uUser assigned '%s'" % uUser)
-	logger.debug("psqlAppNameG assigned '%s'" % psqlAppNameG)
-	logger.debug("psqlAppNameM assigned '%s'" % psqlAppNameM)
-
-	print ("Removing %s from datasync database.. " % userConfig['name'], end='')
-	logger.info("Removing '%s' from datasync database started" % userConfig['name'])
+	print ("Removing user(s) from datasync database: %s " % ', '.join(userArray['users']), end='')
+	logger.info("Removing user(s) from datasync database: %s" % ', '.join(userArray['users']))
 
 	# Delete objectMappings, cache, membershipCache, folderMappings, and targets from datasync DB
 	conn = getConn(dbConfig, 'datasync')
@@ -2220,32 +2239,38 @@ def dCleanup(dbConfig, userConfig):
 	spinner.start(); time.sleep(.000001)
 	time1 = time.time()
 
-	cmd = "DELETE FROM \"objectMappings\" WHERE \"objectID\" IN (SELECT \"objectID\" FROM \"objectMappings\" WHERE \"objectID\" ilike '%%|%s' OR \"objectID\" ilike '%%|%s' OR \"objectID\" ilike '%%|%s')" % (psqlAppNameG, psqlAppNameM, userConfig['name'])
-	cur.execute(cmd)
-	logger.debug("cmd: %s" % cmd)
+	# cmd = "DELETE FROM \"objectMappings\" WHERE \"objectID\" IN (SELECT \"objectID\" FROM \"objectMappings\" WHERE \"objectID\" ilike '%%|%s' OR \"objectID\" ilike '%%|%s' OR \"objectID\" ilike '%%|%s')"
+	cur.execute("DELETE FROM \"objectMappings\" WHERE \"objectID\" ~* ANY(%s)", (userArray['default'],))
+	logger.debug("Query: %s" % cur.query)
+	logger.debug("Results: %s" % cur.statusmessage)
 
-	cmd = "DELETE FROM consumerevents WHERE edata ilike '%%<sourceName>%s</sourceName>%%' OR edata ilike '%%<sourceName>%s</sourceName>%%' OR edata ilike '%%<sourceDN>%s</sourceDN>%%' OR edata ilike '%%<sourceDN>%s</sourceDN>%%'" % (psqlAppNameG, psqlAppNameM, psqlAppNameG, psqlAppNameM)
-	cur.execute(cmd)
-	logger.debug("cmd: %s" % cmd)
+	# cmd = "DELETE FROM consumerevents WHERE edata ilike '%%<sourceName>%s</sourceName>%%' OR edata ilike '%%<sourceName>%s</sourceName>%%' OR edata ilike '%%<sourceDN>%s</sourceDN>%%' OR edata ilike '%%<sourceDN>%s</sourceDN>%%'" % (psqlAppNameG, psqlAppNameM, psqlAppNameG, psqlAppNameM)
+	cur.execute("DELETE FROM consumerevents WHERE edata ~* ANY(%s)", (userArray['mapping'],))
+	logger.debug("Query: %s" % cur.query)
+	logger.debug("Results: %s" % cur.statusmessage)
 
-	cmd = "DELETE FROM \"folderMappings\" WHERE \"targetDN\" ~* '(\\\\m%s[.|,].*)$' OR \"targetDN\" ilike '%s'" % (uUser, uUser)
-	cur.execute(cmd)
-	logger.debug("cmd: %s" % cmd)
+	# cmd = "DELETE FROM \"folderMappings\" WHERE \"targetDN\" ~* '(\\\\m%s[.|,].*)$' OR \"targetDN\" ilike '%s'" % (uUser, uUser)
+	cur.execute("DELETE FROM \"folderMappings\" WHERE \"targetDN\" ~* ANY(%s)", (userArray['default'],))
+	logger.debug("Query: %s" % cur.query)
+	logger.debug("Results: %s" % cur.statusmessage)
 
-	cmd = "DELETE FROM cache WHERE \"sourceDN\" ~* '(\\\\m%s[.|,].*)$' OR \"sourceDN\" ilike '%s'" % (uUser, uUser)
-	cur.execute(cmd)
-	logger.debug("cmd: %s" % cmd)
+	# cmd = "DELETE FROM cache WHERE \"sourceDN\" ~* '(\\\\m%s[.|,].*)$' OR \"sourceDN\" ilike '%s'" % (uUser, uUser)
+	cur.execute("DELETE FROM cache WHERE \"sourceDN\" ~* ANY(%s)", (userArray['default'],))
+	logger.debug("Query: %s" % cur.query)
+	logger.debug("Results: %s" % cur.statusmessage)
 	
-	cmd = "DELETE FROM \"membershipCache\" WHERE (groupdn ~* '(\\\\m%s[.|,].*)$' OR memberdn ~* '(\\\\m%s[.|,].*)$') OR (groupdn ilike '%s' OR memberdn ilike '%s')" % (uUser, userConfig['name'], uUser, uUser)
-	cur.execute(cmd)
-	logger.debug("cmd: %s" % cmd)
+	# cmd = "DELETE FROM \"membershipCache\" WHERE  groupdn ~* ANY(%s) OR memberdn ~* ANY(%s)", (userArray['default'],userArray['default'],))
+	cur.execute("DELETE FROM \"membershipCache\" WHERE  groupdn ~* ANY(%s) OR memberdn ~* ANY(%s)", (userArray['default'],userArray['default'],))
+	logger.debug("Query: %s" % cur.query)
+	logger.debug("Results: %s" % cur.statusmessage)
 	
-	cmd = "DELETE FROM targets WHERE dn ~* '(\\\\m%s[.|,].*)$' OR dn ilike '%s' OR \"targetName\" ilike '%s'" % (uUser, userConfig['name'], userConfig['name'])
-	cur.execute(cmd)
-	logger.debug("cmd: %s" % cmd)
-	
+	# cmd = "DELETE FROM targets WHERE dn ~* '(\\\\m%s[.|,].*)$' OR dn ilike '%s' OR \"targetName\" ilike '%s'" % (uUser, userConfig['name'], userConfig['name'])
+	cur.execute("DELETE FROM targets WHERE dn ~* ANY(%s) OR \"targetName\" ~* ANY(%s)", (userArray['default'],userArray['default'],))
+	logger.debug("Query: %s" % cur.query)
+	logger.debug("Results: %s" % cur.statusmessage)
+
 	time2 = time.time()
-	logger.info("Removing '%s' from datasync database complete" % userConfig['name'])
+	logger.info("Removal complete for user(s): %s" % ', '.join(userArray['users']))
 	logger.info("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 	spinner.stop(); print()
 
@@ -2254,25 +2279,33 @@ def dCleanup(dbConfig, userConfig):
 
 def remove_user(dbConfig, op = None):
 	# Pass in 1 for op to skip user database check in confirm_user()
-	userConfig_List = verifyUser(dbConfig)
-	if len(userConfig_List) == 1:
-		if userConfig_List[0]['name'] is None:
-			return
 
 	datasyncBanner(dsappversion)
 	if op == 1:
+		userArray = buildUserDBArray(verifyUser(dbConfig), dbConfig)
+		if len(userArray['users']) == 1:
+			if userArray['users'][0] is None:
+				return
+
 		logger.debug("Skipping user database check")
 		fileClean = False
 		count = 0
-		# TODO: Work on cleaning up multiple users at once to save time - or just loop through every user?
-		for userConfig in userConfig_List:
-			if confirm_user(userConfig, op):
-				if askYesOrNo("Remove %s from datasync database" % userConfig['name']):
-					dCleanup(dbConfig, userConfig)
-				print()
-				if askYesOrNo("Remove %s from mobility database" % userConfig['name']):
-					count += mCleanup(dbConfig, userConfig, fileCleanupNow=False)
-					fileClean = True
+
+		if len(userArray['users']) > 1:
+			if askYesOrNo("Remove all users/groups from datasync database"):
+				dCleanup( dbConfig, userArray)
+			print()
+			if askYesOrNo("Remove all users from mobility database"):
+				count += mCleanup(dbConfig, userArray, fileCleanupNow=False)
+				fileClean = True
+			print()
+		else:
+			if askYesOrNo("Remove %s from datasync database" % userArray['users'][0]):
+				dCleanup(dbConfig, userArray)
+			print()
+			if askYesOrNo("Remove %s from mobility database" % userArray['users'][0]):
+				count += mCleanup(dbConfig, userArray, fileCleanupNow=False)
+				fileClean = True
 			print()
 
 		# Run file cleanup after ALL users have been removed
@@ -2280,6 +2313,11 @@ def remove_user(dbConfig, op = None):
 			file_mCleanup_run(count)
 
 	elif op == None:
+		userConfig_List = verifyUser(dbConfig)
+		if len(userConfig_List) == 1:
+			if userConfig_List[0]['name'] is None:
+				return
+				
 		userConfig = userConfig_List[0]
 		logger.debug("Checking user in database")
 		if confirm_user(userConfig):
@@ -2317,9 +2355,11 @@ def remove_user(dbConfig, op = None):
 			conn.close()
 			logger.info("Cleanup complete. Running force cleanup")
 
-			dCleanup(dbConfig, userConfig)
+			userArry = buildUserDBArray(userConfig_List, dbConfig)
+
+			dCleanup(dbConfig, userArry)
 			print()
-			mCleanup(dbConfig, userConfig)
+			mCleanup(dbConfig, userArry)
 			print()
 
 	eContinue()
