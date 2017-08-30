@@ -56,18 +56,7 @@ import getch
 getch = getch._Getch()
 import dsapp_ghc as ghc
 
-# Global variables
-forceMode = False
-installedConnector = "/etc/init.d/datasync-connectors"
-COMPANY_BU = 'Micro Focus'
-ERROR_MSG = "\ndsapp has encountered an error. See dsapp.log for more details"
-if sys.stdout.isatty():
-	WINDOW_SIZE = rows, columns = os.popen('stty size', 'r').read().split()
-else:
-	# Default terminal size
-	WINDOW_SIZE = [24,80]
-
-# Folder variables
+# Global Folder variables
 dsappDirectory = "/opt/novell/datasync/tools/dsapp"
 dsappConf = dsappDirectory + "/conf"
 dsappLogs = dsappDirectory + "/logs"
@@ -77,6 +66,16 @@ dsapptmp = dsappDirectory + "/tmp"
 dsappupload = dsappDirectory + "/upload"
 dsappdata = dsappDirectory + "/data"
 rootDownloads = "/root/Downloads"
+
+# Global variables
+forceMode = False
+installedConnector = "/etc/init.d/datasync-connectors"
+COMPANY_BU = 'Micro Focus'
+if sys.stdout.isatty():
+	WINDOW_SIZE = rows, columns = os.popen('stty size', 'r').read().split()
+else:
+	# Default terminal size
+	WINDOW_SIZE = [24,80]
 
 # Misc variables
 serverinfo = "/etc/*release"
@@ -149,6 +148,22 @@ colorGREEN = "\033[01;32m{0}\033[00m"
 colorRED = "\033[01;31m{0}\033[00m"
 colorYELLOW = "\033[01;33m{0}\033[00m"
 colorBLUE = "\033[01;34m{0}\033[00m"
+
+def dsappExitError(message=None, exit=True, printMessage=False):
+	ERROR_MSG1 = "\n\ndsapp has encountered an error. See log for more details\n%s/dsapp.log" % dsappLogs
+	ERROR_MSG2 = "\n\ndsapp has encountered an error."
+
+	if message is not None: 
+		if printMessage:
+			print (ERROR_MSG2)
+			print("Error: %s" % message)
+		else:
+			print (ERROR_MSG1)
+		logger.error(message)
+	else:
+		print (ERROR_MSG1)
+	if exit:
+		sys.exit(1)
 
 # Define Variables for Eenou+ (2.x)
 def declareVariables2():
@@ -370,9 +385,7 @@ def getFilePath(prompt):
 				break
 		else:
 			break
-
 	return filePath
-
 
 def findReplace(find, replace, filePath):
 	for line in fileinput.input(filePath, inplace=True):
@@ -420,15 +433,9 @@ def getXMLTree(filePath):
 		return etree.parse(filePath, parser)
 		logger.debug(filePath + " loaded as XML tree")
 	except IOError:
-		print (ERROR_MSG)
-		logger.error('Unable to find file: ' + filePath)
-		eContinue()
-		sys.exit(1)
+		dsappExitError('Unable to find file: %s' % filePath ,exit=True, printMessage=True)
 	except ExpatError:
-		print (ERROR_MSG)
-		logger.error('Unable to parse XML: %s' % (filePath))
-		eContinue()
-		sys.exit(1)
+		dsappExitError('Unable to parse XML: %s' % filePath ,exit=True, printMessage=True)
 
 def xmlpath (elem, tree):
 	# Example of elem: './/configengine/ldap/enabled/'
@@ -1131,8 +1138,7 @@ def protect(msg, encode, path, host = None, key = None, skip=False):
 
 		if not skip:
 			os.remove(dsapptmp + '/decode_error_check')
-			print (ERROR_MSG)
-			sys.exit(1)
+			dsappExitError('bad decrypt - error decoding %s' % (path), exit=True, printMessage=True)
 		else:
 			return None
 	elif result:
@@ -1323,7 +1329,7 @@ def checkPostgresql(dbConfig, report=True):
 		conn.close()
 	except:
 		if report:
-			print (ERROR_MSG)
+			dsappExitError(exit=False, printMessage=False)
 		logger.error('Unable to connect to postgresql [user=%s,pass=%s]' % (dbConfig['user'],"*" * len(dbConfig['pass'])))
 		return False
 	return True
@@ -1332,13 +1338,12 @@ def checkDatabase(dbConfig, database):
 	if (database,) not in listDatabases(dbConfig):
 		logger.warning("Database %s does not exist" % database)
 		return False
-
 	try:
 		conn = psycopg2.connect("dbname='%s' user='%s' host='%s' password='%s'" % (database, dbConfig['user'],dbConfig['host'],dbConfig['pass']))
 		logger.info('Successfully connected to %s database [user=%s,pass=%s]' % (database, dbConfig['user'],"*" * len(dbConfig['pass'])))
 		conn.close()
 	except:
-		print (ERROR_MSG)
+		dsappExitError(exit=False, printMessage=False)
 		logger.error('Unable to connect to %s database [user=%s,pass=%s]' % (database, dbConfig['user'],"*" * len(dbConfig['pass'])))
 		return False
 	return True
@@ -2154,42 +2159,34 @@ def mCleanup(dbConfig, userArray, fileCleanupNow=True):
 	time1 = time.time()
 
 	# clean tables with users guid
-	#cmd = "DELETE from foldermaps where deviceid IN (select deviceid from devices where userid ~* ANY(%s))"
 	cur.execute("DELETE from foldermaps where deviceid IN (select deviceid from devices where userid ~* ANY(%s))", (userArray['mobile'],))
 	logger.debug("Query: %s" % cur.query)
 	logger.debug("Results: %s" % cur.statusmessage)
 
-	#cmd = "DELETE from deviceimages where userid='%s'" % uGuid
 	cur.execute("DELETE from deviceimages where userid ~* ANY(%s)", (userArray['mobile'],))
 	logger.debug("Query: %s" % cur.query)
 	logger.debug("Results: %s" % cur.statusmessage)
 
-	#cmd = "DELETE from syncevents where userid='%s'" % uGuid
 	cur.execute("DELETE from syncevents where userid ~* ANY(%s)", (userArray['mobile'],))
 	logger.debug("Query: %s" % cur.query)
 	logger.debug("Results: %s" % cur.statusmessage)
 
-	#cmd = "DELETE from deviceevents where userid='%s'" % uGuid
 	cur.execute("DELETE from deviceevents where userid ~* ANY(%s)", (userArray['mobile'],))
 	logger.debug("Query: %s" % cur.query)
 	logger.debug("Results: %s" % cur.statusmessage)
 
-	# cmd = "DELETE from devices where userid='%s'" % uGuid
 	cur.execute("DELETE from devices where userid ~* ANY(%s)", (userArray['mobile'],))
 	logger.debug("Query: %s" % cur.query)
 	logger.debug("Results: %s" % cur.statusmessage)
 
-	# cmd = "DELETE from users where guid='%s'" % uGuid
 	cur.execute("DELETE from users where guid ~* ANY(%s)", (userArray['mobile'],))
 	logger.debug("Query: %s" % cur.query)
 	logger.debug("Results: %s" % cur.statusmessage)
 
-	# cmd = "DELETE from attachments where attachmentid IN (select attachmentid from attachmentmaps where objectid in (select objectid from deviceimages where userid='%s'))" % uGuid
 	cur.execute("DELETE from attachments where attachmentid IN (select attachmentid from attachmentmaps where objectid in (select objectid from deviceimages where userid ~* ANY(%s)))", (userArray['mobile'],))
 	logger.debug("Query: %s" % cur.query)
 	logger.debug("Results: %s" % cur.statusmessage)
 
-	# cmd = "DELETE from attachments where filestoreid IN (SELECT filestoreid FROM attachments LEFT OUTER JOIN attachmentmaps ON attachments.attachmentid=attachmentmaps.attachmentid WHERE attachmentmaps.attachmentid IS NULL)"
 	cur.execute("DELETE from attachments where filestoreid IN (SELECT filestoreid FROM attachments LEFT OUTER JOIN attachmentmaps ON attachments.attachmentid=attachmentmaps.attachmentid WHERE attachmentmaps.attachmentid IS NULL)")
 	logger.debug("Query: %s" % cur.query)
 	logger.debug("Results: %s" % cur.statusmessage)
@@ -4120,8 +4117,6 @@ def fix_referenceCount(dbConfig):
 
 def list_deviceInfo(dbConfig):
 	datasyncBanner(dsappversion)
-	# print (textwrap.fill("Below is a list of users and devices. For more details about each device (i.e. OS version), look up what is in the description column. For an iOS device, there could be a listing of Apple-iPhone3C1/902.176. Use the following website, http://enterpriseios.com/wiki/UserAgent to convert to an Apple product, iOS Version and Build.", 80))
-	# print ()
 	cmd = "PGPASSWORD='%(pass)s' psql -U %(user)s mobility -c \"select u.userid, description, identifierstring, devicetype from devices d INNER JOIN users u ON d.userid = u.guid;\"" % dbConfig
 	logger.info("Listing all devices from the database")
 	out = util_subprocess(cmd)
@@ -4291,10 +4286,7 @@ def check_userAuth(dbConfig, authConfig):
 	print ("\nCheck for User Authentication Problems:")
 	print ("Checking log files..\n")
 	logger.info("Checking log files for '%s'" % userConfig['mAppName'])
-	# authErrors = dict()
 	error = False
-	# with open(mAlog, 'r') as open_file:
-	# 	for line in open_file:
 	for line in readlines_reverse(mAlog):
 
 		# User locked/expired/disabled - "authentication problem"
@@ -4302,7 +4294,6 @@ def check_userAuth(dbConfig, authConfig):
 			logger.debug("Line found: Account disabled")
 			error = True
 			errDate, errTime = line.split(' ')[0:2]
-			# authErrors['disabled'] = "%s had an authentication problem. %s %s\nThe user is locked, expired, and/or disabled\n" % (userConfig['name'].lower(), errDate, errTime)
 			authErrors = "%s had an authentication problem. %s %s\nThe user is locked, expired, and/or disabled\n" % (userConfig['name'].lower(), errDate, errTime)
 			break
 
@@ -4311,7 +4302,6 @@ def check_userAuth(dbConfig, authConfig):
 			logger.debug("Line found: Invalid password")
 			error = True
 			errDate, errTime = line.split(' ')[0:2]
-			# authErrors['invalid'] = "%s had a authentication problem %s %s\nThe password is incorrect\nSuggestion: See TID 7007504\n" % (userConfig['name'].lower(), errDate, errTime)
 			authErrors = "%s had a authentication problem %s %s\nThe password is incorrect\nSuggestion: See TID 7007504\n" % (userConfig['name'].lower(), errDate, errTime)
 			break
 
@@ -4319,7 +4309,6 @@ def check_userAuth(dbConfig, authConfig):
 			logger.debug("Line found: Password expired")
 			error = True
 			errDate, errTime = line.split(' ')[0:2]
-			# authErrors['database'] = "%s had a authentication problem %s %s\nThe password is expired\n" % (userConfig['name'].lower(), errDate, errTime)
 			authErrors = "%s had a authentication problem %s %s\nThe password is expired\n" % (userConfig['name'].lower(), errDate, errTime)
 			break
 
@@ -4328,7 +4317,6 @@ def check_userAuth(dbConfig, authConfig):
 			logger.debug("Line found: User Database")
 			error = True
 			errDate, errTime = line.split(' ')[0:2]
-			# authErrors['database'] = "%s had a database problem %s %s\nUser may not have a password set for authentication type\n" % (userConfig['name'].lower(), errDate, errTime)
 			authErrors = "%s had a database problem %s %s\nUser may not have a password set for authentication type\n" % (userConfig['name'].lower(), errDate, errTime)
 			break
 
@@ -4337,7 +4325,6 @@ def check_userAuth(dbConfig, authConfig):
 			logger.debug("Line found: Connection Blocked")
 			error = True
 			errDate, errTime = line.split(' ')[0:2]
-			# authErrors['blocked'] = "%s had a connection problem %s %s\nUser has not completed the initial sync\n" % (userConfig['name'].lower(), errDate, errTime)
 			authErrors = "%s had a connection problem %s %s\nUser has not completed the initial sync\n" % (userConfig['name'].lower(), errDate, errTime)
 			break
 
@@ -4345,14 +4332,12 @@ def check_userAuth(dbConfig, authConfig):
 			logger.debug("Line found: User failed")
 			error = True
 			errDate, errTime = line.split(' ')[0:2]
-			# authErrors['failed'] = "%s had a sync problem %s %s\nUser initial sync failed\n" % (userConfig['name'].lower(), errDate, errTime)
 			authErrors = "%s had a sync problem %s %s\nUser initial sync failed\n" % (userConfig['name'].lower(), errDate, errTime)
 		try:
 			if userConfig['mAppName'] in line and 'Connection Blocked' in line and 'currently blocked from accessing the server':
 				logger.debug("Line found: Quarantined")
 				error = True
 				errDate, errTime = line.split(' ')[0:2]
-				# authErrors['failed'] = "%s had a connection problem %s %s\nDevice has been quarantined\n" % (userConfig['name'].lower(), errDate, errTime)
 				authErrors = "%s had a connection problem %s %s\nDevice has been quarantined\n" % (userConfig['name'].lower(), errDate, errTime)
 				break
 		except:
@@ -4369,8 +4354,6 @@ def check_userAuth(dbConfig, authConfig):
 	if error:
 		logger.info("Problems found with authentication for '%s'" % userConfig['name'].lower())
 		logger.debug(authErrors)
-		# for key in authErrors:
-		# 	print (authErrors[key])
 		print (authErrors)
 	if not error:
 		logger.info("No problems detected")
@@ -4619,58 +4602,57 @@ def removeDevice(dbConfig, userConfig = None):
 			if len(deleteGUIDS) >= 1:
 				logger.info("Removing guids: %s" % deleteGUIDS)
 
-				cmd = "DELETE FROM foldermaps WHERE deviceid IN (%s)" % deleteGUIDS
 				cur.execute("DELETE FROM foldermaps WHERE deviceid = ANY(%s)", (deleteGUIDS,))
-				logger.debug("cmd: %s" % cmd)
+				logger.debug("Query: %s" % cur.query)
+				logger.debug("Results: %s" % cur.statusmessage)
 
-				cmd = "DELETE FROM syncevents WHERE deviceid IN (%s)" % deleteGUIDS
 				cur.execute("DELETE FROM syncevents WHERE deviceid = ANY(%s)", (deleteGUIDS,))
-				logger.debug("cmd: %s" % cmd)
+				logger.debug("Query: %s" % cur.query)
+				logger.debug("Results: %s" % cur.statusmessage)
 
-				cmd = "DELETE FROM deviceevents WHERE deviceid IN (%s)" % deleteGUIDS
 				cur.execute("DELETE FROM deviceevents WHERE deviceid = ANY(%s)", (deleteGUIDS,))
-				logger.debug("cmd: %s" % cmd)
+				logger.debug("Query: %s" % cur.query)
+				logger.debug("Results: %s" % cur.statusmessage)
 
-				cmd = "DELETE FROM deviceimages WHERE deviceid IN (%s)" % deleteGUIDS
 				cur.execute("DELETE FROM deviceimages WHERE deviceid = ANY(%s)", (deleteGUIDS,))
-				logger.debug("cmd: %s" % cmd)
+				logger.debug("Query: %s" % cur.query)
+				logger.debug("Results: %s" % cur.statusmessage)
 
-				cmd = "DELETE FROM devices WHERE deviceid IN (%s)" % deleteGUIDS
 				cur.execute("DELETE FROM devices WHERE deviceid = ANY(%s)", (deleteGUIDS,))
-				logger.debug("cmd: %s" % cmd)
+				logger.debug("Query: %s" % cur.query)
+				logger.debug("Results: %s" % cur.statusmessage)
 
 	# Set last devices blank
 	for guid in lastGUIDS:
 		logger.info("Setting default blank value to guid: %s" % guid)
 
-		# TODO : DEBUG logging for every execute
-		cmd = "UPDATE devices SET identifierstring='', description='', state='0', statedata='{}' WHERE deviceid='%s'" % guid
-		cur.execute(cmd)
-		logger.debug("cmd: %s" % cmd)
+		cur.execute("UPDATE devices SET identifierstring='', description='', state='0', statedata='{}' WHERE deviceid='%s'" % guid)
+		logger.debug("Query: %s" % cur.query)
+		logger.debug("Results: %s" % cur.statusmessage)
 
-		cmd = "UPDATE deviceimages SET synckey='0' WHERE deviceid='%s' AND state<>'1000'" % guid
-		cur.execute(cmd)
-		logger.debug("cmd: %s" % cmd)
+		cur.execute("UPDATE deviceimages SET synckey='0' WHERE deviceid='%s' AND state<>'1000'" % guid)
+		logger.debug("Query: %s" % cur.query)
+		logger.debug("Results: %s" % cur.statusmessage)
 
-		cmd = "UPDATE foldermaps SET synckey='1' WHERE deviceid='%s'" % guid
-		cur.execute(cmd)
-		logger.debug("cmd: %s" % cmd)
+		cur.execute("UPDATE foldermaps SET synckey='1' WHERE deviceid='%s'" % guid)
+		logger.debug("Query: %s" % cur.query)
+		logger.debug("Results: %s" % cur.statusmessage)
 
-		cmd = "UPDATE foldermaps SET synckey='0' WHERE deviceid='%s' AND folderid='0'" % guid
-		cur.execute(cmd)
-		logger.debug("cmd: %s" % cmd)
+		cur.execute("UPDATE foldermaps SET synckey='0' WHERE deviceid='%s' AND folderid='0'" % guid)
+		logger.debug("Query: %s" % cur.query)
+		logger.debug("Results: %s" % cur.statusmessage)
 
-		cmd = "DELETE FROM deviceevents WHERE deviceid='%s'" % guid
-		cur.execute(cmd)
-		logger.debug("cmd: %s" % cmd)
+		cur.execute("DELETE FROM deviceevents WHERE deviceid='%s'" % guid)
+		logger.debug("Query: %s" % cur.query)
+		logger.debug("Results: %s" % cur.statusmessage)
 
-		cmd = "DELETE FROM syncevents WHERE deviceid='%s'" % guid
-		cur.execute(cmd)
-		logger.debug("cmd: %s" % cmd)
+		cur.execute("DELETE FROM syncevents WHERE deviceid='%s'" % guid)
+		logger.debug("Query: %s" % cur.query)
+		logger.debug("Results: %s" % cur.statusmessage)
 
-		cmd = "SELECT deviceconfig FROM devices WHERE deviceid='%s'" % guid
-		cur.execute(cmd)
-		logger.debug("cmd: %s" % cmd)
+		cur.execute("SELECT deviceconfig FROM devices WHERE deviceid='%s'" % guid)
+		logger.debug("Query: %s" % cur.query)
+		logger.debug("Results: %s" % cur.statusmessage)
 
 		deviceconfig = cur.fetchall()
 
@@ -4685,9 +4667,9 @@ def removeDevice(dbConfig, userConfig = None):
 				tree.remove(path)
 				logger.debug("Found XML path: %s" % path)
 
-			cmd = "UPDATE devices SET deviceconfig='%s' WHERE deviceid='%s'" % (etree.tostring(tree, pretty_print=False), guid)
-			cur.execute(cmd)
-			logger.debug("cmd: %s" % cmd)
+			cur.execute("UPDATE devices SET deviceconfig='%s' WHERE deviceid='%s'" % (etree.tostring(tree, pretty_print=False), guid))
+			logger.debug("Query: %s" % cur.query)
+			logger.debug("Results: %s" % cur.statusmessage)
 
 
 	cur.close()
