@@ -1216,15 +1216,19 @@ def ghc_checkVMWare():
 	ghc_util_NewHeader("Checking VMware-tools..")
 	time1 = time.time()
 	problem = False
+	Config.read(dsappSettings)
+	slesVersion = Config.get('Misc', 'sles.version')
 
 	cmd = "lspci | grep VMware"
 	out = ghc_util_subprocess(cmd)
 
 	vmwareChecks = ['/etc/init.d/vmware-tools-services', '/etc/init.d/vmware-tools']
+	vmwareChecksSLES12 = ['vmtoolsd.service']
 
 	with open(ghcLog, 'a') as log:
 		if out[0]:
 			log.write("Server is running within a virtualized platform\n")
+			problem = 'warning'
 		else:
 			problem = 'skipped'
 
@@ -1232,9 +1236,23 @@ def ghc_checkVMWare():
 			if os.path.isfile(check):
 				cmd = "%s status" % check
 				out = ghc_util_subprocess(cmd)
+				logger.debug(cmd)
+				logger.debug(out)
 				if 'not running' in out[0]:
-					problem = 'warning'
 					log.write("%s is not running\n" % check)
+				if 'running' in out[0]:
+					problem = False
+
+		if slesVersion >= '12':
+			for check in vmwareChecksSLES12:
+				cmd = "systemctl is-active %s" % check
+				out = ghc_util_subprocess(cmd)
+				logger.debug(cmd)
+				logger.debug(out)
+				if 'active' not in out[0]:
+					log.write("%s is not running\n" % check)
+				if 'active' in out[0]:
+					problem = False
 
 	if problem == 'skipped':
 		msg = "VMware not detected\n"
