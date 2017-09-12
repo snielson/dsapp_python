@@ -12,6 +12,7 @@ import suds.client
 import traceback
 import logging, logging.config
 import datetime
+from distutils.version import LooseVersion, StrictVersion
 import dsapp_Definitions as ds
 import ConfigParser
 Config = ConfigParser.ConfigParser()
@@ -57,6 +58,21 @@ SOAP_STRING = "/soap"
 CONTENT_TYPE = "Content-Type"
 TEXT_XML = "text/xml"
 
+
+# GroupWise version to be passed in via SOAP
+groupWiseVersions = {"base": "1.00",
+"7.0.2": "1.00", 
+"8.0.0": "1.02",
+"8.0.1": "1.03",
+"8.0.2": "1.04",
+"12.0.0": "1.05",
+"14.0.0": "1.06",
+"14.2.0": "1.07",
+"14.2.1": "1.08",
+"14.2.2": "1.09",
+"18.0.0": "1.09",
+'max': '1.09'}
+
 logoutRequest = """<?xml version="1.0" encoding="UTF-8"?>
 <SOAP-ENV:Envelope xmlns:ns0="http://schemas.novell.com/2005/01/GroupWise/types" xmlns:ns1="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns2="http://schemas.novell.com/2005/01/GroupWise/methods" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
 	<SOAP-ENV:Header/>
@@ -79,7 +95,7 @@ loginRequest = """<?xml version="1.0" encoding="UTF-8"?>
 					<ns0:key>%s</ns0:key>
 				</auth>
 				<language xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">en</language>
-				<version xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">1.05</version>
+				<version xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">%s</version>
 				<application xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">dsapp_service</application>
 				<userid xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">true</userid>
 			</ns1:loginRequest>
@@ -156,7 +172,24 @@ modifyItemRequest_Calendar = """<?xml version="1.0" encoding="UTF-8"?>
 	</SOAP-ENV:Envelope>
 """
 
-def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False, ignoreError=False):
+def getGroupWiseVersion(version):
+	# default version to 1.0.5
+	poaVersion = "1.05"
+
+	try:
+		poaVersion = groupWiseVersions[version.strip()]
+	except KeyError:
+		logger.debug("Unable to find GroupWise version in list: %s" % version)
+		if LooseVersion(version.strip()) >= groupWiseVersions['max']:
+			poaVersion = groupWiseVersions['max']
+		else:
+			poaVersion = "1.05"
+
+	logger.debug("Setting SOAP poaVersion = '%s'" % poaVersion)
+	return poaVersion
+
+
+def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False, ignoreError=False, poa_version='1.0.5'):
 	soapAddr = None
 	# if verifyMobility is True, only check users found in GMS
 	if verifyMobility:
@@ -179,7 +212,7 @@ def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False
 		return
 
 	logger.info("Starting GroupWise SOAP check on '%s' at %s://%s:%s/soap" % (userid,gwConfig['sSecure'], gwConfig['gListenAddress'], gwConfig['sPort']))
-	soap = loginRequest % (userid, trustedConfig['name'], trustedConfig['key'])
+	soap = loginRequest % (userid, trustedConfig['name'], trustedConfig['key'], poa_version)
 	soapClient = suds.client.Client(WSDL, location='%(sSecure)s://%(gListenAddress)s:%(sPort)s/soap' % gwConfig)
 	soapAddr = '%(sSecure)s://%(gListenAddress)s:%(sPort)s/soap' % gwConfig
 	try:
@@ -229,6 +262,18 @@ def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False
 					print ("Unable to return results for %s" % userid)
 				logger.warning('Unable to return results for %s' % userid)
 				return
+
+	# Check GroupWise version returned, and SOAP login with the correct version
+	if results['status']['code'] == 0:
+		poa_version = getGroupWiseVersion(results['gwVersion'])
+		if poa_version != "1.0.5":
+			soap = loginRequest % (userid, trustedConfig['name'], trustedConfig['key'], poa_version)
+			results = soapClient.service.loginRequest(__inject={'msg': soap})
+			if logLevel == 'DEBUG':
+				with open (soapDebugLog, 'a') as soapLog:
+					DATE = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
+					soapLog.write(DATE + ' [loginRequest][userid: %s] sending to: (%s)\n' % (userid,soapAddr) + '\n' + soap + '\n' + str(results).decode("ascii", 'ignore') + '\n')
+
 
 	# Create new userConfig dictionary if status code is 0
 	logger.info("Done checking '%s' on GroupWise SOAP" % userid)
