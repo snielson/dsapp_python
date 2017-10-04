@@ -380,9 +380,13 @@ def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
 	else:
 		foundRoot = False
 		for folder in soap_folderList[0][0]:
-			if folder['sid'] == 1 or folder['folderType'] == 'Root':
-				root_id = folder['id']
-				foundRoot = True
+			try:
+				if folder['sid'] == 1 or folder['folderType'] == 'Root':
+					root_id = folder['id']
+					foundRoot = True
+			except AttributeError:
+				logger.error("AttributeError - No sid or folderType")
+				logger.error(folder)
 
 		if not foundRoot:
 			print ("Unable to find the root folder for %s" % userConfig['name'])
