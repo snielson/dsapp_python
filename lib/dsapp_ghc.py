@@ -1047,6 +1047,7 @@ def ghc_checkManualMaintenance(dbConfig):
 	# cmd = "rpm --last -qa | grep 'datasync-common-[0-9]' | awk  '{print $6\",\"$3\",\"$4}' | uniq"
 	# install_date = ghc_util_subprocess(cmd)[0]
 	if install_date is not None:
+		logger.debug("install_date = '%s'" % install_date)
 		install_date_year = int(install_date.split('-')[0])
 		install_date_month = int(install_date.split('-')[1])
 		install_date_day = int(install_date.split('-')[2])
