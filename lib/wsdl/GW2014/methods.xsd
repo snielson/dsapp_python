@@ -398,7 +398,7 @@ current contact information at www.novell.com.
 				Forwarding a message is a two step process.
 				First you call the method with the id of the original item.
 				A new mail item is returned.
-				It has the orignal subject.
+				It has the original subject.
 				The caller is responsible to prepend "Fwd:" or what ever they
 				want to modify the original subject.
 				If the caller wants the original message body returned, they need
@@ -425,6 +425,27 @@ current contact information at www.novell.com.
       <xs:complexType>
          <xs:sequence>
             <xs:element name="item" type="types:Item" minOccurs="0"/>
+            <xs:element name="status" type="types:Status"/>
+         </xs:sequence>
+      </xs:complexType>
+   </xs:element>
+   <xs:element name="freeBusyRequest">
+      <xs:complexType>
+         <xs:sequence>
+            <xs:element name="users" type="types:FreeBusyUserList"/>
+            <xs:element name="startDate" type="xs:dateTime"/>
+            <xs:element name="endDate" type="xs:dateTime"/>
+            <xs:element name="exclude" type="types:uid" minOccurs="0"/>
+            <xs:element name="token" type="xs:string" minOccurs="0"/>
+            <xs:element name="view" type="xs:string" minOccurs="0"/>
+         </xs:sequence>
+      </xs:complexType>
+   </xs:element>
+   <xs:element name="freeBusyResponse">
+      <xs:complexType>
+         <xs:sequence>
+            <xs:element name="freeBusyInfo" type="types:FreeBusyInfoList" minOccurs="0"/>
+            <xs:element name="redirectToHost" type="types:HostFreeBusy" minOccurs="0" maxOccurs="unbounded"/>
             <xs:element name="status" type="types:Status"/>
          </xs:sequence>
       </xs:complexType>
@@ -874,7 +895,11 @@ current contact information at www.novell.com.
       </xs:complexType>
    </xs:element>
    <xs:element name="getProxyAccessListRequest">
-     <xs:complexType/>
+      <xs:complexType>
+         <xs:sequence>
+            <xs:element name="view" type="xs:string" minOccurs="0"/>
+         </xs:sequence>
+      </xs:complexType>
    </xs:element>
    <xs:element name="getProxyAccessListResponse">
       <xs:complexType>
@@ -909,7 +934,7 @@ current contact information at www.novell.com.
    <xs:element name="getSentItemRequest">
       <xs:complexType>
          <xs:sequence>
-            <xs:element name="filename" type="xs:string" minOccurs="0"/>
+            <xs:element name="fileName" type="xs:string" minOccurs="0"/>
             <xs:element name="id" type="types:uid" minOccurs="0"/>
             <xs:element name="view" type="xs:string" minOccurs="0"/>
          </xs:sequence>
@@ -1297,7 +1322,7 @@ current contact information at www.novell.com.
 				be positioned between the two items.
 				If you do not supply values for before and after, the item
 				will be placed last in the checklist folder.
-				There are special values useds as helpers. "first" can be
+				There are special values used as helpers. "first" can be
 				used in before to place the item first in the list. "last"
 				can be placed in after to place the item last in the list.
 				The under element controls making an item a subtask item.
@@ -1708,7 +1733,22 @@ current contact information at www.novell.com.
          </xs:sequence>
       </xs:complexType>
    </xs:element>
-   <xs:element name="restoreItemRequest">
+	<xs:element name="restartTransferOwnershipRequest">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="id" type="types:uid"/>
+				<xs:element name="newOwnerGuid" type="types:UUID"/>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	<xs:element name="restartTransferOwnershipResponse">
+		<xs:complexType>
+			<xs:sequence>
+				<xs:element name="status" type="types:Status"/>
+			</xs:sequence>
+		</xs:complexType>
+	</xs:element>
+	<xs:element name="restoreItemRequest">
       <xs:complexType>
          <xs:sequence>
             <xs:element name="id" type="types:uid"/>
@@ -1840,6 +1880,20 @@ current contact information at www.novell.com.
       <xs:complexType>
          <xs:sequence>
             <xs:element name="id" type="types:uid" minOccurs="0"/>
+            <xs:element name="status" type="types:Status"/>
+         </xs:sequence>
+      </xs:complexType>
+   </xs:element>
+   <xs:element name="takeOwnershipRequest">
+      <xs:complexType>
+         <xs:sequence>
+            <xs:element name="id" type="types:uid"/>
+         </xs:sequence>
+      </xs:complexType>
+   </xs:element>
+   <xs:element name="takeOwnershipResponse">
+      <xs:complexType>
+         <xs:sequence>
             <xs:element name="status" type="types:Status"/>
          </xs:sequence>
       </xs:complexType>

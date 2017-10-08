@@ -38,41 +38,19 @@ import filestoreIdToPath
 import getch
 getch = getch._Getch()
 
-# Folder variables
-dsappDirectory = "/opt/novell/datasync/tools/dsapp"
-dsappConf = dsappDirectory + "/conf"
-dsappLogs = dsappDirectory + "/logs"
-
-# Misc variables
-initScripts = "/etc/init.d/"
-mobilityVersion = 0
-version = "/opt/novell/datasync/version"
-
 # Global variables
+import dsapp_global as glb
 silent = None
 mobile_serviceCheck = True
 web_serviceCheck = True
 serverDateCheck = True
 proxy_enabled = False
 
-# Mobility Directories
-dirOptMobility = "/opt/novell/datasync"
-dirEtcMobility = "/etc/datasync"
-dirVarMobility = "/var/lib/datasync"
-log = "/var/log/datasync"
-
 # System logs / settings
 proxyConf = "/etc/sysconfig/proxy"
 
-# dsapp Conf / Logs
-dsappSettings = dsappConf + "/setting.cfg"
-ghcSettings = dsappConf + "/ghc_checks.cfg"
-dsappLogSettings = dsappConf + "/logging.cfg"
-dsappLog = dsappConf + "/dsapp.log"
-ghcLog = dsappLogs + "/generalHealthCheck.log"
-
 # Log Settings
-logging.config.fileConfig('%s/logging.cfg' % (dsappConf))
+logging.config.fileConfig('%s/logging.cfg' % (glb.dsappConf))
 logger = logging.getLogger('dsapp_Definitions')
 excep_logger = logging.getLogger('exceptions_log')
 
@@ -86,8 +64,7 @@ def my_handler(type, value, tb):
 sys.excepthook = my_handler
 
 # Read Config
-Config.read(dsappSettings)
-dsappversion = Config.get('Misc', 'dsapp.version')
+Config.read(glb.dsappSettings)
 dsHostname = Config.get('Misc', 'hostname')
 
 # Text color formats
@@ -100,8 +77,8 @@ colorBLUE = "\033[01;34m{0}\033[00m"
 COL1 = "{0:35}"
 
 # Create ghc_setting.cfg if not found
-if not os.path.isfile(ghcSettings):
-	with open(ghcSettings, 'w') as cfgfile:
+if not os.path.isfile(glb.ghcSettings):
+	with open(glb.ghcSettings, 'w') as cfgfile:
 		ghc_Config.add_section('GHC Checks')
 		ghc_Config.set('GHC Checks', 'services', True)
 		ghc_Config.set('GHC Checks', 'ldap', True)
@@ -133,9 +110,9 @@ if not os.path.isfile(ghcSettings):
 #  General Health Check definitions
 ##################################################################################################
 
-def generalHealthCheck(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig, trustedConfig, config_files, webConfig, ghc_silent=False):
+def generalHealthCheck(ghc_silent=False):
 	# Read Config
-	ghc_Config.read(ghcSettings)
+	ghc_Config.read(glb.ghcSettings)
 	check_services = ghc_Config.getboolean('GHC Checks', 'services')
 	check_ldap = ghc_Config.getboolean('GHC Checks', 'ldap')
 	check_trustedApp = ghc_Config.getboolean('GHC Checks', 'trusted.app')
@@ -163,13 +140,13 @@ def generalHealthCheck(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig
 	global silent
 	silent = ghc_silent
 	if not silent:
-		ds.datasyncBanner(dsappversion)
+		ds.datasyncBanner()
 	DATE = datetime.datetime.now().strftime('%c')
 
 	# Rewrite health check log with timestamp and version
-	with open(ghcLog, 'w') as log:
+	with open(glb.ghcLog, 'w') as log:
 		log.write("##########################################################\n#  General Health Check\n##########################################################\n")
-		log.write("Gathered by dsapp v%s on %s\n\n" % (dsappversion, DATE))
+		log.write("Gathered by dsapp v%s on %s\n\n" % (glb.dsappversion, DATE))
 	logger.info("Starting General Health Check..")
 	time1 = time.time()
 
@@ -181,13 +158,13 @@ def generalHealthCheck(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig
 
 	# Begin Health Checks
 	if check_services:
-		ghc_checkServices(mobilityConfig, gwConfig, webConfig)
+		ghc_checkServices()
 	if check_ldap:
-		ghc_checkLDAP(XMLconfig ,ldapConfig)
+		ghc_checkLDAP()
 
 	# ghc_checkPOA
 	if check_trustedApp:
-		ghc_checkTrustedApp(trustedConfig, gwConfig)
+		ghc_checkTrustedApp()
 	if check_requiredXMLs:
 		ghc_checkReqXMLs()
 	if check_xmls:
@@ -201,23 +178,23 @@ def generalHealthCheck(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig
 	if check_diskSpace:
 		ghc_checkDiskSpace()
 	if check_memory:
-		ghc_checkMemory(dbConfig)
+		ghc_checkMemory()
 	if check_vmware:
 		ghc_checkVMWare()
 	if check_config:
 		ghc_checkConfig()
 	if check_dbSchema:
-		ghc_checkDBSchema(dbConfig)
+		ghc_checkDBSchema()
 	if check_manualMaintenance:
-		ghc_checkManualMaintenance(dbConfig)
+		ghc_checkManualMaintenance()
 	if check_referenceCount:
-		ghc_checkReferenceCount(dbConfig)
+		ghc_checkReferenceCount()
 	if check_userFDN:
-		ghc_checkUserFDN(dbConfig, XMLconfig ,ldapConfig)
+		ghc_checkUserFDN()
 	if check_databaseIntegrity:
-		ghc_verifyDatabaseIntegrity(dbConfig)
+		ghc_verifyDatabaseIntegrity()
 	if check_targetsIntegrity:
-		ghc_verifyTargetsIntegrity(dbConfig)
+		ghc_verifyTargetsIntegrity()
 
 	# # Slower checks...
 	if check_rpms:
@@ -227,13 +204,13 @@ def generalHealthCheck(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig
 	if check_diskIO:
 		ghc_checkDiskIO()
 	if check_nightlyMaint:
-		ghc_verifyNightlyMaintenance(config_files, mobilityConfig)
+		ghc_verifyNightlyMaintenance()
 
 	# # Lots of information...
 	if check_serverDate:
 		ghc_verifyServerDate()
 	if check_certificates:
-		ghc_verifyCertificates(mobilityConfig, webConfig)
+		ghc_verifyCertificates()
 
 	time2 = time.time()
 	logger.info("General Health Check took %0.3f ms" % ((time2 - time1) * 1000))
@@ -241,9 +218,9 @@ def generalHealthCheck(mobilityConfig, gwConfig, XMLconfig ,ldapConfig, dbConfig
 	# Prompt View Logs
 	if not silent:
 		print ('\n')
-		print ("Log created at: %s" % ghcLog)
-		if ds.askYesOrNo("View the %s" % os.path.basename(ghcLog)):
-			with open(ghcLog, 'r') as ghcfile:
+		print ("Log created at: %s" % glb.ghcLog)
+		if ds.askYesOrNo("View the %s" % os.path.basename(glb.ghcLog)):
+			with open(glb.ghcLog, 'r') as ghcfile:
 				pydoc.pager(ghcfile.read())
 
 ###  Utility definitions for General Health Checks ###
@@ -253,12 +230,12 @@ def ghc_util_NewHeader(header):
 		print (COL1.format("\n%s  " % header), end='')
 		sys.stdout.flush()
 	logger.info("[GHC] %s" % header)
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		log.write("==========================================================\n%s\n==========================================================\n" % header)
 
 def ghc_util_passFail(result, msg=None):
 	global silent
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		if msg is not None:
 			log.write(msg)
 
@@ -286,7 +263,7 @@ def ghc_util_checkStatus(agent):
 	p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	p.wait()
 	out = p.communicate()
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		log.write(out[0])
 		if out[1]:
 			log.write(out[1])
@@ -305,7 +282,7 @@ def ghc_util_checkPostgresql():
 	p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 	p.wait()
 	out = p.communicate()
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		log.write(out[0])
 		if out[1]:
 			log.write(out[1])
@@ -317,14 +294,14 @@ def ghc_util_checkPostgresql():
 	else:
 		return True
 
-def ghc_util_checkMobility(mobilityConfig):
+def ghc_util_checkMobility():
 	result = False
-	cmd = "netstat -pan | grep LISTEN | grep :%s" % mobilityConfig['mPort']
+	cmd = "netstat -pan | grep LISTEN | grep :%s" % glb.mobilityConfig['mPort']
 	time1 = time.time()
-	logger.debug("Checking port %s listener" % mobilityConfig['mPort'])
+	logger.debug("Checking port %s listener" % glb.mobilityConfig['mPort'])
 	p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
 	p.wait()
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		try:
 			listener = p.communicate()[0].split('/')[1].strip()
 		except:
@@ -332,26 +309,26 @@ def ghc_util_checkMobility(mobilityConfig):
 
 		if listener == 'python':
 			result = True
-			log.write("\nMobility Connector listening on port %s: %s" % (mobilityConfig['mPort'], result))
+			log.write("\nMobility Connector listening on port %s: %s" % (glb.mobilityConfig['mPort'], result))
 		elif listener == 'httpd2-prefork':
 			result = False
-			log.write("\nApache2 listening on port %s: %s" % (mobilityConfig['mPort'], result))
+			log.write("\nApache2 listening on port %s: %s" % (glb.mobilityConfig['mPort'], result))
 		elif listener != 'python' or listener is None:
 			result = False
-			log.write("\nMobility Connector not listening on port %s: %s" % (mobilityConfig['mPort'], result))
+			log.write("\nMobility Connector not listening on port %s: %s" % (glb.mobilityConfig['mPort'], result))
 
 	time2 = time.time()
 	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 	return result
 
-def ghc_util_checkGroupWise(gwConfig):
+def ghc_util_checkGroupWise():
 	result = False
-	cmd = "netstat -pan | grep LISTEN | grep :%s" % gwConfig['gport']
+	cmd = "netstat -pan | grep LISTEN | grep :%s" % glb.gwConfig['gport']
 	time1 = time.time()
-	logger.debug("Checking port %s listener" % gwConfig['gport'])
+	logger.debug("Checking port %s listener" % glb.gwConfig['gport'])
 	p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
 	p.wait()
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		try:
 			listener = p.communicate()[0].split('/')[1].strip()
 		except:
@@ -359,23 +336,23 @@ def ghc_util_checkGroupWise(gwConfig):
 
 		if listener == 'python':
 			result = True
-			log.write("\nGroupWise Connector listening on port %s: %s" % (gwConfig['gport'], result))
+			log.write("\nGroupWise Connector listening on port %s: %s" % (glb.gwConfig['gport'], result))
 		elif listener != 'python' or listener is None:
 			result = False
-			log.write("\nGroupWise Connector not listening on port %s: %s" % (gwConfig['gport'], result))
+			log.write("\nGroupWise Connector not listening on port %s: %s" % (glb.gwConfig['gport'], result))
 
 	time2 = time.time()
 	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 	return result
 
-def ghc_util_checkWebAdmin(webConfig):
+def ghc_util_checkWebAdmin():
 	result = False
-	cmd = "netstat -pan | grep LISTEN | grep :%s" % webConfig['port']
+	cmd = "netstat -pan | grep LISTEN | grep :%s" % glb.webConfig['port']
 	time1 = time.time()
-	logger.debug("Checking port %s listener" % webConfig['port'])
+	logger.debug("Checking port %s listener" % glb.webConfig['port'])
 	p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
 	p.wait()
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		try:
 			listener = p.communicate()[0].split('/')[1].strip()
 		except:
@@ -383,23 +360,23 @@ def ghc_util_checkWebAdmin(webConfig):
 
 		if listener == 'python':
 			result = True
-			log.write("\nWeb Admin listening on port %s: %s\n" % (webConfig['port'], result))
+			log.write("\nWeb Admin listening on port %s: %s\n" % (glb.webConfig['port'], result))
 		elif listener != 'python' or listener is None:
 			result = False
-			log.write("\nWeb Admin not listening on port %s: %s\n" % (webConfig['port'], result))
+			log.write("\nWeb Admin not listening on port %s: %s\n" % (glb.webConfig['port'], result))
 
 	time2 = time.time()
 	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 	return result
 
-def ghc_util_checkMobPortConnectivity(mobilityConfig):
+def ghc_util_checkMobPortConnectivity():
 	result = False
-	cmd = "netcat -z -w 5 %s %s -v" % (mobilityConfig['mlistenAddress'], mobilityConfig['mPort'])
+	cmd = "netcat -z -w 5 %s %s -v" % (glb.mobilityConfig['mlistenAddress'], glb.mobilityConfig['mPort'])
 	time1 = time.time()
-	logger.debug("Checking port %s connectivity on %s" % (mobilityConfig['mPort'], mobilityConfig['mlistenAddress']))
+	logger.debug("Checking port %s connectivity on %s" % (glb.mobilityConfig['mPort'], glb.mobilityConfig['mlistenAddress']))
 	p = subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE)
 	p.wait()
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		try:
 			listener = p.communicate()[1].split(' ')[-1].strip()
 		except:
@@ -407,26 +384,26 @@ def ghc_util_checkMobPortConnectivity(mobilityConfig):
 
 		if 'open' in listener or 'succeeded!' in listener:
 			result = True
-			log.write("\nConnection successful on port %s\n" % mobilityConfig['mPort'])
+			log.write("\nConnection successful on port %s\n" % glb.mobilityConfig['mPort'])
 		elif 'timed out' in listener or listener is None:
 			result = False
-			log.write("\nConnection timed out on port %s\n" % mobilityConfig['mPort'])
+			log.write("\nConnection timed out on port %s\n" % glb.mobilityConfig['mPort'])
 		elif 'refused' in listener or listener is None:
 			result = False
-			log.write("\nConnection refused on port %s\n" % mobilityConfig['mPort'])
+			log.write("\nConnection refused on port %s\n" % glb.mobilityConfig['mPort'])
 
 	time2 = time.time()
 	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 	return result
 
-def ghc_util_checkGWPortConnectivity(gwConfig):
+def ghc_util_checkGWPortConnectivity():
 	result = False
-	cmd = "netcat -z -w 5 %s %s -v" % (gwConfig['sListenAddress'], gwConfig['gport'])
+	cmd = "netcat -z -w 5 %s %s -v" % (glb.gwConfig['sListenAddress'], glb.gwConfig['gport'])
 	time1 = time.time()
-	logger.debug("Checking port %s connectivity on %s" % (gwConfig['gport'], gwConfig['sListenAddress']))
+	logger.debug("Checking port %s connectivity on %s" % (glb.gwConfig['gport'], glb.gwConfig['sListenAddress']))
 	p = subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE)
 	p.wait()
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		try:
 			listener = p.communicate()[1].split(' ')[-1].strip()
 		except:
@@ -434,26 +411,26 @@ def ghc_util_checkGWPortConnectivity(gwConfig):
 
 		if 'open' in listener or 'succeeded!' in listener:
 			result = True
-			log.write("Connection successful on port %s\n" % gwConfig['gport'])
+			log.write("Connection successful on port %s\n" % glb.gwConfig['gport'])
 		elif 'timed out' in listener or listener is None:
 			result = False
-			log.write("Connection timed out on port %s\n" % gwConfig['gport'])
+			log.write("Connection timed out on port %s\n" % glb.gwConfig['gport'])
 		elif 'refused' in listener or listener is None:
 			result = False
-			log.write("Connection refused on port %s\n" % gwConfig['gport'])
+			log.write("Connection refused on port %s\n" % glb.gwConfig['gport'])
 
 	time2 = time.time()
 	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 	return result
 
-def ghc_util_checkWebPortConnectivity(webConfig):
+def ghc_util_checkWebPortConnectivity():
 	result = False
-	cmd = "netcat -z -w 5 %s %s -v -z" % (webConfig['ip'], webConfig['port'])
+	cmd = "netcat -z -w 5 %s %s -v -z" % (glb.webConfig['ip'], glb.webConfig['port'])
 	time1 = time.time()
-	logger.debug("Checking port %s connectivity on %s" % (webConfig['port'], webConfig['ip']))
+	logger.debug("Checking port %s connectivity on %s" % (glb.webConfig['port'], glb.webConfig['ip']))
 	p = subprocess.Popen(cmd, shell=True, stderr=subprocess.PIPE)
 	p.wait()
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		try:
 			listener = p.communicate()[1].split(' ')[-1].strip()
 		except:
@@ -461,13 +438,13 @@ def ghc_util_checkWebPortConnectivity(webConfig):
 
 		if 'open' in listener or 'succeeded!' in listener:
 			result = True
-			log.write("Connection successful on port %s\n" % webConfig['port'])
+			log.write("Connection successful on port %s\n" % glb.webConfig['port'])
 		elif 'timed out' in listener or listener is None:
 			result = False
-			log.write("Connection timed out on port %s\n" % webConfig['port'])
+			log.write("Connection timed out on port %s\n" % glb.webConfig['port'])
 		elif 'refused' in listener or listener is None:
 			result = False
-			log.write("Connection refused on port %s\n" % webConfig['port'])
+			log.write("Connection refused on port %s\n" % glb.webConfig['port'])
 
 	time2 = time.time()
 	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
@@ -526,16 +503,16 @@ def ghc_util_subprocess(cmd, error=False):
 		out = p.communicate()
 	return out
 
-def ghc_util_checkIPs(gwConfig, mobilityConfig):
+def ghc_util_checkIPs():
 	mobility_ip4 = "Unknown host"
 	groupwise_ip4 = "Unknown host"
 	try:
-		mobility_ip4 = socket.gethostbyname(mobilityConfig['mlistenAddress'])
+		mobility_ip4 = socket.gethostbyname(glb.mobilityConfig['mlistenAddress'])
 	except:
 		pass
 
 	try:
-		groupwise_ip4 = socket.gethostbyname(gwConfig['sListenAddress'])
+		groupwise_ip4 = socket.gethostbyname(glb.gwConfig['sListenAddress'])
 	except:
 		pass
 
@@ -553,11 +530,11 @@ def ghc_util_checkIPs(gwConfig, mobilityConfig):
 	if '0.0.0.0' in mobility_ip4:
 		mobile_found = True
 
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		# TODO : Print out list of interfaces
 		if not mobile_found:
 			if 'Unknown host' in mobility_ip4:
-				log.write("\nUnable to resolve '%s' for mobility connector\n" % mobilityConfig['mlistenAddress'])
+				log.write("\nUnable to resolve '%s' for mobility connector\n" % glb.mobilityConfig['mlistenAddress'])
 			else:
 				log.write("\nNo found interface '%s' for mobility connector\n" % mobility_ip4)
 		else:
@@ -565,7 +542,7 @@ def ghc_util_checkIPs(gwConfig, mobilityConfig):
 
 		if not groupwise_found:
 			if 'Unknown host' in groupwise_ip4:
-				log.write("Unable to resolve '%s' for groupwise connector\n" % gwConfig['sListenAddress'])
+				log.write("Unable to resolve '%s' for groupwise connector\n" % glb.gwConfig['sListenAddress'])
 			else:
 				log.write("No found interface '%s' for groupwise connector\n" % groupwise_ip4)
 		else:
@@ -574,7 +551,7 @@ def ghc_util_checkIPs(gwConfig, mobilityConfig):
 	return mobile_found and groupwise_found
 
 
-def ghc_checkServices(mobilityConfig, gwConfig, webConfig):
+def ghc_checkServices():
 	ghc_util_NewHeader("Checking Mobility Services..")
 	time1 = time.time()
 	problem = False
@@ -583,7 +560,7 @@ def ghc_checkServices(mobilityConfig, gwConfig, webConfig):
 
 	# Finds all datasync scripts in /etc/inid.d. Appends them to datasync_scripts
 	datasync_scripts = []
-	for file in os.listdir(initScripts):
+	for file in os.listdir(glb.initScripts):
 		if 'datasync-' in file:
 			datasync_scripts.append(file)
 
@@ -594,23 +571,23 @@ def ghc_checkServices(mobilityConfig, gwConfig, webConfig):
 			problem = True
 	if not ghc_util_checkPostgresql():
 		problem = True
-	if not ghc_util_checkMobility(mobilityConfig):
+	if not ghc_util_checkMobility():
 		problem = True
 		mobile_serviceCheck = False
-	if not ghc_util_checkGroupWise(gwConfig):
+	if not ghc_util_checkGroupWise():
 		problem = True
-	if not ghc_util_checkWebAdmin(webConfig):
+	if not ghc_util_checkWebAdmin():
 		problem = True
 		web_serviceCheck = False
-	if not ghc_util_checkMobPortConnectivity(mobilityConfig):
+	if not ghc_util_checkMobPortConnectivity():
 		problem = True
 		mobile_serviceCheck = False
-	if not ghc_util_checkGWPortConnectivity(gwConfig):
+	if not ghc_util_checkGWPortConnectivity():
 		problem = True
-	if not ghc_util_checkWebPortConnectivity(webConfig):
+	if not ghc_util_checkWebPortConnectivity():
 		problem = True
 		web_serviceCheck = False
-	if not ghc_util_checkIPs(gwConfig, mobilityConfig):
+	if not ghc_util_checkIPs():
 		problem = True
 
 	if problem:
@@ -621,15 +598,15 @@ def ghc_checkServices(mobilityConfig, gwConfig, webConfig):
 	time2 = time.time()
 	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
-def ghc_checkLDAP(XMLconfig ,ldapConfig):
+def ghc_checkLDAP():
 	ghc_util_NewHeader("Checking LDAP Connectivity..")
 	time1 = time.time()
 	problem = False
 
-	if ldapConfig['enabled'] != 'true':
+	if glb.ldapConfig['enabled'] != 'true':
 		problem = 'skipped'
-	elif ldapConfig['enabled'] == 'true':
-		if not ds.checkLDAP(XMLconfig ,ldapConfig, ghc=True):
+	elif glb.ldapConfig['enabled'] == 'true':
+		if not ds.checkLDAP(ghc=True):
 			problem = True
 
 	if problem == 'skipped':
@@ -643,12 +620,12 @@ def ghc_checkLDAP(XMLconfig ,ldapConfig):
 		ghc_util_passFail('passed', msg)
 
 def ghc_checkRPMs(system_rpms):
-	Config.read(dsappSettings)
+	Config.read(glb.dsappSettings)
 	osVersion = Config.getint('Misc', 'sles.version')
 	if osVersion <= 11:
-		ghc_file = dsappConf + '/ghc_sles11_RPMs.txt'
+		ghc_file = glb.dsappConf + '/ghc_sles11_RPMs.txt'
 	else:
-		ghc_file = dsappConf + '/ghc_sles12_RPMs.txt'
+		ghc_file = glb.dsappConf + '/ghc_sles12_RPMs.txt'
 
 	ghc_util_NewHeader("Checking RPMs..")
 	time1 = time.time()
@@ -664,7 +641,7 @@ def ghc_checkRPMs(system_rpms):
 
 	if problem is not 'warning':
 		logger.info("Comparing all system RPMs")
-		with open(ghcLog, 'a') as log:
+		with open(glb.ghcLog, 'a') as log:
 			for rpm in required_RPMs:
 				found = False
 				for r in system_rpms:
@@ -707,7 +684,7 @@ def ghc_checkProxy():
 	except KeyError:
 		noProxy = None
 
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		# Check if proxy  is enabled
 		if noProxy is not None:
 			if 'PROXY_ENABLED="yes"' in proxy_settings:
@@ -747,7 +724,7 @@ def ghc_checkProxy():
 	time2 = time.time()
 	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
-def ghc_checkMemory(dbConfig):
+def ghc_checkMemory():
 	# Display HealthCheck name to user and create section in logs
 	ghc_util_NewHeader("Checking Memory..")
 	time1 = time.time()
@@ -767,7 +744,7 @@ def ghc_checkMemory(dbConfig):
 
 	logger.debug("Found system memory: %sMB" % mem_MB)
 	# Get number of devices
-	conn = ds.getConn(dbConfig, 'mobility')
+	conn = ds.getConn('mobility')
 	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
 	cur.execute("select count(*) from devices where devicetype!=''")
 	data = cur.fetchall()
@@ -777,7 +754,7 @@ def ghc_checkMemory(dbConfig):
 	for row in data:
 		numOfDevices = row['count']
 
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		log.write("Number of devices: %s\n" % numOfDevices)
 		log.write("Total Memory: %sMB\n\n" % mem_MB)
 
@@ -819,12 +796,12 @@ def ghc_checkRPMSave():
 	problem = False
 
 	rpmSaves = []
-	for dirName, subdirList, fileList in os.walk(dirEtcMobility):
+	for dirName, subdirList, fileList in os.walk(glb.dirEtcMobility):
 		for fname in fileList:
 			if '.rpmsave' in fname:
 				rpmSaves.append(dirName + "/" + fname)
 
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		if len(rpmSaves) > 0:
 			problem = 'warning'
 			log.write("Found rpmsaves:\n")
@@ -845,7 +822,7 @@ def ghc_checkReqXMLs():
 	ghc_util_NewHeader("Checking Required XMLs..")
 	time1 = time.time()
 	problem = False
-	ghc_file = dsappConf + '/ghc_XMLs.txt'
+	ghc_file = glb.dsappConf + '/ghc_XMLs.txt'
 
 	if not os.path.isfile(ghc_file):
 		problem = 'warning'
@@ -855,7 +832,7 @@ def ghc_checkReqXMLs():
 			required_XMLs = open_file.read().strip().splitlines()
 
 	if problem is not 'warning':
-		with open(ghcLog, 'a') as log:
+		with open(glb.ghcLog, 'a') as log:
 			for xml in required_XMLs:
 				if not os.path.isfile(xml):
 					log.write("Missing XML: %s\n" % xml)
@@ -873,12 +850,12 @@ def ghc_checkReqXMLs():
 	time2 = time.time()
 	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
-def ghc_checkTrustedApp(trustedConfig, gwConfig):
+def ghc_checkTrustedApp():
 	ghc_util_NewHeader("Checking Trusted Application..")
 	time1 = time.time()
 	problem = False
 
-	results = dsSoap.soap_getUserList(trustedConfig, gwConfig)
+	results = dsSoap.soap_getUserList()
 	if results is None:
 		problem = 'None'
 	elif results['status']['code'] != 0:
@@ -892,7 +869,7 @@ def ghc_checkTrustedApp(trustedConfig, gwConfig):
 		msg = "Invalid key for trusted application\n"
 		ghc_util_passFail('failed', msg)
 	elif problem == 'no-key':
-		msg = "Unable to find trusted application: %s\n" % trustedConfig['name']
+		msg = "Unable to find trusted application: %s\n" % glb.trustedConfig['name']
 		ghc_util_passFail('failed', msg)
 	elif problem == 'None':
 		msg = "Unable to connect to the GroupWise server\n"
@@ -904,22 +881,22 @@ def ghc_checkTrustedApp(trustedConfig, gwConfig):
 	time2 = time.time()
 	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
-def ghc_verifyNightlyMaintenance(config_files, mobilityConfig):
+def ghc_verifyNightlyMaintenance():
 	ghc_util_NewHeader("Checking Nightly Maintenance..")
 	time1 = time.time()
 	problem = False
 
-	results = ds.checkNightlyMaintenance(config_files, mobilityConfig, True)
+	results = ds.checkNightlyMaintenance(True)
 
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		log.write(results['output'] + '\n')
 
 	problem = results['result']
 	if problem:
-		if mobilityConfig['logLevel'] == 'info' or mobilityConfig['logLevel'] == 'debug':
+		if glb.mobilityConfig['logLevel'] == 'info' or glb.mobilityConfig['logLevel'] == 'debug':
 			ghc_util_passFail('failed')
 		else:
-			msg = "Logging in %s. Logging level does not log maintenance\n" % mobilityConfig['logLevel']
+			msg = "Logging in %s. Logging level does not log maintenance\n" % glb.mobilityConfig['logLevel']
 			ghc_util_passFail('warning', msg)
 	elif not problem:
 		ghc_util_passFail('passed')
@@ -927,16 +904,16 @@ def ghc_verifyNightlyMaintenance(config_files, mobilityConfig):
 	time2 = time.time()
 	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
-def ghc_checkDBSchema(dbConfig):
+def ghc_checkDBSchema():
 	ghc_util_NewHeader("Checking Database Schema..")
 	time1 = time.time()
 	problem = False
 	ghc_dbVersion = None
 
-	with open(version, 'r') as file:
+	with open(glb.gmsVersion, 'r') as file:
 		mobilityVersion = file.read().strip()
 
-	conn = ds.getConn(dbConfig, 'datasync')
+	conn = ds.getConn('datasync')
 	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
 	cur.execute("select service_version from services")
 	data = cur.fetchall()
@@ -947,7 +924,7 @@ def ghc_checkDBSchema(dbConfig):
 	except:
 		pass
 
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		if ghc_dbVersion is not None and ghc_dbVersion == mobilityVersion:
 			log.write("Schema version: %s\n" % ghc_dbVersion)
 			log.write("Mobility version: %s\n" % mobilityVersion)
@@ -962,7 +939,7 @@ def ghc_checkDBSchema(dbConfig):
 		msg = "\n\nUnable to verify service version\n"
 		ghc_util_passFail('skipped', msg)
 	elif problem:
-		msg = "\nVersion mismatch between mobility and schema\nSuggestion: Run %s/update.sh to update the schema\n" % dirOptMobility
+		msg = "\nVersion mismatch between mobility and schema\nSuggestion: Run %s/update.sh to update the schema\n" % glb.dirOptMobility
 		ghc_util_passFail('failed', msg)
 	elif not problem:
 		ghc_util_passFail('passed')
@@ -976,13 +953,13 @@ def ghc_checkXML():
 	problem = False
 
 	xmlFiles = []
-	for dirName, subdirList, fileList in os.walk(dirEtcMobility):
+	for dirName, subdirList, fileList in os.walk(glb.dirEtcMobility):
 		for fname in fileList:
 			if '.xml' in fname:
 				xmlFiles.append(dirName + "/" + fname)
 
 	xmllint = "xmllint --noout %s"
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		for xml in xmlFiles:
 			cmd = xmllint % xml
 			out = ghc_util_subprocess(cmd, True)
@@ -1012,7 +989,7 @@ def ghc_checkDiskSpace():
 	out2 = ghc_util_subprocess(cmd2)
 	device, size, used, available, percent, mountpoint = out2[0].split("\n")[1].split()
 
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		log.write(out[0])
 		if int(percent.rstrip('%')) >= 90:
 			problem = 'warning'
@@ -1031,7 +1008,7 @@ def ghc_checkDiskSpace():
 	time2 = time.time()
 	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
-def ghc_checkManualMaintenance(dbConfig):
+def ghc_checkManualMaintenance():
 	ghc_util_NewHeader("Checking Database Maintenance..")
 	time1 = time.time()
 	dbMaintTolerance = 180
@@ -1042,7 +1019,7 @@ def ghc_checkManualMaintenance(dbConfig):
 	# months = dict(Jan=1, Feb=2, Mar=3, Apr=4, May=5, Jun=6, Jul=7, Aug=8, Sep=9, Oct=10, Nov=11, Dec=12)
 
 	# Attempt to time GMS  has been installed
-	install_date = ds.getPostgresModDate(dbConfig)
+	install_date = ds.getPostgresModDate()
 
 	# cmd = "rpm --last -qa | grep 'datasync-common-[0-9]' | awk  '{print $6\",\"$3\",\"$4}' | uniq"
 	# install_date = ghc_util_subprocess(cmd)[0]
@@ -1059,23 +1036,23 @@ def ghc_checkManualMaintenance(dbConfig):
 		delta_days = True
 
 
-	conn = ds.getConn(dbConfig, 'datasync')
+	conn = ds.getConn('datasync')
 	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
 	cur.execute("select date_part('days', now() - last_vacuum) as \"days_ago\" from pg_stat_user_tables")
 	datasync_data = cur.fetchall()
 	cur.close()
 	conn.close()
 
-	conn = ds.getConn(dbConfig, 'mobility')
+	conn = ds.getConn('mobility')
 	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
 	cur.execute("select date_part('days', now() - last_vacuum) as \"days_ago\" from pg_stat_user_tables")
 	mobility_data = cur.fetchall()
 	cur.close()
 	conn.close()
 
-	cmd_datasync = "PGPASSWORD='%(pass)s' psql -U %(user)s datasync -c \"select relname,last_vacuum,date_part('days', now() - last_vacuum) as \"days_ago\" from pg_stat_user_tables;\"" % dbConfig
-	cmd_mobility = "PGPASSWORD='%(pass)s' psql -U %(user)s mobility -c \"select relname,last_vacuum,date_part('days', now() - last_vacuum) as \"days_ago\" from pg_stat_user_tables;\"" % dbConfig
-	with open(ghcLog, 'a') as log:
+	cmd_datasync = "PGPASSWORD='%(pass)s' psql -U %(user)s datasync -c \"select relname,last_vacuum,date_part('days', now() - last_vacuum) as \"days_ago\" from pg_stat_user_tables;\"" % glb.dbConfig
+	cmd_mobility = "PGPASSWORD='%(pass)s' psql -U %(user)s mobility -c \"select relname,last_vacuum,date_part('days', now() - last_vacuum) as \"days_ago\" from pg_stat_user_tables;\"" % glb.dbConfig
+	with open(glb.ghcLog, 'a') as log:
 		p = subprocess.Popen(cmd_datasync, shell=True, stdout=subprocess.PIPE)
 		p.wait()
 		log.write(p.communicate()[0])
@@ -1134,7 +1111,7 @@ def ghc_checkConfig():
 	out1 = ghc_util_subprocess(cmd1)
 	out2 = ghc_util_subprocess(cmd2)
 
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		log.write(out1[0])
 
 	if out2[0]:
@@ -1155,7 +1132,7 @@ def ghc_checkPSQLConfig():
 	pghba = "/var/lib/pgsql/data/pg_hba.conf"
 	problem = False
 
-	Config.read(dsappSettings)
+	Config.read(glb.dsappSettings)
 	osVersion = Config.getint('Misc', 'sles.version')
 	if osVersion <= 11:
 		searchLines = ["local*.*all*.*postgres*.*ident*.*sameuser",
@@ -1188,7 +1165,7 @@ def ghc_checkPSQLConfig():
 	
 	search = "grep -iw %s %s"
 
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		log.write("File: %s\n" % pghba)
 
 		if os.path.isfile(pghba):
@@ -1217,7 +1194,7 @@ def ghc_checkVMWare():
 	ghc_util_NewHeader("Checking VMware-tools..")
 	time1 = time.time()
 	problem = False
-	Config.read(dsappSettings)
+	Config.read(glb.dsappSettings)
 	slesVersion = Config.get('Misc', 'sles.version')
 
 	cmd = "lspci | grep VMware"
@@ -1226,7 +1203,7 @@ def ghc_checkVMWare():
 	vmwareChecks = ['/etc/init.d/vmware-tools-services', '/etc/init.d/vmware-tools']
 	vmwareChecksSLES12 = ['vmtoolsd.service']
 
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		if out[0]:
 			log.write("Server is running within a virtualized platform\n")
 			problem = 'warning'
@@ -1289,13 +1266,13 @@ def ghc_checkDiskIO():
 	time2 = time.time()
 	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
-def ghc_checkUserFDN(dbConfig, XMLconfig ,ldapConfig):
+def ghc_checkUserFDN():
 	ghc_util_NewHeader("Checking Users FDN..")
 	time1 = time.time()
 	problem = False
 
-	if ds.checkLDAP(XMLconfig ,ldapConfig, ghc=True):
-		conn = ds.getConn(dbConfig, 'datasync')
+	if ds.checkLDAP(ghc=True):
+		conn = ds.getConn('datasync')
 		cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
 		cur.execute("select distinct dn from targets where disabled='0' and dn ilike 'cn=%%'")
 		data = cur.fetchall()
@@ -1306,12 +1283,12 @@ def ghc_checkUserFDN(dbConfig, XMLconfig ,ldapConfig):
 			logger.debug("Found %s users" % len(data))
 			ldap_count = 1
 			for row in data:
-				if ldapConfig['secure'] == 'false':
-					cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D '%s' -w '%s' -l 5 -b '%s' -s base cn" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], row['dn'])
-				if ldapConfig['secure'] == 'true':
-					cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D '%s' -w '%s' -l 5 -b '%s' -s base cn" % (ldapConfig['host'], ldapConfig['port'], ldapConfig['login'], ldapConfig['pass'], row['dn'])
+				if glb.ldapConfig['secure'] == 'false':
+					cmd = "/usr/bin/ldapsearch -x -H ldap://%s:%s -D '%s' -w '%s' -l 5 -b '%s' -s base cn" % (glb.ldapConfig['host'], glb.ldapConfig['port'], glb.ldapConfig['login'], glb.ldapConfig['pass'], row['dn'])
+				if glb.ldapConfig['secure'] == 'true':
+					cmd = "/usr/bin/ldapsearch -x -H ldaps://%s:%s -D '%s' -w '%s' -l 5 -b '%s' -s base cn" % (glb.ldapConfig['host'], glb.ldapConfig['port'], glb.ldapConfig['login'], glb.ldapConfig['pass'], row['dn'])
 
-				log_cmd = cmd.replace("-w '" + ldapConfig['pass'] + "'","-w '*******'")
+				log_cmd = cmd.replace("-w '" + glb.ldapConfig['pass'] + "'","-w '*******'")
 				logger.debug("LDAP search %s: %s" % (ldap_count, log_cmd))
 				out = ghc_util_subprocess(cmd, True)
 				if out[1] or 'dn:' not in out[0]:
@@ -1324,7 +1301,7 @@ def ghc_checkUserFDN(dbConfig, XMLconfig ,ldapConfig):
 				# 	logger.debug("LDAP results: %s" % out[0])
 				ldap_count += 1
 
-				with open(ghcLog, 'a') as log:
+				with open(glb.ghcLog, 'a') as log:
 					if 'dn:' not in out[0]:
 						log.write("Invalid FDN: %s\n" % row['dn'])
 						problem = True
@@ -1343,21 +1320,21 @@ def ghc_checkUserFDN(dbConfig, XMLconfig ,ldapConfig):
 	time2 = time.time()
 	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
-def ghc_verifyDatabaseIntegrity(dbConfig):
+def ghc_verifyDatabaseIntegrity():
 	ghc_util_NewHeader("Checking Databases Integrity..")
 	time1 = time.time()
 	problem = False
 
 	found = None
 
-	conn = ds.getConn(dbConfig, 'datasync')
+	conn = ds.getConn('datasync')
 	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
 	cur.execute("select distinct dn from targets where disabled='0' and \"targetType\"='user'")
 	ds_data = cur.fetchall()
 	cur.close()
 	conn.close()
 
-	conn = ds.getConn(dbConfig, 'mobility')
+	conn = ds.getConn('mobility')
 	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
 	cur.execute("select distinct userid from users")
 	mo_data = cur.fetchall()
@@ -1365,7 +1342,7 @@ def ghc_verifyDatabaseIntegrity(dbConfig):
 	conn.close()
 
 
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		log_writeNotFound = True
 		for ds_row in ds_data:
 			found = False
@@ -1401,12 +1378,12 @@ def ghc_verifyDatabaseIntegrity(dbConfig):
 	time2 = time.time()
 	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
-def ghc_verifyTargetsIntegrity(dbConfig):
+def ghc_verifyTargetsIntegrity():
 	ghc_util_NewHeader("Checking Targets Table..")
 	time1 = time.time()
 	problem = False
 
-	conn = ds.getConn(dbConfig, 'datasync')
+	conn = ds.getConn('datasync')
 	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
 	cur.execute("select dn,\"connectorID\" from targets where disabled='0'")
 	data = cur.fetchall()
@@ -1420,7 +1397,7 @@ def ghc_verifyTargetsIntegrity(dbConfig):
 		else:
 			userRef[row['dn']][0] = userRef[row['dn']][0] + 1
 
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		for row in userRef:
 			if userRef[row][0] != 2:
 				if 'groupwise' in userRef[row][1]:
@@ -1438,12 +1415,12 @@ def ghc_verifyTargetsIntegrity(dbConfig):
 	time2 = time.time()
 	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
-def ghc_checkReferenceCount(dbConfig):
+def ghc_checkReferenceCount():
 	ghc_util_NewHeader("Checking Reference Count..")
 	time1 = time.time()
 	problem = False
 
-	conn = ds.getConn(dbConfig, 'datasync')
+	conn = ds.getConn('datasync')
 	cur = conn.cursor(cursor_factory = psycopg2.extras.RealDictCursor)
 	cur.execute("select distinct \"referenceCount\",dn from targets")
 	target_data = cur.fetchall()
@@ -1453,7 +1430,7 @@ def ghc_checkReferenceCount(dbConfig):
 	conn.close()
 
 	log_newline = False
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		for row in target_data:
 			if row['referenceCount'] != 1:
 				count = 0
@@ -1476,18 +1453,18 @@ def ghc_checkReferenceCount(dbConfig):
 	time2 = time.time()
 	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
-def ghc_verifyCertificates(mobilityConfig, webConfig):
+def ghc_verifyCertificates():
 	ghc_util_NewHeader("Checking Certificates..")
 	time1 = time.time()
 	problem = False
 	global web_serviceCheck
 	global mobile_serviceCheck
 	global serverDateCheck
-	mSecure = bool(int(mobilityConfig['mSecure']))
+	mSecure = bool(int(glb.mobilityConfig['mSecure']))
 
-	devCert = dirVarMobility + "/device/mobility.pem"
-	webCert = dirVarMobility + "/webadmin/server.pem"
-	CACert = dirVarMobility + "/common/CA/trustedroot.pem"
+	devCert = glb.dirVarMobility + "/device/mobility.pem"
+	webCert = glb.dirVarMobility + "/webadmin/server.pem"
+	CACert = glb.dirVarMobility + "/common/CA/trustedroot.pem"
 	dateTolerance = 7776000
 
 	# Verify cert path
@@ -1517,7 +1494,7 @@ def ghc_verifyCertificates(mobilityConfig, webConfig):
 		CAOut = ghc_util_subprocess(CAChk)
 
 		getDate = "openssl x509 -noout -enddate -in %s"
-		with open(ghcLog, 'a') as log:
+		with open(glb.ghcLog, 'a') as log:
 			if not no_dev and mSecure:
 				cmd = getDate % devCert
 				out = ghc_util_subprocess(cmd)[0].split('=')[1]
@@ -1578,29 +1555,29 @@ def ghc_verifyCertificates(mobilityConfig, webConfig):
 			# Check SSL Handshake mobility.pem
 			if not no_dev and mSecure:
 				if mobile_serviceCheck and mobile_serviceCheck is not None:
-					cmd = "echo 'QUIT' | openssl s_client -connect %s:%s -CAfile %s" % (mobilityConfig['mlistenAddress'], mobilityConfig['mPort'], devCert)
+					cmd = "echo 'QUIT' | openssl s_client -connect %s:%s -CAfile %s" % (glb.mobilityConfig['mlistenAddress'], glb.mobilityConfig['mPort'], devCert)
 					out = ghc_util_subprocess(cmd,True)
 					if 'return code: 0 (ok)' not in out[0]:
-						log.write("Handshake Failed: Return code: 0 (ok) not found\nAttempt made to: %s:%s\nCA file: %s\n" % (mobilityConfig['mlistenAddress'], mobilityConfig['mPort'], devCert))
+						log.write("Handshake Failed: Return code: 0 (ok) not found\nAttempt made to: %s:%s\nCA file: %s\n" % (glb.mobilityConfig['mlistenAddress'], glb.mobilityConfig['mPort'], devCert))
 						problem = 'warning'
 					else:
-						log.write("Handshake Successful\nConnect: %s:%s\nCA File: %s\n" % (mobilityConfig['mlistenAddress'], mobilityConfig['mPort'], devCert))
+						log.write("Handshake Successful\nConnect: %s:%s\nCA File: %s\n" % (glb.mobilityConfig['mlistenAddress'], glb.mobilityConfig['mPort'], devCert))
 				else:
-					log.write("Problem with mobility connector\nUnable to request handshake with %s:%s\n" % (mobilityConfig['mlistenAddress'], mobilityConfig['mPort']))
+					log.write("Problem with mobility connector\nUnable to request handshake with %s:%s\n" % (glb.mobilityConfig['mlistenAddress'], glb.mobilityConfig['mPort']))
 					problem = 'warning'
 				log.write('\n')
 
 			# Check SSL Handshake server.pem
 			if web_serviceCheck and web_serviceCheck is not None:
-				cmd = "echo 'QUIT' | openssl s_client -connect %s:%s -CAfile %s" % (webConfig['ip'], webConfig['port'], webCert)
+				cmd = "echo 'QUIT' | openssl s_client -connect %s:%s -CAfile %s" % (glb.webConfig['ip'], glb.webConfig['port'], webCert)
 				out = ghc_util_subprocess(cmd,True)
 				if 'return code: 0 (ok)' not in out[0]:
-					log.write("Handshake Failed: Return code: 0 (ok) not found\nAttempt made to: %s:%s\nCA file: %s\n" % (webConfig['ip'], webConfig['port'], webCert))
+					log.write("Handshake Failed: Return code: 0 (ok) not found\nAttempt made to: %s:%s\nCA file: %s\n" % (glb.webConfig['ip'], glb.webConfig['port'], webCert))
 					problem = 'warning'
 				else:
-					log.write("Handshake Successful\nConnect: %s:%s\nCA File: %s\n" % (webConfig['ip'], webConfig['port'], webCert))
+					log.write("Handshake Successful\nConnect: %s:%s\nCA File: %s\n" % (glb.webConfig['ip'], glb.webConfig['port'], webCert))
 			else:
-				log.write("Problem with web admin\nUnable to request handshake with %s:%s\n" % (webConfig['ip'], webConfig['port']))
+				log.write("Problem with web admin\nUnable to request handshake with %s:%s\n" % (glb.webConfig['ip'], glb.webConfig['port']))
 				problem = 'warning'
 
 			# Check for ^M carriage return character
@@ -1640,14 +1617,14 @@ def ghc_verifyServerDate():
 	ntpServer_results = dict()
 	c = ntplib.NTPClient()
 
-	Config.read(dsappSettings)
+	Config.read(glb.dsappSettings)
 	ntpServerList.append(Config.get('GHC', 'ntp.server'))
 
 	# Get server daytime
 	data = datetime.datetime.utcnow().strftime('%y %m %d').split(' ')
 	localTime = {'year': int(data[0]), 'month': int(data[1]), 'day': int(data[2])}
 
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		log.write("(Source - year/month/day)\n")
 		log.write("Local - %(year)s/%(month)s/%(day)s\n" % localTime)
 
@@ -1664,7 +1641,7 @@ def ghc_verifyServerDate():
 			ntpServer_results['Google'] = False
 		else:
 			ntpServer_results['Google'] = True
-		with open(ghcLog, 'a') as log:
+		with open(glb.ghcLog, 'a') as log:
 			log.write("Google - %(year)s/%(month)s/%(day)s\n" % remoteTime)
 
 	# Append all ntp servers to list
@@ -1675,7 +1652,7 @@ def ghc_verifyServerDate():
 			ntpServerList.append(server.strip())
 
 	# Get NTP daytime from ntpServer
-	with open(ghcLog, 'a') as log:
+	with open(glb.ghcLog, 'a') as log:
 		log.write("\nNTP server(s)\n-------------------------\n")
 		for ntpServer in ntpServerList:
 			data = []

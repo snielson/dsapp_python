@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?><!-- 
 ================================================================================
-File:	groupwise.wsdl
+File:   groupwise.wsdl
 
-Copyright (c) 2005-2008	Novell, Inc. All Rights Reserved.
+Copyright (c) 2005-2016   Micro Focus All Rights Reserved.
 
 Use and redistribution of this work is subject to the developer license
 agreement through which this work is made available. Pursuant to that license
@@ -39,16 +39,28 @@ along with this program; if not, contact Novell, Inc.
 
 To contact Novell about this file by physical or electronic mail, you may find 
 current contact information at www.novell.com.
+
+Versions: 
+1.00 [none]: base
+1.01: GW 7.0.2
+1.02: GW 8.0.0
+1.03: GW 8.0.1
+1.04: GW 8.0.2
+1.05: GW 12.0.0
+1.06: GW 14.0.0
+1.07: GW 14.2.0
+1.08: GW 14.2.1
+1.09: GW 14.2.2 / GW 17.0.0
 ================================================================================
 --><definitions xmlns="http://schemas.xmlsoap.org/wsdl/" targetNamespace="http://schemas.novell.com/2005/01/GroupWise/groupwise.wsdl" xmlns:tns="http://schemas.novell.com/2005/01/GroupWise/groupwise.wsdl" xmlns:http="http://schemas.xmlsoap.org/wsdl/http/" xmlns:types="http://schemas.novell.com/2005/01/GroupWise/types" xmlns:methods="http://schemas.novell.com/2005/01/GroupWise/methods" xmlns:events="http://schemas.novell.com/2005/01/GroupWise/events" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
    
-	<types>
-		<schema xmlns="http://www.w3.org/2001/XMLSchema">
-			<import namespace="http://schemas.novell.com/2005/01/GroupWise/types" schemaLocation="types.xsd"/>
-			<import namespace="http://schemas.novell.com/2005/01/GroupWise/methods" schemaLocation="methods.xsd"/>
-			<import namespace="http://schemas.novell.com/2005/01/GroupWise/events" schemaLocation="events.xsd"/>
-		</schema>		
-	</types>
+   <types>
+      <schema xmlns="http://www.w3.org/2001/XMLSchema">
+         <import namespace="http://schemas.novell.com/2005/01/GroupWise/types" schemaLocation="types.xsd"/>
+         <import namespace="http://schemas.novell.com/2005/01/GroupWise/methods" schemaLocation="methods.xsd"/>
+         <import namespace="http://schemas.novell.com/2005/01/GroupWise/events" schemaLocation="events.xsd"/>
+      </schema>      
+   </types>
 
    <message name="acceptRequestMessage">
       <part name="acceptReq" element="methods:acceptRequest"/>
@@ -134,7 +146,7 @@ current contact information at www.novell.com.
       <part name="createItemsRes" element="methods:createItemsResponse"/>
    </message>
 
-	<message name="createJunkEntryRequestMessage">
+   <message name="createJunkEntryRequestMessage">
       <part name="createJunkEntryReq" element="methods:createJunkEntryRequest"/>
    </message>
    <message name="createJunkEntryResponseMessage">
@@ -188,13 +200,20 @@ current contact information at www.novell.com.
    </message>
    <message name="executeRuleResponseMessage">
       <part name="executeRuleRes" element="methods:executeRuleResponse"/>
-	</message>
+   </message>
 
    <message name="forwardRequestMessage">
       <part name="forwardReq" element="methods:forwardRequest"/>
    </message>
    <message name="forwardResponseMessage">
       <part name="forwardRes" element="methods:forwardResponse"/>
+   </message>
+
+   <message name="freeBusyRequestMessage">
+      <part name="freeBusyReq" element="methods:freeBusyRequest"/>
+   </message>
+   <message name="freeBusyResponseMessage">
+      <part name="freeBusyRes" element="methods:freeBusyResponse"/>
    </message>
 
    <message name="getAccountListRequestMessage">
@@ -220,7 +239,7 @@ current contact information at www.novell.com.
 
    <message name="getAttachmentRequestMessage">
       <part name="getAttachmentReq" element="methods:getAttachmentRequest"/>
-	</message>
+   </message>
    <message name="getAttachmentResponseMessage">
       <part name="getAttachmentRes" element="methods:getAttachmentResponse"/>
    </message>
@@ -278,7 +297,7 @@ current contact information at www.novell.com.
       <part name="getFolderReq" element="methods:getFolderRequest"/>
    </message>
    <message name="getFolderResponseMessage">
-		<part name="getFolderRes" element="methods:getFolderResponse"/>
+      <part name="getFolderRes" element="methods:getFolderResponse"/>
    </message>
 
    <message name="getFolderListRequestMessage">
@@ -360,7 +379,7 @@ current contact information at www.novell.com.
 
    <message name="getPathRequestMessage">
       <part name="getPathReq" element="methods:getPathRequest"/>
-	</message>
+   </message>
    <message name="getPathResponseMessage">
       <part name="getPathRes" element="methods:getPathResponse"/>
    </message>
@@ -384,7 +403,7 @@ current contact information at www.novell.com.
    </message>
    <message name="getRuleListResponseMessage">
       <part name="getRuleListRes" element="methods:getRuleListResponse"/>
-	</message>
+   </message>
 
    <message name="getSentItemRequestMessage">
       <part name="getSentItemReq" element="methods:getSentItemRequest"/>
@@ -698,7 +717,14 @@ current contact information at www.novell.com.
       <part name="resolveRes" element="methods:resolveResponse"/>
    </message>
 
-   <message name="restoreItemRequestMessage">
+	<message name="restartTransferOwnershipRequestMessage">
+		<part name="restartTransferOwnershipReq" element="methods:restartTransferOwnershipRequest"/>
+	</message>
+	<message name="restartTransferOwnershipResponseMessage">
+		<part name="restartTransferOwnershipRes" element="methods:restartTransferOwnershipResponse"/>
+	</message>
+
+	<message name="restoreItemRequestMessage">
       <part name="restoreItemReq" element="methods:restoreItemRequest"/>
    </message>
    <message name="restoreItemResponseMessage">
@@ -751,7 +777,14 @@ current contact information at www.novell.com.
       <part name="stubItemRes" element="methods:stubItemResponse"/>
    </message>
 
-   <message name="unacceptRequestMessage">
+	<message name="takeOwnershipRequestMessage">
+		<part name="takeOwnershipReq" element="methods:takeOwnershipRequest"/>
+	</message>
+	<message name="takeOwnershipResponseMessage">
+		<part name="takeOwnershipRes" element="methods:takeOwnershipResponse"/>
+	</message>
+
+	<message name="unacceptRequestMessage">
       <part name="unacceptReq" element="methods:unacceptRequest"/>
    </message>
    <message name="unacceptResponseMessage">
@@ -935,11 +968,16 @@ current contact information at www.novell.com.
      <operation name="executeRuleRequest">
        <input message="tns:executeRuleRequestMessage"/>
        <output message="tns:executeRuleResponseMessage"/>
-	  </operation>
+     </operation>
 
      <operation name="forwardRequest">
        <input message="tns:forwardRequestMessage"/>
        <output message="tns:forwardResponseMessage"/>
+     </operation>
+
+     <operation name="freeBusyRequest">
+       <input message="tns:freeBusyRequestMessage"/>
+       <output message="tns:freeBusyResponseMessage"/>
      </operation>
 
      <operation name="getAccountListRequest">
@@ -999,7 +1037,7 @@ current contact information at www.novell.com.
 
      <operation name="getFolderRequest">
        <input message="tns:getFolderRequestMessage"/>
-		 <output message="tns:getFolderResponseMessage"/>
+       <output message="tns:getFolderResponseMessage"/>
      </operation>
 
      <operation name="getFolderListRequest">
@@ -1075,7 +1113,7 @@ current contact information at www.novell.com.
      <operation name="getRuleListRequest">
        <input message="tns:getRuleListRequestMessage"/>
        <output message="tns:getRuleListResponseMessage"/>
-	  </operation>
+     </operation>
 
      <operation name="getSentItemRequest">
        <input message="tns:getSentItemRequestMessage"/>
@@ -1295,7 +1333,12 @@ current contact information at www.novell.com.
        <output message="tns:resolveResponseMessage"/>
      </operation>
 
-     <operation name="restoreItemRequest">
+		<operation name="restartTransferOwnershipRequest">
+			<input message="tns:restartTransferOwnershipRequestMessage"/>
+			<output message="tns:restartTransferOwnershipResponseMessage"/>
+		</operation>
+
+		<operation name="restoreItemRequest">
        <input message="tns:restoreItemRequestMessage"/>
        <output message="tns:restoreItemResponseMessage"/>
      </operation>
@@ -1330,7 +1373,12 @@ current contact information at www.novell.com.
        <output message="tns:stubItemResponseMessage"/>
      </operation>
 
-     <operation name="unacceptRequest">
+		<operation name="takeOwnershipRequest">
+			<input message="tns:takeOwnershipRequestMessage"/>
+			<output message="tns:takeOwnershipResponseMessage"/>
+		</operation>
+
+		<operation name="unacceptRequest">
        <input message="tns:unacceptRequestMessage"/>
        <output message="tns:unacceptResponseMessage"/>
      </operation>
@@ -1397,8 +1445,8 @@ current contact information at www.novell.com.
     <operation name="acceptRequest">
       <soap:operation soapAction="acceptRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1409,8 +1457,8 @@ current contact information at www.novell.com.
     <operation name="acceptShareRequest">
       <soap:operation soapAction="acceptShareRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1421,8 +1469,8 @@ current contact information at www.novell.com.
     <operation name="addItemRequest">
       <soap:operation soapAction="addItemRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1433,8 +1481,8 @@ current contact information at www.novell.com.
     <operation name="addItemsRequest">
       <soap:operation soapAction="addItemsRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1445,8 +1493,8 @@ current contact information at www.novell.com.
     <operation name="addMembersRequest">
       <soap:operation soapAction="addMembersRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1457,8 +1505,8 @@ current contact information at www.novell.com.
     <operation name="archiveRequest">
       <soap:operation soapAction="archiveRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1469,8 +1517,8 @@ current contact information at www.novell.com.
     <operation name="closeFreeBusySessionRequest">
       <soap:operation soapAction="closeFreeBusySessionRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1481,8 +1529,8 @@ current contact information at www.novell.com.
     <operation name="completeRequest">
       <soap:operation soapAction="completeRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1493,8 +1541,8 @@ current contact information at www.novell.com.
     <operation name="counterRequest">
       <soap:operation soapAction="counterRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1505,8 +1553,8 @@ current contact information at www.novell.com.
     <operation name="createCursorRequest">
       <soap:operation soapAction="createCursorRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1517,8 +1565,8 @@ current contact information at www.novell.com.
     <operation name="createItemRequest">
       <soap:operation soapAction="createItemRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1529,8 +1577,8 @@ current contact information at www.novell.com.
     <operation name="createItemsRequest">
       <soap:operation soapAction="createItemsRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1541,8 +1589,8 @@ current contact information at www.novell.com.
     <operation name="createJunkEntryRequest">
       <soap:operation soapAction="createJunkEntryRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1553,8 +1601,8 @@ current contact information at www.novell.com.
     <operation name="createNotifyRequest">
       <soap:operation soapAction="createNotifyRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1565,8 +1613,8 @@ current contact information at www.novell.com.
     <operation name="createProxyAccessRequest">
       <soap:operation soapAction="createProxyAccessRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1577,8 +1625,8 @@ current contact information at www.novell.com.
     <operation name="createSignatureRequest">
       <soap:operation soapAction="createSignatureRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1589,8 +1637,8 @@ current contact information at www.novell.com.
     <operation name="declineRequest">
       <soap:operation soapAction="declineRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1601,8 +1649,8 @@ current contact information at www.novell.com.
     <operation name="delegateRequest">
       <soap:operation soapAction="delegateRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1613,8 +1661,8 @@ current contact information at www.novell.com.
     <operation name="destroyCursorRequest">
       <soap:operation soapAction="destroyCursorRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1625,20 +1673,8 @@ current contact information at www.novell.com.
     <operation name="executeRuleRequest">
       <soap:operation soapAction="executeRuleRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
-        <soap:body use="literal"/>
-      </input>
-      <output>
-        <soap:body use="literal"/>
-      </output>
-	 </operation>
-
-    <operation name="forwardRequest">
-      <soap:operation soapAction="forwardRequest" style="document"/>
-      <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1646,11 +1682,35 @@ current contact information at www.novell.com.
       </output>
     </operation>
 
-    <operation name="getAccountListRequest">
+    <operation name="forwardRequest">
+      <soap:operation soapAction="forwardRequest" style="document"/>
+      <input>
+        <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+        <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+        <soap:body use="literal"/>
+      </input>
+      <output>
+        <soap:body use="literal"/>
+      </output>
+    </operation>
+
+    <operation name="freeBusyRequest">
+      <soap:operation soapAction="freeBusyRequest" style="document"/>
+      <input>
+         <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+         <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+         <soap:body use="literal"/>
+      </input>
+      <output>
+         <soap:body use="literal"/>
+      </output>
+   </operation>
+
+   <operation name="getAccountListRequest">
       <soap:operation soapAction="getAccountListRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1661,8 +1721,8 @@ current contact information at www.novell.com.
     <operation name="getAddressBookListRequest">
       <soap:operation soapAction="getAddressBookListRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1673,8 +1733,8 @@ current contact information at www.novell.com.
     <operation name="getArchiveItemsRequest">
       <soap:operation soapAction="getArchiveItemsRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1685,8 +1745,8 @@ current contact information at www.novell.com.
     <operation name="getAttachmentRequestMessage">
       <soap:operation soapAction="getAttachmentRequestMessage" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1697,8 +1757,8 @@ current contact information at www.novell.com.
     <operation name="getCategoryListRequest">
       <soap:operation soapAction="getCategoryListRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1709,8 +1769,8 @@ current contact information at www.novell.com.
     <operation name="getContactHistoryFilterRequest">
       <soap:operation soapAction="getContactHistoryFilterRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1721,8 +1781,8 @@ current contact information at www.novell.com.
     <operation name="getCustomListRequest">
       <soap:operation soapAction="getCustomListRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1733,8 +1793,8 @@ current contact information at www.novell.com.
     <operation name="getDeltasRequest">
       <soap:operation soapAction="getDeltasRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1745,8 +1805,8 @@ current contact information at www.novell.com.
     <operation name="getDeltaInfoRequest">
       <soap:operation soapAction="getDeltaInfoRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1769,8 +1829,8 @@ current contact information at www.novell.com.
     <operation name="getDocumentTypeListRequest">
       <soap:operation soapAction="getDocumentTypeListRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1781,8 +1841,8 @@ current contact information at www.novell.com.
     <operation name="getFolderRequest">
       <soap:operation soapAction="getFolderRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1793,8 +1853,8 @@ current contact information at www.novell.com.
     <operation name="getFolderListRequest">
       <soap:operation soapAction="getFolderListRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1805,8 +1865,8 @@ current contact information at www.novell.com.
     <operation name="getFreeBusyRequest">
       <soap:operation soapAction="getFreeBusyRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1817,8 +1877,8 @@ current contact information at www.novell.com.
     <operation name="getItemRequest">
       <soap:operation soapAction="getItemRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1829,8 +1889,8 @@ current contact information at www.novell.com.
     <operation name="getItemsRequest">
       <soap:operation soapAction="getItemsRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1841,8 +1901,8 @@ current contact information at www.novell.com.
     <operation name="getJunkEntriesRequest">
       <soap:operation soapAction="getJunkEntriesRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1853,8 +1913,8 @@ current contact information at www.novell.com.
     <operation name="getJunkMailSettingsRequest">
       <soap:operation soapAction="getJunkMailSettingsRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1865,8 +1925,8 @@ current contact information at www.novell.com.
     <operation name="getLibraryItemRequest">
       <soap:operation soapAction="getLibraryItemRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1877,8 +1937,8 @@ current contact information at www.novell.com.
     <operation name="getLibraryListRequest">
       <soap:operation soapAction="getLibraryListRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1889,8 +1949,8 @@ current contact information at www.novell.com.
     <operation name="getMemberOfRequest">
       <soap:operation soapAction="getMemberOfRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1901,8 +1961,8 @@ current contact information at www.novell.com.
     <operation name="getNotifyListRequest">
       <soap:operation soapAction="getNotifyListRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1913,8 +1973,8 @@ current contact information at www.novell.com.
     <operation name="getQuickMessagesRequest">
       <soap:operation soapAction="getQuickMessagesRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1925,8 +1985,8 @@ current contact information at www.novell.com.
     <operation name="getPathRequestMessage">
       <soap:operation soapAction="getPathRequestMessage" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1937,8 +1997,8 @@ current contact information at www.novell.com.
     <operation name="getProxyAccessListRequest">
       <soap:operation soapAction="getProxyAccessListRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1949,8 +2009,8 @@ current contact information at www.novell.com.
     <operation name="getProxyListRequest">
       <soap:operation soapAction="getProxyListRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1961,20 +2021,20 @@ current contact information at www.novell.com.
     <operation name="getRuleListRequest">
       <soap:operation soapAction="getRuleListRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
         <soap:body use="literal"/>
       </output>
-	 </operation>
+    </operation>
 
     <operation name="getSentItemRequest">
       <soap:operation soapAction="getSentItemRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1985,8 +2045,8 @@ current contact information at www.novell.com.
     <operation name="getSettingsRequest">
       <soap:operation soapAction="getSettingsRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -1997,8 +2057,8 @@ current contact information at www.novell.com.
     <operation name="getSignaturesRequest">
       <soap:operation soapAction="getSignaturesRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2009,8 +2069,8 @@ current contact information at www.novell.com.
     <operation name="getStringRequest">
       <soap:operation soapAction="getStringRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2021,8 +2081,8 @@ current contact information at www.novell.com.
     <operation name="getTimestampRequest">
       <soap:operation soapAction="getTimestampRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2033,8 +2093,8 @@ current contact information at www.novell.com.
     <operation name="getTimezoneListRequest">
       <soap:operation soapAction="getTimezoneListRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2045,8 +2105,8 @@ current contact information at www.novell.com.
     <operation name="getUnreadRequest">
       <soap:operation soapAction="getUnreadRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2057,8 +2117,8 @@ current contact information at www.novell.com.
     <operation name="getUserListRequest">
       <soap:operation soapAction="getUserListRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2069,8 +2129,8 @@ current contact information at www.novell.com.
     <operation name="incrementRelevanceRequest">
       <soap:operation soapAction="incrementRelevanceRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2081,7 +2141,7 @@ current contact information at www.novell.com.
     <operation name="loginRequest">
       <soap:operation soapAction="loginRequest" style="document"/>
       <input>
-		  <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+        <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2091,8 +2151,8 @@ current contact information at www.novell.com.
     <operation name="logoutRequest">
       <soap:operation soapAction="logoutRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2103,8 +2163,8 @@ current contact information at www.novell.com.
     <operation name="markPrivateRequest">
       <soap:operation soapAction="markPrivateRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2115,8 +2175,8 @@ current contact information at www.novell.com.
     <operation name="markReadRequest">
       <soap:operation soapAction="markReadRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2127,8 +2187,8 @@ current contact information at www.novell.com.
     <operation name="markUnPrivateRequest">
       <soap:operation soapAction="markUnPrivateRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2139,8 +2199,8 @@ current contact information at www.novell.com.
     <operation name="markUnReadRequest">
       <soap:operation soapAction="markUnReadRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2151,8 +2211,8 @@ current contact information at www.novell.com.
     <operation name="modifyItemRequest">
       <soap:operation soapAction="modifyItemRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2175,8 +2235,8 @@ current contact information at www.novell.com.
   <operation name="modifyJunkEntryRequest">
       <soap:operation soapAction="modifyJunkEntryRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2187,8 +2247,8 @@ current contact information at www.novell.com.
     <operation name="modifyJunkMailSettingsRequest">
       <soap:operation soapAction="modifyJunkMailSettingsRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2199,8 +2259,8 @@ current contact information at www.novell.com.
     <operation name="modifyNotifyRequest">
       <soap:operation soapAction="modifyNotifyRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2211,8 +2271,8 @@ current contact information at www.novell.com.
     <operation name="modifyPasswordRequest">
       <soap:operation soapAction="modifyPasswordRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2223,8 +2283,8 @@ current contact information at www.novell.com.
     <operation name="modifyProxyAccessRequest">
       <soap:operation soapAction="modifyProxyAccessRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2235,8 +2295,8 @@ current contact information at www.novell.com.
     <operation name="modifySettingsRequest">
       <soap:operation soapAction="modifySettingsRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2247,8 +2307,8 @@ current contact information at www.novell.com.
     <operation name="modifySignaturesRequest">
       <soap:operation soapAction="modifySignaturesRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2259,8 +2319,8 @@ current contact information at www.novell.com.
     <operation name="moveItemRequest">
       <soap:operation soapAction="moveItemRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2295,8 +2355,8 @@ current contact information at www.novell.com.
     <operation name="positionCursorRequest">
       <soap:operation soapAction="positionCursorRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2307,8 +2367,8 @@ current contact information at www.novell.com.
     <operation name="purgeDeletedItemsRequest">
       <soap:operation soapAction="purgeDeletedItemsRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2319,8 +2379,8 @@ current contact information at www.novell.com.
     <operation name="purgeRequest">
       <soap:operation soapAction="purgeRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2331,8 +2391,8 @@ current contact information at www.novell.com.
     <operation name="queryRequest">
       <soap:operation soapAction="queryRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2343,8 +2403,8 @@ current contact information at www.novell.com.
     <operation name="readCursorRequest">
       <soap:operation soapAction="readCursorRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2355,8 +2415,8 @@ current contact information at www.novell.com.
     <operation name="removeCustomDefinitionRequest">
       <soap:operation soapAction="removeCustomDefinitionRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2367,8 +2427,8 @@ current contact information at www.novell.com.
     <operation name="removeItemRequest">
       <soap:operation soapAction="removeItemRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2379,8 +2439,8 @@ current contact information at www.novell.com.
     <operation name="removeItemsRequest">
       <soap:operation soapAction="removeItemsRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2391,8 +2451,8 @@ current contact information at www.novell.com.
     <operation name="removeJunkEntryRequest">
       <soap:operation soapAction="removeJunkEntryRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2403,8 +2463,8 @@ current contact information at www.novell.com.
     <operation name="removeMembersRequest">
       <soap:operation soapAction="removeMembersRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2415,8 +2475,8 @@ current contact information at www.novell.com.
     <operation name="removeNotifyRequest">
       <soap:operation soapAction="removeNotifyRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2427,8 +2487,8 @@ current contact information at www.novell.com.
     <operation name="removeProxyAccessRequest">
       <soap:operation soapAction="removeProxyAccessRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2439,8 +2499,8 @@ current contact information at www.novell.com.
     <operation name="removeProxyUserRequest">
       <soap:operation soapAction="removeProxyUserRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2451,8 +2511,8 @@ current contact information at www.novell.com.
     <operation name="removeSignatureRequest">
       <soap:operation soapAction="removeSignatureRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2463,8 +2523,8 @@ current contact information at www.novell.com.
     <operation name="replyRequest">
       <soap:operation soapAction="replyRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2475,8 +2535,8 @@ current contact information at www.novell.com.
     <operation name="resendRequest">
       <soap:operation soapAction="resendRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2487,8 +2547,8 @@ current contact information at www.novell.com.
     <operation name="resolveRequest">
       <soap:operation soapAction="resolveRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2496,11 +2556,23 @@ current contact information at www.novell.com.
       </output>
     </operation>
 
-    <operation name="restoreItemRequest">
+	<operation name="restartTransferOwnershipRequest">
+		<soap:operation soapAction="restartTransferOwnershipRequest" style="document"/>
+		<input>
+			<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+			<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+			<soap:body use="literal"/>
+		</input>
+		<output>
+			<soap:body use="literal"/>
+		</output>
+	</operation>
+
+	<operation name="restoreItemRequest">
       <soap:operation soapAction="restoreItemRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2511,8 +2583,8 @@ current contact information at www.novell.com.
     <operation name="retractRequest">
       <soap:operation soapAction="retractRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2523,8 +2595,8 @@ current contact information at www.novell.com.
     <operation name="sendItemRequest">
       <soap:operation soapAction="sendItemRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2535,8 +2607,8 @@ current contact information at www.novell.com.
     <operation name="setTimestampRequest">
       <soap:operation soapAction="setTimestampRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2547,8 +2619,8 @@ current contact information at www.novell.com.
     <operation name="startFreeBusySessionRequest">
       <soap:operation soapAction="startFreeBusySessionRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2559,8 +2631,8 @@ current contact information at www.novell.com.
     <operation name="streamedSearchRequest">
       <soap:operation soapAction="streamedSearchRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2571,8 +2643,8 @@ current contact information at www.novell.com.
     <operation name="stubItemRequest">
       <soap:operation soapAction="stubItemRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2580,11 +2652,23 @@ current contact information at www.novell.com.
       </output>
     </operation>
 
-    <operation name="unacceptRequest">
+	<operation name="takeOwnershipRequest">
+		<soap:operation soapAction="takeOwnershipRequest" style="document"/>
+		<input>
+			<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+			<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+			<soap:body use="literal"/>
+		</input>
+		<output>
+			<soap:body use="literal"/>
+		</output>
+	</operation>
+
+	<operation name="unacceptRequest">
       <soap:operation soapAction="unacceptRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2595,8 +2679,8 @@ current contact information at www.novell.com.
     <operation name="uncompleteRequest">
       <soap:operation soapAction="uncompleteRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2607,8 +2691,8 @@ current contact information at www.novell.com.
     <operation name="unarchiveRequest">
       <soap:operation soapAction="unarchiveRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2619,8 +2703,8 @@ current contact information at www.novell.com.
     <operation name="updateVersionStatusRequest">
       <soap:operation soapAction="updateVersionStatusRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2631,8 +2715,8 @@ current contact information at www.novell.com.
     <operation name="verifyPasswordRequest">
       <soap:operation soapAction="verifyPasswordRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2649,8 +2733,8 @@ current contact information at www.novell.com.
     <operation name="cleanEventConfigurationRequest">
       <soap:operation soapAction="cleanEventConfigurationRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2661,8 +2745,8 @@ current contact information at www.novell.com.
     <operation name="configureEventsRequest">
       <soap:operation soapAction="configureEventsRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2672,8 +2756,8 @@ current contact information at www.novell.com.
     <operation name="getEventConfigurationRequest">
       <soap:operation soapAction="getEventConfigurationRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2683,8 +2767,8 @@ current contact information at www.novell.com.
     <operation name="getEventsRequest">
       <soap:operation soapAction="getEventsRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2694,8 +2778,8 @@ current contact information at www.novell.com.
     <operation name="removeEventConfigurationRequest">
       <soap:operation soapAction="removeEventConfigurationRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2706,8 +2790,8 @@ current contact information at www.novell.com.
     <operation name="removeEventsByTypeRequest">
       <soap:operation soapAction="removeEventsByTypeRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>
@@ -2718,8 +2802,8 @@ current contact information at www.novell.com.
     <operation name="removeEventsRequest">
       <soap:operation soapAction="removeEventsRequest" style="document"/>
       <input>
-		<soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
-		<soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
+      <soap:header message="tns:sessionMessage" part="sessionId" use="literal"/>
+      <soap:header message="tns:gwTraceMessage" part="gwTrace" use="literal"/>
         <soap:body use="literal"/>
       </input>
       <output>

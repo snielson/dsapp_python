@@ -17,22 +17,19 @@ import dsapp_Definitions as ds
 import ConfigParser
 Config = ConfigParser.ConfigParser()
 
-# Global paths
-dsappDirectory = "/opt/novell/datasync/tools/dsapp"
-dsappConf = dsappDirectory + "/conf"
-dsappLogs = dsappDirectory + "/logs"
-dsappLogSettings = dsappConf + "/logging.cfg"
-soapDebugLog = dsappLogs + '/soapResults.log'
+# Globals
+import dsapp_global as glb
 
-WSDL = 'file://%s/wsdl/GW2012/groupwise.wsdl' % os.path.dirname(os.path.realpath(__file__))
+
+WSDL = 'file://%s/wsdl/GW2014/groupwise.wsdl' % os.path.dirname(os.path.realpath(__file__))
 
 # Log Settings
-logging.config.fileConfig(dsappLogSettings)
+logging.config.fileConfig(glb.dsappLogSettings)
 logger = logging.getLogger('dsapp_Definitions')
 excep_logger = logging.getLogger('exceptions_log')
 
 # Read in current log level
-Config.read(dsappLogSettings)
+Config.read(glb.dsappLogSettings)
 logLevel = Config.get('logger_dsapp_Definitions', 'level')
 
 def my_handler(type, value, tb):
@@ -61,7 +58,7 @@ TEXT_XML = "text/xml"
 
 # GroupWise version to be passed in via SOAP
 groupWiseVersions = {"base": "1.00",
-"7.0.2": "1.00", 
+"7.0.2": "1.01", 
 "8.0.0": "1.02",
 "8.0.1": "1.03",
 "8.0.2": "1.04",
@@ -109,13 +106,13 @@ getFolderListRequest = """<?xml version="1.0" encoding="UTF-8"?>
 			<tns:session>%s</tns:session>
 		</SOAP-ENV:Header>
 		<SOAP-ENV:Body>
-			<ns0:getFolderListRequest>
+			<ns2:getFolderListRequest>
 				<parent xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">folders</parent>
 				<view xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">default nodisplay pabName</view>
 				<recurse xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">true</recurse>
 				<imap xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">true</imap>
 				<nntp xmlns="http://schemas.novell.com/2005/01/GroupWise/methods">true</nntp>
-			</ns0:getFolderListRequest>
+			</ns2:getFolderListRequest>
 		</SOAP-ENV:Body>
 	</SOAP-ENV:Envelope>
 """
@@ -172,6 +169,17 @@ modifyItemRequest_Calendar = """<?xml version="1.0" encoding="UTF-8"?>
 	</SOAP-ENV:Envelope>
 """
 
+def soap_logout(soap_userConfig):
+	soap = logoutRequest % (soap_userConfig['session'])
+	soapClient = suds.client.Client(WSDL, location='%(soapAddr)s' % soap_userConfig)
+	logout_results = soapClient.service.logoutRequest(__inject={'msg': soap})
+	logger.debug("Sending SOAP logoutRequest")
+	if logLevel == 'DEBUG':
+		with open (glb.soapDebugLog, 'a') as soapLog:
+			DATE = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
+			soapLog.write(DATE + ' [logoutRequest] sending to: (%s)\n' % soap_userConfig['soapAddr'] + '\n' + soap + '\n' + str(logout_results).decode("ascii", 'ignore') + '\n')
+
+
 def getGroupWiseVersion(version):
 	# default version to 1.0.5
 	poaVersion = "1.05"
@@ -189,7 +197,7 @@ def getGroupWiseVersion(version):
 	return poaVersion
 
 
-def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False, ignoreError=False, poa_version='1.0.5'):
+def soap_getUserInfo(userConfig, verifyMobility = False, ignoreError=False, poa_version='1.0.5'):
 	soapAddr = None
 	# if verifyMobility is True, only check users found in GMS
 	if verifyMobility:
@@ -202,23 +210,23 @@ def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False
 		userid = userConfig['name']
 
 	# Get http or https, and put in order to try (for redirects)
-	if gwConfig['sSecure'] == 'https':
+	if glb.gwConfig['sSecure'] == 'https':
 		secureOrder = ['https', 'http']
-	elif gwConfig['sSecure'] == 'http':
+	elif glb.gwConfig['sSecure'] == 'http':
 		secureOrder = ['http', 'https']
 	else:
 		print ("Missing value for http(s). Aborting")
 		logger.error('Missing value for http(s)')
 		return
 
-	logger.info("Starting GroupWise SOAP check on '%s' at %s://%s:%s/soap" % (userid,gwConfig['sSecure'], gwConfig['gListenAddress'], gwConfig['sPort']))
-	soap = loginRequest % (userid, trustedConfig['name'], trustedConfig['key'], poa_version)
-	soapClient = suds.client.Client(WSDL, location='%(sSecure)s://%(gListenAddress)s:%(sPort)s/soap' % gwConfig)
-	soapAddr = '%(sSecure)s://%(gListenAddress)s:%(sPort)s/soap' % gwConfig
+	logger.info("Starting GroupWise SOAP check on '%s' at %s://%s:%s/soap" % (userid,glb.gwConfig['sSecure'], glb.gwConfig['gListenAddress'], glb.gwConfig['sPort']))
+	soap = loginRequest % (userid, glb.trustedConfig['name'], glb.trustedConfig['key'], poa_version)
+	soapClient = suds.client.Client(WSDL, location='%(sSecure)s://%(gListenAddress)s:%(sPort)s/soap' % glb.gwConfig)
+	soapAddr = '%(sSecure)s://%(gListenAddress)s:%(sPort)s/soap' % glb.gwConfig
 	try:
 		results = soapClient.service.loginRequest(__inject={'msg': soap})
 		if logLevel == 'DEBUG':
-			with open (soapDebugLog, 'a') as soapLog:
+			with open (glb.soapDebugLog, 'a') as soapLog:
 				DATE = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
 				soapLog.write(DATE + ' [loginRequest][userid: %s] sending to: (%s)\n' % (userid,soapAddr) + '\n' + soap + '\n' + str(results).decode("ascii", 'ignore') + '\n')
 
@@ -244,7 +252,7 @@ def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False
 		try:
 			results = soapClient.service.loginRequest(__inject={'msg': soap})
 			if logLevel == 'DEBUG':
-				with open (soapDebugLog, 'a') as soapLog:
+				with open (glb.soapDebugLog, 'a') as soapLog:
 					DATE = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
 					soapLog.write(DATE + ' [loginRequest][userid: %s] sending to: (%s)\n' % (userid,soapAddr) + '\n' + soap + '\n' + str(results).decode("ascii", 'ignore') + '\n')
 		except:
@@ -254,7 +262,7 @@ def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False
 			try:
 				results = soapClient.service.loginRequest(__inject={'msg': soap})
 				if logLevel == 'DEBUG':
-					with open (soapDebugLog, 'a') as soapLog:
+					with open (glb.soapDebugLog, 'a') as soapLog:
 						DATE = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
 						soapLog.write(DATE + ' [loginRequest][userid: %s] sending to: (%s)\n' % (userid,soapAddr) + '\n' + soap + '\n' + str(results).decode("ascii", 'ignore') + '\n')
 			except:
@@ -267,10 +275,18 @@ def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False
 	if results['status']['code'] == 0:
 		poa_version = getGroupWiseVersion(results['gwVersion'])
 		if poa_version != "1.0.5":
-			soap = loginRequest % (userid, trustedConfig['name'], trustedConfig['key'], poa_version)
+			# Log out of last session
+			soap = logoutRequest % (results['session'])
+			logout_results = soapClient.service.logoutRequest(__inject={'msg': soap})
+			if logLevel == 'DEBUG':
+				with open (glb.soapDebugLog, 'a') as soapLog:
+					DATE = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
+					soapLog.write(DATE + ' [logoutRequest]sending to: (%s)\n' % soapAddr + '\n' + soap + '\n' + str(results).decode("ascii", 'ignore') + '\n')
+
+			soap = loginRequest % (userid, glb.trustedConfig['name'], glb.trustedConfig['key'], poa_version)
 			results = soapClient.service.loginRequest(__inject={'msg': soap})
 			if logLevel == 'DEBUG':
-				with open (soapDebugLog, 'a') as soapLog:
+				with open (glb.soapDebugLog, 'a') as soapLog:
 					DATE = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
 					soapLog.write(DATE + ' [loginRequest][userid: %s] sending to: (%s)\n' % (userid,soapAddr) + '\n' + soap + '\n' + str(results).decode("ascii", 'ignore') + '\n')
 
@@ -296,9 +312,9 @@ def soap_getUserInfo(trustedConfig, gwConfig, userConfig, verifyMobility = False
 		return
 	return soap_userConfig
 
-def soap_getFolderList(trustedConfig, gwConfig, userConfig, ignoreError=False, soap_userConfig=None):
+def soap_getFolderList(userConfig, ignoreError=False, soap_userConfig=None):
 	if soap_userConfig is None:
-		soap_userConfig = soap_getUserInfo(trustedConfig, gwConfig, userConfig, ignoreError=ignoreError)
+		soap_userConfig = soap_getUserInfo(userConfig, ignoreError=ignoreError)
 		if soap_userConfig == None:
 			return
 
@@ -306,23 +322,15 @@ def soap_getFolderList(trustedConfig, gwConfig, userConfig, ignoreError=False, s
 	soapClient = suds.client.Client(WSDL, location='%(soapAddr)s' % soap_userConfig)
 	results = soapClient.service.getFolderListRequest(__inject={'msg': soap})
 	if logLevel == 'DEBUG':
-		with open (soapDebugLog, 'a') as soapLog:
+		with open (glb.soapDebugLog, 'a') as soapLog:
 			DATE = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
 			soapLog.write(DATE + ' [getFolderListRequest] sending to: (%s)\n' % soap_userConfig['soapAddr'] + '\n' + soap + '\n' + str(results).decode("ascii", 'ignore') + '\n')
 
-	soap = logoutRequest % (soap_userConfig['session'])
-	soapClient = suds.client.Client(WSDL, location='%(soapAddr)s' % soap_userConfig)
-	logout_results = soapClient.service.logoutRequest(__inject={'msg': soap})
-	if logLevel == 'DEBUG':
-		with open (soapDebugLog, 'a') as soapLog:
-			DATE = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
-			soapLog.write(DATE + ' [logoutRequest] sending to: (%s)\n' % soap_userConfig['soapAddr'] + '\n' + soap + '\n' + str(logout_results).decode("ascii", 'ignore') + '\n')
-
 	return results
 
-def soap_getAddressBookList(trustedConfig, gwConfig, userConfig, ignoreError=False, soap_userConfig=None):
+def soap_getAddressBookList(userConfig, ignoreError=False, soap_userConfig=None):
 	if soap_userConfig is None:
-		soap_userConfig = soap_getUserInfo(trustedConfig, gwConfig, userConfig, ignoreError=ignoreError)
+		soap_userConfig = soap_getUserInfo(userConfig, ignoreError=ignoreError)
 		if soap_userConfig == None:
 			return
 
@@ -330,28 +338,21 @@ def soap_getAddressBookList(trustedConfig, gwConfig, userConfig, ignoreError=Fal
 	soapClient = suds.client.Client(WSDL, location='%(soapAddr)s' % soap_userConfig)
 	results = soapClient.service.getAddressBookListRequest(__inject={'msg': soap})
 	if logLevel == 'DEBUG':
-		with open (soapDebugLog, 'a') as soapLog:
+		with open (glb.soapDebugLog, 'a') as soapLog:
 			DATE = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
 			soapLog.write(DATE + ' [getAddressBookListRequest] sending to: (%s)\n' % soap_userConfig['soapAddr'] + '\n' + soap + '\n' + str(results).decode("ascii", 'ignore') + '\n')
 
-	soap = logoutRequest % (soap_userConfig['session'])
-	soapClient = suds.client.Client(WSDL, location='%(soapAddr)s' % soap_userConfig)
-	logout_results = soapClient.service.logoutRequest(__inject={'msg': soap})
-	if logLevel == 'DEBUG':
-		with open (soapDebugLog, 'a') as soapLog:
-			DATE = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
-			soapLog.write(DATE + ' [logoutRequest] sending to: (%s)\n' % soap_userConfig['soapAddr'] + '\n' + soap + '\n' + str(logout_results).decode("ascii", 'ignore') + '\n')
-
+	soap_logout(soap_userConfig)
 	return results
 
-def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
+def soap_checkFolderList(userConfig):
 	if userConfig['name'] is None:
 		return
 
-	soap_userConfig = soap_getUserInfo(trustedConfig, gwConfig, userConfig)
+	soap_userConfig = soap_getUserInfo(userConfig)
 
 	# Log output for users folder structure
-	folderStructure_Log = dsappLogs + '/folderStructure/%s_folderStructure.log' % userConfig['name']
+	folderStructure_Log = glb.dsappLogs + '/folderStructure/%s_folderStructure.log' % userConfig['name']
 
 	# Set up IDs for fixing structure
 	systemIDs = dict()
@@ -362,15 +363,15 @@ def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
 	problem = False
 	print ("Getting folder list..")
 	logger.info("Getting folder list..")
-	soap_folderList = soap_getFolderList(trustedConfig, gwConfig, userConfig, soap_userConfig=soap_userConfig)
+	soap_folderList = soap_getFolderList(userConfig, soap_userConfig=soap_userConfig)
 	if soap_folderList == None:
 		logger.debug("SOAP folder list is None")
 		print(); ds.eContinue()
 		return
 
 	# Write folder list to log
-	if not os.path.exists(dsappLogs + '/folderStructure'):
-		os.makedirs(dsappLogs + '/folderStructure')
+	if not os.path.exists(glb.dsappLogs + '/folderStructure'):
+		os.makedirs(glb.dsappLogs + '/folderStructure')
 	with open(folderStructure_Log, 'w') as file:
 		file.write(str(soap_folderList))
 
@@ -425,11 +426,12 @@ def soap_checkFolderList(trustedConfig, gwConfig, userConfig):
 		if ds.askYesOrNo("Fix %s folder structure" % userConfig['name']):
 			fixFolderStructure(soap_userConfig, systemIDs, system_problemIDs, subCalendar_problemIDs, subContact_problemIDs)
 
+	soap_logout(soap_userConfig)
 	print(); ds.eContinue()
 
 
-def soap_printUser(trustedConfig, gwConfig, userConfig):
-	soap_userConfig = soap_getUserInfo(trustedConfig, gwConfig, userConfig)
+def soap_printUser(userConfig):
+	soap_userConfig = soap_getUserInfo(userConfig)
 	if soap_userConfig == None:
 		return
 
@@ -447,24 +449,17 @@ User Email: %(email)s
 User GroupWise ID: %(userid)s 
 User File ID: %(fid)s """ % soap_userConfig
 
-	soap = logoutRequest % (soap_userConfig['session'])
-	soapClient = suds.client.Client(WSDL, location='%(soapAddr)s' % soap_userConfig)
-	logout_results = soapClient.service.logoutRequest(__inject={'msg': soap})
-	if logLevel == 'DEBUG':
-		with open (soapDebugLog, 'a') as soapLog:
-			DATE = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
-			soapLog.write(DATE + ' [logoutRequest] sending to: (%s)\n' % soap_userConfig['soapAddr'] + '\n' + soap + '\n' + str(logout_results).decode("ascii", 'ignore') + '\n')
-
+	soap_logout(soap_userConfig)
 	print (results)
 
 
-def soap_getUserList(trustedConfig, gwConfig, noout='true'):
+def soap_getUserList(noout='true'):
 	params = dict()
-	params['name'] = trustedConfig['name']
-	params['key'] = trustedConfig['key']
+	params['name'] = glb.trustedConfig['name']
+	params['key'] = glb.trustedConfig['key']
 	params['noop'] = noout
 
-	gw_location = "%(sSecure)s://%(gListenAddress)s:%(sPort)s/soap" % gwConfig
+	gw_location = "%(sSecure)s://%(gListenAddress)s:%(sPort)s/soap" % glb.gwConfig
 	logger.debug("GroupWise address: %s" % gw_location)
 	soapClient = suds.client.Client(WSDL, location=gw_location)
 	try:
@@ -472,7 +467,7 @@ def soap_getUserList(trustedConfig, gwConfig, noout='true'):
 	except:
 		results = None
 	if logLevel == 'DEBUG':
-		with open (soapDebugLog, 'a') as soapLog:
+		with open (glb.soapDebugLog, 'a') as soapLog:
 			DATE = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
 			soapLog.write(DATE + ' [getUserListRequest] sending to: (%s)\n' % gw_location + str(results).decode("ascii", 'ignore') + '\n')
 	return results
@@ -545,16 +540,16 @@ def check_subContacts(folderList, parent_id, subContact_problemIDs):
 
 	return problem
 
-def soap_check_sharedFolders(trustedConfig, gwConfig, userConfig):
+def soap_check_sharedFolders(userConfig):
 	print ('Totaling all %s shared folders... Please wait\n' % userConfig['name'])
-	soap_userConfig = soap_getUserInfo(trustedConfig, gwConfig, userConfig)
+	soap_userConfig = soap_getUserInfo(userConfig)
 	if soap_userConfig == None:
 		return
 
 	logger.info("Getting folder list..")
-	soap_folderList = soap_getFolderList(trustedConfig, gwConfig, userConfig, soap_userConfig=soap_userConfig)
+	soap_folderList = soap_getFolderList(userConfig, soap_userConfig=soap_userConfig)
 	logger.info("Getting address book list..")
-	soap_addressList = soap_getAddressBookList(trustedConfig, gwConfig, userConfig, soap_userConfig=soap_userConfig)
+	soap_addressList = soap_getAddressBookList(userConfig, soap_userConfig=soap_userConfig)
 	if soap_folderList == None and soap_addressList == None:
 		logger.debug("SOAP result(s) are None")
 		return
@@ -594,7 +589,7 @@ def soap_check_sharedFolders(trustedConfig, gwConfig, userConfig):
 	
 	return listPrint
 
-def soap_check_allSharedFolders(trustedConfig, gwConfig, userList):
+def soap_check_allSharedFolders(userList):
 	print ('Totaling all users shared folders... Please wait\n')
 	total_sharedBy = 0
 	total_sharedTo = 0
@@ -608,11 +603,11 @@ def soap_check_allSharedFolders(trustedConfig, gwConfig, userList):
 		userConfig = {'name': user}
 		logger.info("Getting folder list..")
 
-		soap_userConfig = soap_getUserInfo(trustedConfig, gwConfig, userConfig, ignoreError=True)
+		soap_userConfig = soap_getUserInfo(userConfig, ignoreError=True)
 		if soap_userConfig is not  None:
-			soap_folderList = soap_getFolderList(trustedConfig, gwConfig, userConfig, ignoreError=True, soap_userConfig=soap_userConfig)
+			soap_folderList = soap_getFolderList(userConfig, ignoreError=True, soap_userConfig=soap_userConfig)
 			logger.info("Getting address book list..")
-			soap_addressList = soap_getAddressBookList(trustedConfig, gwConfig, userConfig, ignoreError=True, soap_userConfig=soap_userConfig)
+			soap_addressList = soap_getAddressBookList(userConfig, ignoreError=True, soap_userConfig=soap_userConfig)
 			if soap_folderList == None and soap_addressList == None:
 				logger.debug("SOAP result(s) are None")
 			else:
@@ -644,20 +639,20 @@ def soap_check_allSharedFolders(trustedConfig, gwConfig, userList):
 	return listPrint
 
 # This function is for developement / troubleshooting
-def soap_checkFolderListTEST(trustedConfig, gwConfig, userConfig):
+def soap_checkFolderListTEST(userConfig):
 	problem = False
 	print ("Getting folder list..")
 	logger.info("Getting folder list..")
-	soap_folderList = soap_getFolderList(trustedConfig, gwConfig, userConfig)
+	soap_folderList = soap_getFolderList(userConfig)
 	if soap_folderList == None:
 		return
 	return soap_folderList
 
-def soap_checkAddressBookListTEST(trustedConfig, gwConfig, userConfig):
+def soap_checkAddressBookListTEST(userConfig):
 	problem = False
 	print ("Getting address book list..")
 	logger.info("Getting address book list..")
-	soap_AdddressBookList = soap_getAddressBookList(trustedConfig, gwConfig, userConfig)
+	soap_AdddressBookList = soap_getAddressBookList(userConfig)
 	if soap_AdddressBookList == None:
 		return
 	return soap_AdddressBookList
@@ -683,7 +678,7 @@ def moveFolder(soap_userConfig, sourceID, targetID, moveType='folder'):
 		logger.error("Failed moving folder")
 
 	if logLevel == 'DEBUG':
-		with open (soapDebugLog, 'a') as soapLog:
+		with open (glb.soapDebugLog, 'a') as soapLog:
 			DATE = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S %Z")
 			soapLog.write(DATE + ' [modifyItemRequest] sending to: (%s)\n' % soap_userConfig['soapAddr'] + '\n' + soap + '\n' + str(results).decode("ascii", 'ignore') + '\n')
 	return results

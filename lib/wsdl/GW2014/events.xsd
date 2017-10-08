@@ -64,7 +64,7 @@ current contact information at www.novell.com.
          <xs:element name="key" type="xs:string" minOccurs="0"/>
          <xs:element name="uid" type="xs:unsignedInt" minOccurs="0"/>
          <xs:element name="type" type="tns:ItemType" minOccurs="0"/>
-         <xs:element name="filename" type="xs:string" minOccurs="0"/>
+         <xs:element name="fileName" type="xs:string" minOccurs="0"/>
          <xs:element name="recurrenceKey" type="xs:unsignedInt" minOccurs="0"/>
       </xs:sequence>
    </xs:complexType>
@@ -93,8 +93,9 @@ current contact information at www.novell.com.
          <xs:element name="definition" type="tns:EventDefinition" minOccurs="0"/>
       </xs:sequence>
       <xs:attribute name="enabled" type="xs:boolean" default="0"/>
-      <xs:attribute name="ignoreOldTasks" type="xs:boolean" default="0"/>
-   </xs:complexType>
+		<xs:attribute name="ignoreOldTasks" type="xs:boolean" default="0"/>
+		<xs:attribute name="ignoreCustomFields" type="xs:boolean" default="0"/>
+	</xs:complexType>
    <xs:complexType name="EventsList">
       <xs:sequence>
          <xs:element name="event" type="tns:Events" minOccurs="0" maxOccurs="unbounded"/>

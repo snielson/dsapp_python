@@ -53,6 +53,7 @@ def initLogs(): # Set up all used logs
 	global mlog
 	global glog
 	global sudslog
+	global log
 
 	log = "/var/log/datasync"
 	# Mobility logs
@@ -83,12 +84,14 @@ def initDsappConfig(): # dsapp Conf / Logs
 	global dsappLog
 	global ghcLog
 	global soapDebugLog
+	global ghcSettings
 
 	dsappSettings = dsappConf + "/setting.cfg"
 	dsappLogSettings = dsappConf + "/logging.cfg"
 	dsappLog = dsappConf + "/dsapp.log"
 	ghcLog = dsappLogs + "/generalHealthCheck.log"
 	soapDebugLog = dsappLogs + '/soapResults.log'
+	ghcSettings = dsappConf + "/ghc_checks.cfg"
 
 def initMiscSettings(): # Misc variables
 	global serverinfo
@@ -105,6 +108,9 @@ def initMiscSettings(): # Misc variables
 	global INIT_NAME
 	global OS_VERSION_FILE
 	global installedConnector
+	global COMPANY_BU
+	global DISCLAIMER
+	global forceMode
 
 	serverinfo = "/etc/*release"
 	initScripts = "/etc/init.d/"
@@ -119,3 +125,38 @@ def initMiscSettings(): # Misc variables
 	INIT_NAME = 'datasync-'
 	OS_VERSION_FILE = '/etc/issue'
 	installedConnector = "/etc/init.d/datasync-connectors"
+	COMPANY_BU = 'Micro Focus'
+	DISCLAIMER = "%s accepts no liability for the consequences of any actions taken\n     by the use of this application. Use at your own discretion" % COMPANY_BU
+	forceMode = False
+
+def initDictonaries():
+	global XMLconfig
+	global authConfig
+	global ldapConfig
+	global dbConfig
+	global mobilityConfig
+	global gwConfig
+	global trustedConfig
+	global webConfig
+	XMLconfig = dict()
+	authConfig = dict()
+	ldapConfig = dict()
+	dbConfig = dict()
+	mobilityConfig = dict()
+	gwConfig = dict()
+	trustedConfig = dict()
+	webConfig = dict()
+
+def initMobilityDirectory():
+	global dirOptMobility
+	global dirEtcMobility
+	global dirVarMobility
+	global gmsLog
+	global dirPGSQL
+	global mAttach
+	dirOptMobility = "/opt/novell/datasync"
+	dirEtcMobility = "/etc/datasync"
+	dirVarMobility = "/var/lib/datasync"
+	# gmsLog = "/var/log/datasync"
+	dirPGSQL = "/var/lib/pgsql"
+	mAttach = dirVarMobility + "/mobility/attachments/"

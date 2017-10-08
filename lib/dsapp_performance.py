@@ -20,49 +20,12 @@ pydoc = imp.load_source('pydoc', os.path.dirname(os.path.realpath(__file__)) + '
 import tempfile
 import subprocess
 
-# Folder variables
-dsappDirectory = "/opt/novell/datasync/tools/dsapp"
-dsappConf = dsappDirectory + "/conf"
-dsappLogs = dsappDirectory + "/logs"
-dsapplib = dsappDirectory + "/lib"
-dsappBackup = dsappDirectory + "/backup"
-dsapptmp = dsappDirectory + "/tmp"
-dsappupload = dsappDirectory + "/upload"
-dsappdata = dsappDirectory + "/data"
-rootDownloads = "/root/Downloads"
-
-# Misc variables
-ds_1x= 1
-ds_2x = 2
-ds_14x = 14
-mobilityVersion = 0
-version = "/opt/novell/datasync/version"
-environ_db = dsapptmp + '/environ.sqlite'
-
-# Mobility Directories variables
-dirOptMobility = "/opt/novell/datasync"
-dirEtcMobility = "/etc/datasync"
-dirVarMobility = "/var/lib/datasync"
-log = "/var/log/datasync"
-dirPGSQL = "/var/lib/pgsql"
-mAttach = dirVarMobility + "/mobility/attachments/"
-
-# Mobility logs variables
-configenginelog = log + "/configengine/configengine.log"
-connectormanagerlog = log + "/syncengine/connectorManager.log"
-syncenginelog = log + "/syncengine/engine.log"
-monitorlog = log + "/monitorengine/monitor.log"
-systemagentlog = log + "/monitorengine/systemagent.log"
-updatelog = log + "/update.log"
-webadminlog = log + "/webadmin/server.log"
-mAlog = None
-gAlog = None
-mlog = None
-glog = None
-sudslog = log + "/connectors/suds.log"
+# Global variables
+import dsapp_global as glb
+environ_db = glb.dsapptmp + '/environ.sqlite'
 
 # Log Settings
-logging.config.fileConfig('%s/logging.cfg' % (dsappConf))
+logging.config.fileConfig('%s/logging.cfg' % (glb.dsappConf))
 logger = logging.getLogger('dsapp_Definitions')
 excep_logger = logging.getLogger('exceptions_log')
 perform_logger = logging.getLogger('performance_log')
@@ -73,50 +36,10 @@ def my_handler(type, value, tb):
 	excep_logger.error("Uncaught exception:\n%s" % ''.join(tmp).strip())
 	print (''.join(tmp).strip())
 
-# Define Variables for Eenou+ (2.x)
-def declareVariables2():
-	global mAlog
-	global gAlog
-	global mlog
-	global glog
-
-	logger.debug('Setting version variables for 2.X')
-	mAlog = log + "/connectors/mobility-agent.log"
-	gAlog = log + "/connectors/groupwise-agent.log"
-	mlog = log + "/connectors/mobility.log"
-	glog = log + "/connectors/groupwise.log"
-
-# Define Variables for Pre-Eenou (1.x)
-def declareVariables1():
-	global mAlog
-	global gAlog
-	global mlog
-	global glog
-
-	logger.debug('Setting version variables for 1.X')
-	mAlog = log + "/connectors/default.pipeline1.mobility-AppInterface.log"
-	gAlog = log + "/connectors/default.pipeline1.groupwise-AppInterface.log"
-	mlog = log + "/connectors/default.pipeline1.mobility.log"
-	glog = log + "/connectors/default.pipeline1.groupwise.log"
-
 def set_spinner():
 	spinner = spin.progress_bar_loading()
 	spinner.setDaemon(True)
 	return spinner
-
-def getDSVersion():
-	with open(version) as f:
-		value = f.read().split('.')[0]
-			
-	return int(value)
-
-def setVariables():
-	dsVersion = getDSVersion()
-	# Depends on version 1.x or 2.x
-	if dsVersion >= ds_1x:
-		declareVariables2()
-	else:
-		declareVariables1()
 
 # Parse logs, and build a list of dictionaries
 def getEnvrion(log=None):
@@ -125,8 +48,8 @@ def getEnvrion(log=None):
 
 	if log is None:
 		# Set the variables to the correct logs
-		setVariables()
-		log = mAlog
+		ds.setVariables()
+		log = glb.mAlog
 
 	# Get log size
 	logMB = os.path.getsize(log)/1024.0/1024.0
@@ -279,9 +202,9 @@ def getDeviceCommands(log):
 	pydoc.pager(out)
 
 	if ds.askYesOrNo("Output results to CSV"):
-		select_cmd = "sqlite3 -csv -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\", cmd as \"Command\", count(cmd) as \"Count\" from data group by userKey, cmd order by \"Count\" desc;' > %s/device_requests.csv" % (environ_db, dsappdata)
+		select_cmd = "sqlite3 -csv -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\", cmd as \"Command\", count(cmd) as \"Count\" from data group by userKey, cmd order by \"Count\" desc;' > %s/device_requests.csv" % (environ_db, glb.dsappdata)
 		out = ds.util_subprocess(select_cmd)
-		print ("Data exported to %s/device_requests.csv" % dsappdata)
+		print ("Data exported to %s/device_requests.csv" % glb.dsappdata)
 	print()
 	
 
@@ -299,7 +222,7 @@ def getPinglessDevices(log):
 	pydoc.pager(out)
 
 	if ds.askYesOrNo("Output results to CSV"):
-		select_cmd ="sqlite3 -csv -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\" from data where deviceid not in (select deviceid from data where cmd=\"Ping\") group by deviceid;' > %s/manualSync_devices.csv" % (environ_db, dsappdata)
+		select_cmd ="sqlite3 -csv -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\" from data where deviceid not in (select deviceid from data where cmd=\"Ping\") group by deviceid;' > %s/manualSync_devices.csv" % (environ_db, glb.dsappdata)
 		out = ds.util_subprocess(select_cmd)
-		print ("Data exported to %s/manualSync_devices.csv" % dsappdata)
+		print ("Data exported to %s/manualSync_devices.csv" % glb.dsappdata)
 	print()

@@ -90,6 +90,8 @@ file by physical or electronic mail, you may find current contact information at
 			<xs:element name="readHidden" type="xs:boolean" minOccurs="0"/>
 			<xs:element name="setup" type="xs:boolean" minOccurs="0"/>
 			<xs:element name="setupSecurity" type="xs:boolean" minOccurs="0"/>
+			<xs:element name="folders" type="xs:boolean" minOccurs="0"/>
+			<xs:element name="rules" type="xs:boolean" minOccurs="0"/>
 		</xs:sequence>
 	</xs:complexType>
 	<xs:complexType name="AccessRight">
@@ -164,6 +166,7 @@ file by physical or electronic mail, you may find current contact information at
 					<xs:element name="isFrequentContacts" type="xs:boolean" minOccurs="0"/>
 					<xs:element name="count" type="xs:int" minOccurs="0"/>
 					<xs:element name="includeInNCC" type="xs:boolean" minOccurs="0"/>
+					<xs:element name="sort" type="xs:string" minOccurs="0"/>
 				</xs:sequence>
 			</xs:extension>
 		</xs:complexContent>
@@ -183,6 +186,7 @@ file by physical or electronic mail, you may find current contact information at
 					<xs:element name="visibility" type="tns:Visibility" minOccurs="0"/>
 					<xs:element name="fileName" type="xs:string" minOccurs="0"/>
 					<xs:element name="xField" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+					<xs:element name="uid" type="xs:string" minOccurs="0"/>
 				</xs:sequence>
 				<xs:attribute name="external" type="xs:boolean"/>
 			</xs:extension>
@@ -223,6 +227,13 @@ file by physical or electronic mail, you may find current contact information at
 			  <xs:documentation> Alarm time is in seconds </xs:documentation>
 			</xs:annotation>
 			<xs:extension base="xs:int">
+				<xs:attribute name="enabled" type="xs:boolean"/>
+			</xs:extension>
+		</xs:simpleContent>
+	</xs:complexType>
+	<xs:complexType name="AlarmDate">
+		<xs:simpleContent>
+			<xs:extension base="xs:dateTime">
 				<xs:attribute name="enabled" type="xs:boolean"/>
 			</xs:extension>
 		</xs:simpleContent>
@@ -349,6 +360,7 @@ file by physical or electronic mail, you may find current contact information at
 					<xs:element name="iCalId" type="xs:string" minOccurs="0"/>
 					<xs:element name="flags" type="tns:ModifyFlags" minOccurs="0" maxOccurs="3"/>
 					<xs:element name="fileName" type="xs:string" minOccurs="0"/>
+					<xs:element name="travelTime" type="xs:unsignedInt" minOccurs="0"/>
 				</xs:sequence>
 			</xs:extension>
 		</xs:complexContent>
@@ -432,7 +444,8 @@ file by physical or electronic mail, you may find current contact information at
 			<xs:element name="completed" type="xs:dateTime" minOccurs="0"/>
 			<xs:element name="thread" type="xs:string" minOccurs="0"/>
 			<xs:element name="alarm" type="tns:Alarm" minOccurs="0"/>
-			<xs:element name="alarmDate" type="xs:dateTime" minOccurs="0"/>
+			<xs:element name="alarmDate" type="tns:AlarmDate" minOccurs="0"/>
+			<xs:element name="taskTimeOffset" type="xs:unsignedInt" minOccurs="0"/>
 		</xs:sequence>
 	</xs:complexType>
 	<xs:complexType name="ColumnSettings">
@@ -765,6 +778,7 @@ file by physical or electronic mail, you may find current contact information at
 			<xs:element name="bc" type="xs:string" minOccurs="0"/>
 			<xs:element name="recipients" type="tns:RecipientList" minOccurs="0"/>
 			<xs:element name="sendoptions" type="tns:SendOptions" minOccurs="0"/>
+			<xs:element name="replyOptions" type="tns:ReplyOptions" minOccurs="0"/>
 		</xs:sequence>
 	</xs:complexType>
 	<xs:simpleType name="DistributionType">
@@ -1007,6 +1021,12 @@ file by physical or electronic mail, you may find current contact information at
 			<xs:element name="hidden" type="xs:boolean" minOccurs="0"/>
 			<xs:element name="protected" type="xs:boolean" minOccurs="0"/>
 			<xs:element name="unnamed" type="xs:boolean" minOccurs="0"/>
+			<xs:element name="shareTree" type="xs:boolean" minOccurs="0"/>
+			<xs:element name="shareSub" type="xs:boolean" minOccurs="0"/>
+			<xs:element name="repairShareTree" type="xs:boolean" minOccurs="0"/>
+			<xs:element name="repairContents" type="xs:boolean" minOccurs="0"/>
+			<xs:element name="canTakeOwnership" type="xs:boolean" minOccurs="0"/>
+			<xs:element name="keepMeAsARecipient" type="xs:boolean" minOccurs="0"/>
 		</xs:sequence>
 	</xs:complexType>
 	<xs:complexType name="FolderList">
@@ -1158,6 +1178,7 @@ file by physical or electronic mail, you may find current contact information at
 			<xs:element ref="tns:email" minOccurs="0"/>
 			<xs:element name="distType" type="tns:DistributionType" minOccurs="0" default="TO"/>
 			<xs:element name="itemType" type="tns:ContactType" minOccurs="0" default="Contact"/>
+			<xs:element name="uid" type="xs:string" minOccurs="0"/>
 			<xs:element name="members" type="tns:GroupMemberList" minOccurs="0"/>
 		</xs:sequence>
 	</xs:complexType>
@@ -1178,6 +1199,19 @@ file by physical or electronic mail, you may find current contact information at
 			<xs:element name="port" type="xs:unsignedInt" minOccurs="0" maxOccurs="1"/>
 			<xs:element name="SSLRequired" type="xs:boolean" minOccurs="0"/>
 		</xs:sequence>
+	</xs:complexType>
+	<xs:complexType name="HostFreeBusy">
+		<xs:complexContent>
+			<xs:extension base="tns:Host">
+				<xs:sequence>
+					<xs:element name="domain" type="xs:string" minOccurs="0"/>
+					<xs:element name="postOffice" type="xs:string" minOccurs="0"/>
+					<xs:element name="idomain" type="xs:string" minOccurs="0"/>
+					<xs:element name="token" type="xs:string" minOccurs="0"/>
+					<xs:element name="users" type="tns:FreeBusyUserList"/>
+				</xs:sequence>
+			</xs:extension>
+		</xs:complexContent>
 	</xs:complexType>
 	<xs:simpleType name="Hour">
 		<xs:restriction base="xs:unsignedByte">
@@ -1421,6 +1455,8 @@ file by physical or electronic mail, you may find current contact information at
 	<xs:complexType name="LoginFlags">
 		<xs:sequence>
 			<xs:element name="SSLRequired" type="xs:boolean" minOccurs="0"/>
+			<xs:element name="misc" type="xs:boolean" minOccurs="0"/>
+			<xs:element name="extended" type="xs:boolean" minOccurs="0"/>
 		</xs:sequence>
 	</xs:complexType>
 	<xs:complexType name="LookupTable">
@@ -1486,6 +1522,8 @@ file by physical or electronic mail, you may find current contact information at
 		<xs:sequence>
 			<xs:element name="autoSaved" type="xs:boolean" minOccurs="0"/>
 			<xs:element name="protected" type="xs:boolean" minOccurs="0"/>
+			<xs:element name="duration" type="xs:boolean" minOccurs="0"/>
+			<xs:element name="noTimezone" type="xs:boolean" minOccurs="0"/>
 		</xs:sequence>
 	</xs:complexType>
 	<xs:simpleType name="MessageList">
@@ -1751,6 +1789,7 @@ file by physical or electronic mail, you may find current contact information at
 			<xs:element name="displayBirthdayYear" type="xs:boolean" minOccurs="0"/>
 			<xs:element name="displayAnniversaryYear" type="xs:boolean" minOccurs="0"/>
 			<xs:element name="timezone" type="tns:Timezone" minOccurs="0"/>
+			<xs:element name="photo" type="tns:PictureData" minOccurs="0"/>
 		</xs:sequence>
 	</xs:complexType>
 	<xs:complexType name="PhoneFlags">
@@ -1828,6 +1867,7 @@ file by physical or electronic mail, you may find current contact information at
 			<xs:element name="contentType" type="xs:string" minOccurs="0"/>
 			<xs:element name="size" type="xs:unsignedInt" minOccurs="0"/>
 			<xs:element name="data" type="xs:base64Binary" minOccurs="0"/>
+			<xs:element name="hash" type="xs:string" minOccurs="0"/>
 		</xs:sequence>
 	</xs:complexType>
 	<xs:complexType name="PlainText">
@@ -2097,6 +2137,11 @@ file by physical or electronic mail, you may find current contact information at
 			<xs:element name="referenceCount" type="xs:int" minOccurs="0"/>
 		</xs:sequence>
 	</xs:complexType>
+	<xs:complexType name="ReplyOptions">
+		<xs:sequence>
+			<xs:element name="replyToAll" type="xs:boolean" minOccurs="0"/>
+		</xs:sequence>
+	</xs:complexType>
 	<xs:complexType name="Resource">
 		<xs:complexContent>
 			<xs:extension base="tns:AddressBookItem">
@@ -2127,7 +2172,7 @@ file by physical or electronic mail, you may find current contact information at
 	<xs:complexType name="ReturnNotification">
 		<xs:annotation>
 			<xs:documentation>
-				A calendar item will have opened, accepted and decliened (not deleted)
+				A calendar item will have opened, accepted and declined (not deleted)
 				A box entry item will have opened and deleted
 			</xs:documentation>
 		</xs:annotation>
@@ -2153,6 +2198,7 @@ file by physical or electronic mail, you may find current contact information at
 			<xs:element name="delete" type="xs:boolean" minOccurs="0"/>
 			<xs:element name="share" type="xs:boolean" minOccurs="0"/>
 			<xs:element name="manage" type="xs:boolean" minOccurs="0"/>
+			<xs:element name="canTakeOwnership" type="xs:boolean" minOccurs="0"/>
 		</xs:sequence>
 	</xs:complexType>
 	<xs:complexType name="Rule">
@@ -2326,6 +2372,7 @@ file by physical or electronic mail, you may find current contact information at
 					<xs:element name="owner" type="tns:NameAndEmail" minOccurs="0"/>
 					<xs:element name="isSharedByMe" type="xs:boolean" minOccurs="0"/>
 					<xs:element name="isSharedToMe" type="xs:boolean" minOccurs="0"/>
+					<xs:element name="newOwnerGuid" type="tns:UUID"/>
 				</xs:sequence>
 			</xs:extension>
 		</xs:complexContent>
@@ -2465,6 +2512,7 @@ file by physical or electronic mail, you may find current contact information at
 					<xs:element name="taskPriority" type="xs:string" minOccurs="0"/>
 					<xs:element name="completed" type="xs:boolean" minOccurs="0"/>
 					<xs:element name="timezone" type="tns:Timezone" minOccurs="0"/>
+					<xs:element name="taskTimeOffset" type="xs:unsignedInt" minOccurs="0"/>
 				</xs:sequence>
 			</xs:extension>
 		</xs:complexContent>
@@ -2588,6 +2636,26 @@ file by physical or electronic mail, you may find current contact information at
 		</xs:annotation>
 		<xs:restriction base="xs:string"/>
 	</xs:simpleType>
+	<xs:complexType name="VacationRule">
+		<xs:complexContent>
+			<xs:extension base="tns:Rule">
+				<xs:sequence>
+					<xs:element ref="tns:subject" minOccurs="0"/>
+					<xs:element name="message" type="tns:MessageBody" minOccurs="0"/>
+					<xs:element name="replyToExternalUsers" type="xs:boolean" minOccurs="0"/>
+					<xs:element name="myContactsOnly" type="xs:boolean" minOccurs="0"/>
+					<xs:element name="appointmentId" type="tns:uid" minOccurs="0"/>
+					<xs:element name="externalSubject" type="xs:string" minOccurs="0"/>
+					<xs:element name="externalMessage" type="tns:MessageBody" minOccurs="0"/>
+					<xs:element name="startDay" type="xs:date" minOccurs="0"/>
+					<xs:element name="endDay" type="xs:date" minOccurs="0"/>
+					<xs:element ref="tns:startDate" minOccurs="0"/>
+					<xs:element ref="tns:endDate" minOccurs="0"/>
+					<xs:element name="timezone" type="tns:Timezone" minOccurs="0"/>
+				</xs:sequence>
+			</xs:extension>
+		</xs:complexContent>
+	</xs:complexType>
 	<xs:complexType name="Version">
 		<xs:complexContent>
 			<xs:extension base="tns:ContainerItem">
