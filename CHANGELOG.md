@@ -1,6 +1,4 @@
-## [Unreleased]
-
-## [247] - 2017-10-08
+## [247 - Unreleased] - 2017-10-08
 ### Added
 - Added more debug logging
 - Created CHANGELOG.md
