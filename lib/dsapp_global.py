@@ -8,7 +8,7 @@ __email__ = "snielson@projectuminfinitas.com"
 
 def initVersion():
 	global dsappversion
-	dsappversion='247'
+	dsappversion='248'
 
 def initFolders(): # Global Folder variables
 	global dsappDirectory
