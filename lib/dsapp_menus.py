@@ -156,7 +156,7 @@ def log_menu():
 			main_menu()
 
 def registerUpdate_menu():
-	menu = ['1. Register Mobility', '2. Update Mobility', '3. FTF options...', '\n     0. Back']
+	menu = ['1. Register Mobility', '2. Update Mobility', '3. FTF options..', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -319,7 +319,7 @@ def cuso_menu():
 ### End ### Sub menu for database_menu ###
 
 def certificate_menu():
-	menu = ['1. Generate CSR & Private key', '2. Generate self-signed certificate', '3. Apply certificates (Generate PEM)', '\n     4. Verify certificate / key pair', '\n     0. Back']
+	menu = ['1. Generate CSR & Private key', '2. Generate self-signed certificate', '3. Apply certificates (Generate PEM)', '4. Verify certificate / key pair', '\n     5. LetsEncrypt..','\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -329,24 +329,60 @@ def certificate_menu():
 		if choice == '1':
 			ds.createCSRKey()
 			print; ds.eContinue()
-		elif choice == '2': # TODO : Finish
+		elif choice == '2':
 			ds.pre_signCert()
 			print; ds.eContinue()
-		# elif choice == '3':
-		# 	ds.createCSRKey(True)
-		# 	print; ds.eContinue()
 		elif choice == '3':
 			ds.createPEM()
 			print; ds.eContinue()
 		elif choice == '4':
 			ds.verifyCertifiateMatch()
 			print; ds.eContinue()
+		elif choice == '5':
+		     letsEncrypt_menu()
 		elif choice == '0':
 			loop = False
 			main_menu()
 
+### Start ### Sub menu for letsEncrypt_menu ###
+def letsEncrypt_menu():
+	menu = ['1. Install acme.sh','2. Uninstall acme.sh', '3. Install certificate', '\n     4. Setup auto renew', '5. Uninstall auto renew', '\n     0. Back']
+	import dsapp_acme as acme
+	a = acme.acme()
+
+	available = build_avaialbe(menu)
+	loop = True
+	while loop:
+		show_menu(menu)
+		choice = get_choice(available)
+		if choice == '1':
+			ds.datasyncBanner()
+			a.setupAcme()
+			print; ds.eContinue()
+		elif choice == '2':
+			ds.datasyncBanner()
+			a.removeAcme()
+			print; ds.eContinue()
+		elif choice == '3':
+			ds.datasyncBanner()
+			a.autoIssue()
+			print; ds.eContinue()
+		elif choice == '4':
+			ds.datasyncBanner()
+			a.setAutoRenew()
+			print; ds.eContinue()
+		elif choice == '5':
+			ds.datasyncBanner()
+			a.uninstallAutoRenew()
+			print; ds.eContinue()
+		elif choice == '0':
+			loop = False
+			return
+
+### End ### Sub menu for letsEncrypt_menu ###
+
 def userIssue_menu():
-	menu = ['1. Monitor user sync options...', '2. GroupWise checks options...', '3. Remove & reinitialize users options...', '\n     4. User authentication issues', '5. Change user application name', '6. Change user FDN', '7. What deleted this (contact, email, folder, calendar)?', '8. Remove devices', '\n     0. Back']
+	menu = ['1. Monitor user sync options..', '2. GroupWise checks options..', '3. Remove & reinitialize users options..', '\n     4. User authentication issues', '5. Change user application name', '6. Change user FDN', '7. What deleted this (contact, email, folder, calendar)?', '8. Remove devices', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True
@@ -521,7 +557,7 @@ def userInfo_menu():
 			main_menu()
 
 def checksQueries_menu():
-	menu = ['1. General Health Check', '2. Nightly Maintenance Check', '\n     3. Show Sync Status', '4. GW pending events by User (consumerevents)', '5. Mobility pending events by User (syncevents)', '\n     6. Attachments...', '7. Performance...', '\n     0. Back']
+	menu = ['1. General Health Check', '2. Nightly Maintenance Check', '\n     3. Show Sync Status', '4. GW pending events by User (consumerevents)', '5. Mobility pending events by User (syncevents)', '\n     6. Attachments..', '7. Performance..', '\n     0. Back']
 
 	available = build_avaialbe(menu)
 	loop = True

@@ -88,7 +88,7 @@ def initDsappConfig(): # dsapp Conf / Logs
 
 	dsappSettings = dsappConf + "/setting.cfg"
 	dsappLogSettings = dsappConf + "/logging.cfg"
-	dsappLog = dsappConf + "/dsapp.log"
+	dsappLog = dsappLogs + "/dsapp.log"
 	ghcLog = dsappLogs + "/generalHealthCheck.log"
 	soapDebugLog = dsappLogs + '/soapResults.log'
 	ghcSettings = dsappConf + "/ghc_checks.cfg"

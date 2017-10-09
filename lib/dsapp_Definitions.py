@@ -3103,23 +3103,31 @@ def createPEM(sign = None, commonName = None, keyPass = None, key = None, crt = 
 		logger.debug("Running certificate install..")
 		configureMobilityCerts(path)
 
-def configureMobilityCerts(path):
+def configureMobilityCerts(path, prompts=True):
+	DATE = datetime.datetime.now().strftime('%y-%m-%d')
 	certInstall = False
-	datasyncBanner()
+	if prompts:
+		datasyncBanner()
 
 	if askYesOrNo("Implement pem certificate with Mobility devices"):
+		logger.info("Backing up current mobility.pem")
+		shutil.copy(glb.dirVarMobility + '/device/mobility.pem',glb.dirVarMobility + '/device/mobility.pem.' + DATE)
+
 		shutil.copy(path + '/mobility.pem', glb.dirVarMobility + '/device/mobility.pem')
 		print ("Copied mobility.pem to %s/device/mobility.pem" % glb.dirVarMobility)
 		logger.info("Copied %s/mobility.pem to %s/device/mobility.pem" % (path, glb.dirVarMobility))
 		certInstall = True
 
 	if askYesOrNo("\nImplement pem certificate with Mobility web admin"):
+		logger.info("Backing up current server.pem")
+		shutil.copy(glb.dirVarMobility + '/webadmin/server.pem',glb.dirVarMobility + '/webadmin/server.pem.' + DATE)
+
 		shutil.copy(path + '/mobility.pem', glb.dirVarMobility + '/webadmin/server.pem')
 		print ("Copied mobility.pem to %s/webadmin/server.pem" % glb.dirVarMobility)
 		logger.info("Copied %s/mobility.pem to %s/webadmin/server.pem" % (path, glb.dirVarMobility))
 		certInstall = True
 
-	if certInstall:
+	if certInstall and prompts:
 		if askYesOrNo("\nDo you want to restart Mobility services now"):
 			rcDS('restart')
 		else:
@@ -3195,6 +3203,7 @@ def verifyCertifiateMatch(key = None, keyPass = None, crt = None, path = None):
 		print ("\nInvalid: Public certificate and private key mismatch")
 		logger.warning("Public certificate and private key mismatch")
 		return False
+
 
 ##################################################################################################
 #	End of Certificate

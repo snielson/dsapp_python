@@ -2,13 +2,16 @@
 ### Added
 - Added more debug logging
 - Created CHANGELOG.md
+- Created new acme class which uses Neilpang acme.sh
+- Created new LetsEncrypt sub menu under Certificates
 
 ### Changed
-- Removed user to delete multiple users at once
-- Regex to use word boundary
+- Removed user can now delete multiple users at once (in database)
+- Regex to use word boundary to find exact match in database
 - Fatal exits to print error on screen
 - Changed SOAP to use latest 2014 wsdl
 - Moved all variables over to a global file
+- Changed ghc certificate date tolerance to 30 days
 
 ### Fixed
 - Version in loginRequest. This is now works up to Groupwise 18.0.0

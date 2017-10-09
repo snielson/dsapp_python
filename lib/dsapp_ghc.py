@@ -1465,7 +1465,8 @@ def ghc_verifyCertificates():
 	devCert = glb.dirVarMobility + "/device/mobility.pem"
 	webCert = glb.dirVarMobility + "/webadmin/server.pem"
 	CACert = glb.dirVarMobility + "/common/CA/trustedroot.pem"
-	dateTolerance = 7776000
+	# dateTolerance = 7776000 # 90 days
+	dateTolerance = 2592000 # 30 days
 
 	# Verify cert path
 	no_dev = False

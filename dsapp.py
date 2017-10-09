@@ -642,7 +642,6 @@ if DEBUG_ENABLED:
 
 if len(sys.argv) == 1 or args.force:
 	import dsapp_menus as menus
-	# menus.getConfigs(glb.dbConfig, glb.ldapConfig, glb.mobilityConfig, glb.gwConfig, glb.trustedConfig, glb.XMLconfig, glb.config_files, glb.webConfig, glb.authConfig)
 	menus.main_menu()
 
 sys.exit(0)
