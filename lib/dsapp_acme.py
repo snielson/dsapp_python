@@ -63,6 +63,37 @@ class acme:
 				logger.info("Setting DNS to [%s]" % userInput)
 				return True
 
+	def is_socatInstalled(self):
+		cmd = "which socat >/dev/null 2>&1; echo $?"
+		out = ds.util_subprocess(cmd)
+		return not bool(int(out[0]))
+
+	def installSocat(self):
+		installed = False
+		if not self.is_socatInstalled():
+			print ("Please install socat first")
+			logger.warning("Please install socat first")
+
+			if ds.askYesOrNo("Install socat now"):
+				cmd = "zypper --non-interactive install socat"
+				out = ds.util_subprocess(cmd)
+				logger.debug("Running cmd: %s" % cmd)
+				if not self.is_socatInstalled():
+					print ('Failed to install socat')
+					logger.error('Failed to install socat')
+					installed = False
+				else:
+					print ("socat successfully installed\n")
+					logger.info("socat successfully installed")
+					installed = True
+			else:
+				installed = False
+		else:
+			installed = True
+
+		return installed
+
+
 	def printScript(self):
 		print (self.acmeScript)
 
@@ -131,6 +162,9 @@ class acme:
 			logger.info("Uninstall complete")
 
 	def issueCertificate(self, forced=False):
+		if not self.installSocat():
+			return
+
 		success = False
 		if self.DNS is None:
 			if not self.setDNS():
@@ -192,6 +226,10 @@ class acme:
 		print ("mobility.pem created at %s/" % self.certPath)
 
 	def autoIssue(self, forced=False):
+		# Make sure socat is installed
+		if not self.installSocat():
+			return
+
 		# Make sure acme root is setup
 		if not os.path.isdir(self.acmeRoot):
 			print ("acme.sh is not installed. Please install")

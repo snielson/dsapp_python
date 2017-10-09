@@ -1,3 +1,7 @@
+## [248 - Unreleased] - 2017-10-09
+### Fixed
+- dsapp_acme.py now prompts to install socat for LetsEncrypt functionality
+
 ## [247] - 2017-10-09
 ### Added
 - Added more debug logging
