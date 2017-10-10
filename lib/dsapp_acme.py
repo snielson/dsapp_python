@@ -266,7 +266,7 @@ class acme:
 
 	def setAutoRenew(self):
 		cronFile = "/etc/cron.d/dsapp_acme"
-		cronFormat = "0 %s * * * /root/.acme.sh/auto-renew.sh %s %s %s >/dev/null 2>&1"
+		cronFormat = "0 %s * * %s /root/.acme.sh/auto-renew.sh %s %s %s >/dev/null 2>&1"
 		print ("Auto renew will shutdown mobility if certificate need to update")
 		if not ds.askYesOrNo("Set up auto renew now"):
 			return
@@ -286,21 +286,22 @@ class acme:
 		if self.DNS is None:
 			self.setDNS()
 
+		day = self.getDay()
 		# Get hour from 0-23 for when crontab should run (will restart mobility if needed)
-		hour = raw_input("Hour to check certificates (0-23): ")
-		if 0 <= int(hour) <= 23:
-			print ("Cron will run at [0 %s * * *]" % hour)
-			logger.info("Cron will run at [0 %s * * *]" % hour)
-		else:
-			print ("Invalid hour: %s" % hour)
-			logger.error("Invalid hour: %s" % hour)
+		hour = raw_input("\nHour to check certificates (0-23): ")
+		if hour == "" or not 0 <= int(hour) <= 23:
+			print ("Invalid hour %s" % hour)
+			logger.error("Invalid hour %s" % hour)
 			return
 
-		# Get date to rewnew
-		defaultrenewDate = 20
-		renewDate = raw_input ("Day tolerance for renew (below 60) [%s]: " % defaultrenewDate)
-		if renewDate == "":
-			renewDate = defaultrenewDate
+		# # Get date to rewnew
+		# defaultrenewDate = 20
+		# renewDate = raw_input ("Day tolerance for renew (below 60) [%s]: " % defaultrenewDate)
+		# if renewDate == "":
+		# 	renewDate = defaultrenewDate
+
+		# default to 14 days
+		renewDate = 20
 
 		# if not renewDate >= 1 or not renewDate <= 59:
 		if not 1 <= int(renewDate) <= 59:
@@ -309,12 +310,13 @@ class acme:
 			return
 
 		# Copy auto-renew.sh into place
-		print ("Copying %s to %s" % (glb.dsapplib + "/scripts/auto-renew.sh", self.acmeRoot))
+		print ("\nCopying %s to %s" % (glb.dsapplib + "/scripts/auto-renew.sh", self.acmeRoot))
 		logger.info("Copying %s to %s" % (glb.dsapplib + "/scripts/auto-renew.sh", self.acmeRoot))
 		shutil.copy(glb.dsapplib + "/scripts/auto-renew.sh", self.acmeRoot)
 
 		# Write new cron.d file
-		cron = cronFormat % (hour, self.DNS, renewDate, glb.mobilityConfig['mPort'])
+		cron = cronFormat % (hour, day, self.DNS, renewDate, glb.mobilityConfig['mPort'])
+		logger.info("Cron will run at [0 %s * * %s]" % (hour, day))
 		print ("Creating new cron file at %s" % cronFile)
 		logger.info("Creating new file at %s" % cronFile)
 		logger.debug("Writing to file: %s" % cron)
@@ -335,3 +337,36 @@ class acme:
 			removed = True
 		if not removed:
 			print ("Nothing to remove")
+
+	def getDay(self):
+		# Build list and prompt
+		space="   "
+		days = ['%sMonday' % space, '%sTuesday' % space, '%sWednesday' % space, '%sThursday' % space, '%sFriday' % space, '%sSaturday' % space, '%sSunday' % space]
+		day = None
+		available = ds.build_avaiable(days, startWith=1)
+		choice = None
+
+		# print list
+		print ("\nDay to run certificiate check:\n")
+		for x in range(len(days)):
+			print ("%s%s.%s" % (space, x + 1, days[x]))
+
+		choice = ds.get_choice(available, no_exit=True, selectionSpace="")
+		logger.debug("Selected choice: %s" % choice)
+		
+		if choice == 1:
+			day = 'MON'
+		elif choice == 2:
+			day = 'TUE'
+		elif choice == 3:
+			day = 'WED'
+		elif choice == 4:
+			day = 'THU'
+		elif choice == 5:
+			day = 'FRI'
+		elif choice == 6:
+			day = 'SAT'
+		elif choice == 7:
+			day = 'SUN'
+
+		return day

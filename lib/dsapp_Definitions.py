@@ -3427,10 +3427,11 @@ def getApplicationNames(userConfig):
 	conn.close()
 	return userConfig
 
-def build_avaiable(list):
+def build_avaiable(list, startWith=0):
 	available = []
 	for i in range(len(list)):
-		available.append('%s' % i)
+		num = i + startWith
+		available.append('%s' % num)
 	return available
 
 def printList(list, exitTxt = 'Back'):
@@ -3441,9 +3442,9 @@ def printList(list, exitTxt = 'Back'):
 			count += 1
 		print ("\n     q. %s" % exitTxt)
 
-def get_choice(available, special=None):
+def get_choice(available, special=None, no_exit=False, selectionSpace="     "):
 	if len(available) <= 9:
-		print ("\n     Selection: ", end='')
+		print ("\n%sSelection: " % selectionSpace, end='')
 	while True:
 		if len(available) <= 9:
 			choice = getch()
@@ -3452,16 +3453,18 @@ def get_choice(available, special=None):
 				return special
 			elif choice in available or choice == 'q' or choice == 'Q':
 				if choice == 'q' or choice == 'Q':
-					print()
-					return
+					if not no_exit:
+						print()
+						return
 				else:
 					print()
 					return int(choice)
 		else:
-			choice = raw_input("\n     Selection: ")
+			choice = raw_input("\n%sSelection: " % selectionSpace)
 			if choice == 'q' or choice == 'Q':
-				print()
-				return
+				if not no_exit:
+					print()
+					return
 			elif choice in available and choice.isdigit():
 				print()
 				return int(choice)
