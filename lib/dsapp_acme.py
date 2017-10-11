@@ -48,6 +48,9 @@ class acme:
 		self.certPath = None
 		self.sslKey = None
 		self.sslFullChain = None
+		self.acmeInstalled = False
+		self.cronInstalled = False
+
 
 	def setDNS(self):
 		pattern = re.compile("^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
@@ -67,6 +70,26 @@ class acme:
 		cmd = "which socat >/dev/null 2>&1; echo $?"
 		out = ds.util_subprocess(cmd)
 		return not bool(int(out[0]))
+
+	def is_acmeInstallsed(self):
+		if os.path.isdir(self.acmeRoot) and os.path.isfile(self.acmeRoot + '/acme.sh'):
+			self.acmeInstalled = True
+		else:
+			self.acmeInstalled = False
+
+	def is_cronInstalled(self):
+		if os.path.isfile('/etc/cron.d/dsapp_acme'):
+			self.cronInstalled = True
+		else:
+			self.cronInstalled = False
+
+	def getAcmeInstalled(self):
+		self.is_acmeInstallsed()
+		return self.acmeInstalled
+
+	def getCronInstalled(self):
+		self.is_cronInstalled()
+		return self.cronInstalled
 
 	def installSocat(self):
 		installed = False

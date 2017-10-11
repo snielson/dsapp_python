@@ -346,35 +346,50 @@ def certificate_menu():
 
 ### Start ### Sub menu for letsEncrypt_menu ###
 def letsEncrypt_menu():
-	menu = ['1. Install acme.sh','2. Uninstall acme.sh', '3. Install certificate', '\n     4. Setup auto renew', '5. Uninstall auto renew', '\n     0. Back']
 	import dsapp_acme as acme
 	a = acme.acme()
-
-	available = build_avaialbe(menu)
+	
 	loop = True
 	while loop:
+
+		# Make dynamic menu
+		if a.getAcmeInstalled():
+			is_acmeInstalled = "Uninstall"
+		else:
+			is_acmeInstalled = "Install"
+		if a.getCronInstalled():
+			is_cronInstalled = "Uninstall"
+		else:
+			is_cronInstalled = "Setup"
+	# Dynamic menu based on acme or cron installed
+		menu = ['1. %s acme.sh' % is_acmeInstalled, '2. Issue certificate', '\n     3. %s auto renew' % is_cronInstalled, '\n     0. Back']
+
+		available = build_avaialbe(menu)
+	
 		show_menu(menu)
 		choice = get_choice(available)
 		if choice == '1':
-			ds.datasyncBanner()
-			a.setupAcme()
-			print; ds.eContinue()
+			if not a.getAcmeInstalled():
+				ds.datasyncBanner()
+				a.setupAcme()
+				print; ds.eContinue()
+			else:
+				ds.datasyncBanner()
+				a.removeAcme()
+				print; ds.eContinue()
 		elif choice == '2':
-			ds.datasyncBanner()
-			a.removeAcme()
-			print; ds.eContinue()
-		elif choice == '3':
 			ds.datasyncBanner()
 			a.autoIssue()
 			print; ds.eContinue()
-		elif choice == '4':
-			ds.datasyncBanner()
-			a.setAutoRenew()
-			print; ds.eContinue()
-		elif choice == '5':
-			ds.datasyncBanner()
-			a.uninstallAutoRenew()
-			print; ds.eContinue()
+		elif choice == '3':
+			if not a.getCronInstalled():
+				ds.datasyncBanner()
+				a.setAutoRenew()
+				print; ds.eContinue()
+			else:
+				ds.datasyncBanner()
+				a.uninstallAutoRenew()
+				print; ds.eContinue()
 		elif choice == '0':
 			loop = False
 			return
