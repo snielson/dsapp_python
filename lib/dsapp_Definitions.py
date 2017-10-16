@@ -81,7 +81,7 @@ colorRED = "\033[01;31m{0}\033[00m"
 colorYELLOW = "\033[01;33m{0}\033[00m"
 colorBLUE = "\033[01;34m{0}\033[00m"
 
-def dsappExitError(message=None, exit=True, printMessage=False):
+def dsappExitError(message=None, exit=True, printMessage=False, writeLog=True):
 	ERROR_MSG1 = "\n\ndsapp has encountered an error. See log for more details\n%s/dsapp.log" % glb.dsappLogs
 	ERROR_MSG2 = "\n\ndsapp has encountered an error."
 
@@ -91,7 +91,8 @@ def dsappExitError(message=None, exit=True, printMessage=False):
 			print("Error: %s" % message)
 		else:
 			print (ERROR_MSG1)
-		logger.error(message)
+		if writeLog:
+			logger.error(message)
 	else:
 		print (ERROR_MSG1)
 	if exit:
@@ -1105,6 +1106,7 @@ def getDecrypted(check_path, tree, pro_path, host=None, force=False):
 
 def isProtected(tree, pro_path):
 	protected = xmlpath(pro_path, tree)
+	logger.debug("Protected path: %s" % pro_path)
 	logger.debug("Protected = %s" % protected)
 	if protected is None:
 		return False
@@ -4614,3 +4616,13 @@ def removeDevice(userConfig = None):
 
 	print ("Removal complete\n")
 	eContinue()
+
+def check_XML(xmlFile):
+	xmllint = "xmllint --noout %s"
+	cmd = xmllint % xmlFile
+	out = util_subprocess(cmd, True)
+	if out[1] and not out[0]:
+		logger.error("Problem with %s" % xmlFile)
+		return False
+	logger.debug("%s valid" % xmlFile)
+	return True

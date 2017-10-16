@@ -346,6 +346,18 @@ glb.initDictonaries()
 
 ds.datasyncBanner()
 
+# Verify XML files
+if not ds.check_XML(glb.config_files['mconf']):
+	ds.dsappExitError("Problem with %s" % glb.config_files['mconf'], exit=True, printMessage=True, writeLog=False)
+if not ds.check_XML(glb.config_files['econf']):
+	ds.dsappExitError("Problem with %s" % glb.config_files['econf'], exit=True, printMessage=True, writeLog=False)
+if not ds.check_XML(glb.config_files['ceconf']):
+	ds.dsappExitError("Problem with %s" % glb.config_files['ceconf'], exit=True, printMessage=True, writeLog=False)
+if not ds.check_XML(glb.config_files['wconf']):
+	ds.dsappExitError("Problem with %s" % glb.config_files['wconf'], exit=True, printMessage=True, writeLog=False)
+if not ds.check_XML(glb.config_files['gconf']):
+	ds.dsappExitError("Problem with %s" % glb.config_files['gconf'], exit=True, printMessage=True, writeLog=False)
+
 # XML tree of each XML file
 logger.info('Building XML trees started')
 time1 = time.time()

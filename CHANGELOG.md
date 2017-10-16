@@ -1,4 +1,8 @@
 ## [248] - 2017-10-09
+### Added
+- xmllint ran on main XML files before starting
+- Protected path in debug logging
+
 ### Fixed
 - dsapp_acme.py now prompts to install socat for LetsEncrypt functionality
 
