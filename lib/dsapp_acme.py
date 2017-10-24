@@ -204,8 +204,8 @@ class acme:
 				success = True
 
 		if not success:
-			print ("\nFaield to setup LetsEncrypt certificate")
-			logger.error("Faield to setup LetsEncrypt certificate")
+			print ("\nFailed to setup LetsEncrypt certificate")
+			logger.error("Failed to setup LetsEncrypt certificate")
 
 		return success
 
