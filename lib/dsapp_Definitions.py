@@ -1425,6 +1425,7 @@ def createDatabases():
 	
 
 	# comment
+	# new
 
 	# Opening connection with datasync database
 	print('\nExtending schema..')
