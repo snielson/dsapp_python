@@ -1432,6 +1432,8 @@ def createDatabases():
 	cur.execute(open(glb.dirOptMobility + '/common/sql/postgresql/datasync.sql', 'r').read())
 	print('Extending schema on datasync done')
 	logger.info('Extending schema on datasync complete')
+	logger.debug("Extending schema with: %s" % (glb.dirOptMobility + '/common/sql/postgresql/configengine.sql'))
+	logger.debug("Extending schema with: %s" % (glb.dirOptMobility + '/common/sql/postgresql/datasync.sql'))
 
 	DATE = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 	with open(glb.gmsVersion, 'r') as f:
