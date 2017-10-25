@@ -1422,10 +1422,6 @@ def createDatabases():
 		logger.info('dsmonitor database created')
 	cur.close()
 	conn.close()
-	
-
-	# comment
-	# new
 
 	# Opening connection with datasync database
 	print('\nExtending schema..')
