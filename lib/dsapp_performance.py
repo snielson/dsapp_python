@@ -192,14 +192,13 @@ def getDeviceCommands(log):
 	create_QueryString_table(log)
 
 	# Create tempfile for large tables
-	name = tempfile.TemporaryFile(mode='w+b')
-
-	select_cmd = "sqlite3 -column -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\", cmd as \"Command\", count(cmd) as \"Count\" from data group by userKey, cmd order by \"Count\" desc;'" % environ_db
-	p = subprocess.Popen(select_cmd, shell=True, stdout=name)
-	p.wait()
-	name.seek(0)
-	out = name.read()
-	pydoc.pager(out)
+	with tempfile.TemporaryFile(mode='w+b') as name:
+		select_cmd = "sqlite3 -column -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\", cmd as \"Command\", count(cmd) as \"Count\" from data group by userKey, cmd order by \"Count\" desc;'" % environ_db
+		p = subprocess.Popen(select_cmd, shell=True, stdout=name)
+		p.wait()
+		name.seek(0)
+		out = name.read()
+		pydoc.pager(out)
 
 	if ds.askYesOrNo("Output results to CSV"):
 		select_cmd = "sqlite3 -csv -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\", cmd as \"Command\", count(cmd) as \"Count\" from data group by userKey, cmd order by \"Count\" desc;' > %s/device_requests.csv" % (environ_db, glb.dsappdata)
@@ -212,14 +211,13 @@ def getPinglessDevices(log):
 	create_QueryString_table(log)
 
 	# Create tempfile for large tables
-	name = tempfile.TemporaryFile(mode='w+b')
-
-	select_cmd ="sqlite3 -column -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\" from data where deviceid not in (select deviceid from data where cmd=\"Ping\") group by deviceid;'" % environ_db
-	p = subprocess.Popen(select_cmd, shell=True, stdout=name)
-	p.wait()
-	name.seek(0)
-	out = name.read()
-	pydoc.pager(out)
+	with tempfile.TemporaryFile(mode='w+b') as name:
+		select_cmd ="sqlite3 -column -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\" from data where deviceid not in (select deviceid from data where cmd=\"Ping\") group by deviceid;'" % environ_db
+		p = subprocess.Popen(select_cmd, shell=True, stdout=name)
+		p.wait()
+		name.seek(0)
+		out = name.read()
+		pydoc.pager(out)
 
 	if ds.askYesOrNo("Output results to CSV"):
 		select_cmd ="sqlite3 -csv -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\" from data where deviceid not in (select deviceid from data where cmd=\"Ping\") group by deviceid;' > %s/manualSync_devices.csv" % (environ_db, glb.dsappdata)

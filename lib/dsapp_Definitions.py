@@ -339,14 +339,21 @@ def pgrep(search, filePath, flag=0):
 		return results
 
 def util_subprocess(cmd, error=False):
-	if not error:
-		p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
-		p.wait()
-		out = p.communicate()
-	elif error:
-		p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-		p.wait()
-		out = p.communicate()
+	out = []
+	with tempfile.TemporaryFile(mode='w+b') as name:
+		if not error:
+			p = subprocess.Popen(cmd, shell=True, stdout=name)
+			p.wait()
+			name.seek(0)
+			out.append(name.read())
+		elif error:
+			with tempfile.TemporaryFile(mode='w+b') as errorName:
+				p = subprocess.Popen(cmd, shell=True, stdout=name, stderr=errorName)
+				p.wait()
+				name.seek(0)
+				out.append(name.read())
+				errorName.seek(0)
+				out.append(errorName.read())
 	return out
 
 def print_there(x, y, text):
@@ -1442,6 +1449,7 @@ def createDatabases():
 	INSERT = "INSERT INTO services (service, initial_version, initial_timestamp, previous_version, previous_timestamp, service_version, service_timestamp) VALUES ('Mobility','', '%(DATE)s', '%(VERSION)s', '%(DATE)s', '%(VERSION)s', '%(DATE)s');" % command
 	cur.execute(INSERT)
 	print("Added service record")
+	logger.debug("Added service: %s" % INSERT)
 	logger.info('Added service record to datasync')
 	cur.close()
 	conn.close()
@@ -1450,6 +1458,7 @@ def createDatabases():
 	conn = getConn('mobility')
 	cur = conn.cursor()
 	cur.execute(open(glb.dirOptMobility + '/syncengine/connectors/mobility/mobility_pgsql.sql', 'r').read())
+	logger.debug("Extending schema with: %s" % (glb.dirOptMobility + '/syncengine/connectors/mobility/mobility_pgsql.sql'))
 	print('Extending schema on mobility done')
 	logger.info('Extending schema on mobility complete')
 	cur.close()
@@ -1459,6 +1468,7 @@ def createDatabases():
 		conn = getConn('dsmonitor')
 		cur = conn.cursor()
 		cur.execute(open(glb.dirOptMobility + '/monitorengine/sql/monitor.sql', 'r').read())
+		logger.debug("Extending schema with: %s" % (glb.dirOptMobility + '/monitorengine/sql/monitor.sql'))
 		print('Extending schema on dsmonitor done')
 		logger.info('Extending schema on dsmonitor complete')
 		cur.close()
@@ -1472,6 +1482,7 @@ def createSpecificDatabases(database):
 	conn = getConn('postgres')
 	cur = conn.cursor()
 	cur.execute("CREATE DATABASE %s" % database)
+	logger.info("%s database created" % database)
 	cur.close()
 	conn.close()
 
