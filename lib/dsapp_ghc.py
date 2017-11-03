@@ -1000,7 +1000,7 @@ def ghc_checkDiskSpace():
 		msg = "\nSystem is low on disk space\n"
 		ghc_util_passFail('warning', msg)
 	elif problem:
-		msg + "\nSystem is out of space\n"
+		msg = "\nSystem is out of space\n"
 		ghc_util_passFail('failed', msg)
 	elif not problem:
 		ghc_util_passFail('passed')
@@ -1245,22 +1245,22 @@ def ghc_checkVMWare():
 	logger.debug("Operation took %0.3f ms" % ((time2 - time1) * 1000))
 
 def ghc_checkDiskIO():
-	ghc_util_NewHeader("Checking Disk IO..")
+	ghc_util_NewHeader("Checking Disk Read Speed..")
 	time1 = time.time()
 	problem = False
 
 	cmd = "hdparm -t `df -P /var | tail -1 | cut -d ' ' -f1`"
 	out = ghc_util_subprocess(cmd)
 
-	logger.info("Disk IO %s MB/sec" % out[0].split(' ')[-1-1])
+	logger.info("Disk read speed %s MB/sec" % out[0].split(' ')[-1-1])
 	if float(out[0].split(' ')[-1-1]) <= 13.33:
 		problem = 'warning'
 
 	if problem == 'warning':
-		msg = "Disk IO appears to be slow\nSee TID 7009812 - Slow Performance of Mobility during peak hours\n"
+		msg = "Disk read speed appears to be slow\nSee TID 7009812 - Slow Performance of Mobility during peak hours\n"
 		ghc_util_passFail('warning', msg)
 	elif not problem:
-		msg = "Disk IO meets recommended MB/sec\n"
+		msg = "Disk read speed meets recommended MB/sec\n"
 		ghc_util_passFail('passed', msg)
 
 	time2 = time.time()
