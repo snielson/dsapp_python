@@ -302,15 +302,22 @@ def getVersion(isInstalled):
 			logger.error('Unable to find: ' + glb.gmsVersion)
 			sys.exit(1)
 
-def getFilePath(prompt):
+def getFilePath(prompt, default=None):
 	while True:
-		filePath = autoCompleteInput(prompt)
+		if default is not None:
+			defaultPath = default
+			filePath = autoCompleteInput ("%s [%s]: " % (prompt, default))
+			if filePath == "":
+				filePath = defaultPath
+		else:
+			filePath = autoCompleteInput ("%s" % prompt) 
 		if not os.path.isfile (filePath):
 			if not askYesOrNo("Invalid path. Try again"):
 				filePath = None
 				break
 		else:
 			break
+			
 	return filePath
 
 def findReplace(find, replace, filePath):
@@ -320,11 +327,14 @@ def findReplace(find, replace, filePath):
 def complete(text, state):
 	return (glob.glob(text+'*')+[None])[state]
 
-def autoCompleteInput(text):
+def autoCompleteInput(text, default=None):
 	readline.set_completer_delims(' \t\n;')
 	readline.parse_and_bind("tab: complete")
 	readline.set_completer(complete)
-	user_input = raw_input('%s' % text)
+	if default is not None:
+		user_input = raw_input('%s [%s]' % (text, default))
+	else:
+		user_input = raw_input('%s' % text)
 	return user_input
 
 def pgrep(search, filePath, flag=0):
@@ -514,6 +524,9 @@ def askYesOrNo(question, default=None):
     except KeyboardInterrupt:
     	logger.warning("KeyboardInterrupt detected")
 
+def getFileExtension(fileName):
+	return os.path.splitext(fileName)[1]
+
 def unzip_file(fileName):
 	with contextlib.closing(zipfile.ZipFile(fileName, 'r')) as z:
 	    z.extractall()
@@ -523,7 +536,7 @@ def untar_file(fileName, extractPath="."):
 		tar.extractall(path=extractPath)
 
 def uncompressIt(fileName):
-	extension = os.path.splitext(fileName)[1]
+	extension = getFileExtension(fileName)
 	options = {'.tar': untar_file,'.zip': unzip_file, '.tgz': untar_file}
 	logger.debug("Uncompressing %s with %s extension" % (fileName, extension))
 	options[extension](fileName)
@@ -537,7 +550,7 @@ def tar_content(fileName):
 		return tar.getnames()
 
 def file_content(fileName):
-	extension = os.path.splitext(fileName)[1]
+	extension = getFileExtension(fileName)
 	options = {'.tar': tar_content,'.zip': zip_content, '.tgz': tar_content}
 	logger.debug("Getting %s content with %s extension" % (fileName, extension))
 	return options[extension](fileName)
@@ -1442,7 +1455,7 @@ def createDatabases():
 	logger.debug("Extending schema with: %s" % (glb.dirOptMobility + '/common/sql/postgresql/configengine.sql'))
 	logger.debug("Extending schema with: %s" % (glb.dirOptMobility + '/common/sql/postgresql/datasync.sql'))
 
-	DATE = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+	DATE = datetime.datetime.now().strftime('%Y%m%dT%H%M%S')
 	with open(glb.gmsVersion, 'r') as f:
 		VERSION = f.read()
 	command = {'DATE': DATE, 'VERSION': VERSION}
@@ -3119,7 +3132,7 @@ def createPEM(sign = None, commonName = None, keyPass = None, key = None, crt = 
 		configureMobilityCerts(path)
 
 def configureMobilityCerts(path, prompts=True):
-	DATE = datetime.datetime.now().strftime('%y-%m-%d')
+	DATE = datetime.datetime.now().strftime('%Y%m%dT%H%M%S')
 	certInstall = False
 	if prompts:
 		datasyncBanner()
@@ -3899,7 +3912,7 @@ def getLogs():
 	compress_it.append(glb.ghcLog)
 
 	# Compress log files
-	DATE = datetime.datetime.now().strftime('%m-%d-%y_%H%M%S')
+	DATE = datetime.datetime.now().strftime('%Y%m%dT%H%M%S')
 	os.chdir(glb.dsappupload)
 
 	print ("\nCompressing logs for upload..")

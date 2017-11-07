@@ -12,6 +12,9 @@ import logging, logging.config
 import ast
 import dsapp_Definitions as ds
 import re
+import gzip
+import datetime
+import contextlib
 import spin
 import time
 import sqlite3
@@ -72,27 +75,53 @@ def getEnvrion(log=None):
 	conn.commit()
 	conn_flush = 0
 
-	with open(log, 'r') as inf:
-		for line in inf:
-			if '[Server] environ' in line:
-				tempLine = line.strip()
-				environ_dict = ("{%s}\n" % tempLine.split('{')[1].split('}')[0])
-				if environ_dict is not None:
-					newLine = regex.sub("'*****'", environ_dict)
-					try:
-						temp_dict = [ast.literal_eval(newLine)]
-					except:
-						perform_logger.warning("Syntax Error!\n%s" % newLine)
+	extension = ds.getFileExtension(log)
+	if extension == '.log':
+		with open(log, 'r') as inf:
+			for line in inf:
+				if '[Server] environ' in line:
+					tempLine = line.strip()
+					environ_dict = ("{%s}\n" % tempLine.split('{')[1].split('}')[0])
+					if environ_dict is not None:
+						newLine = regex.sub("'*****'", environ_dict)
+						try:
+							temp_dict = [ast.literal_eval(newLine)]
+						except:
+							perform_logger.warning("Syntax Error!\n%s" % newLine)
 
-					try:
-						cur.execute("INSERT into environ values (?,?,?,?)", [temp_dict[0]['REMOTE_ADDR'], temp_dict[0]['QUERY_STRING'], temp_dict[0]['HTTP_HOST'], temp_dict[0]['SERVER_PORT']])
-						conn_flush += 1
-					except:
-						perform_logger.warning("INSERT Error!\n%s" % temp_dict[0])
+						try:
+							cur.execute("INSERT into environ values (?,?,?,?)", [temp_dict[0]['REMOTE_ADDR'], temp_dict[0]['QUERY_STRING'], temp_dict[0]['HTTP_HOST'], temp_dict[0]['SERVER_PORT']])
+							conn_flush += 1
+						except:
+							perform_logger.warning("INSERT Error!\n%s" % temp_dict[0])
 
-				if conn_flush >= 500:
-					conn.commit()
-					conn_flush = 0
+					if conn_flush >= 500:
+						conn.commit()
+						conn_flush = 0
+
+	# Add support for .gz files
+	elif extension == '.gz':
+		with contextlib.closing(gzip.open(log, 'r')) as inf:
+			for line in inf:
+				if '[Server] environ' in line:
+					tempLine = line.strip()
+					environ_dict = ("{%s}\n" % tempLine.split('{')[1].split('}')[0])
+					if environ_dict is not None:
+						newLine = regex.sub("'*****'", environ_dict)
+						try:
+							temp_dict = [ast.literal_eval(newLine)]
+						except:
+							perform_logger.warning("Syntax Error!\n%s" % newLine)
+
+						try:
+							cur.execute("INSERT into environ values (?,?,?,?)", [temp_dict[0]['REMOTE_ADDR'], temp_dict[0]['QUERY_STRING'], temp_dict[0]['HTTP_HOST'], temp_dict[0]['SERVER_PORT']])
+							conn_flush += 1
+						except:
+							perform_logger.warning("INSERT Error!\n%s" % temp_dict[0])
+
+					if conn_flush >= 500:
+						conn.commit()
+						conn_flush = 0
 
 	# Commit any final changes, and close sqlite connections
 	conn.commit()
@@ -202,9 +231,10 @@ def getDeviceCommands(log):
 			pydoc.pager(out)
 
 		if ds.askYesOrNo("Output results to CSV"):
-			select_cmd = "sqlite3 -csv -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\", cmd as \"Command\", count(cmd) as \"Count\" from data group by userKey, cmd order by \"Count\" desc;' > %s/device_requests.csv" % (environ_db, glb.dsappdata)
+			DATE = datetime.datetime.now().strftime('%Y%m%dT%H%M%S')
+			select_cmd = "sqlite3 -csv -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\", cmd as \"Command\", count(cmd) as \"Count\" from data group by userKey, cmd order by \"Count\" desc;' > %s/device_requests-%s.csv" % (environ_db, glb.dsappdata, DATE)
 			out = ds.util_subprocess(select_cmd)
-			print ("Data exported to %s/device_requests.csv" % glb.dsappdata)
+			print ("Data exported to %s/device_requests-%s.csv" % glb.dsappdata, DATE)
 		print()
 	
 
@@ -221,7 +251,8 @@ def getPinglessDevices(log):
 			pydoc.pager(out)
 
 		if ds.askYesOrNo("Output results to CSV"):
-			select_cmd ="sqlite3 -csv -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\" from data where deviceid not in (select deviceid from data where cmd=\"Ping\") group by deviceid;' > %s/manualSync_devices.csv" % (environ_db, glb.dsappdata)
+			DATE = datetime.datetime.now().strftime('%Y%m%dT%H%M%S')
+			select_cmd ="sqlite3 -csv -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\" from data where deviceid not in (select deviceid from data where cmd=\"Ping\") group by deviceid;' > %s/manualSync_devices-%s.csv" % (environ_db, glb.dsappdata, DATE)
 			out = ds.util_subprocess(select_cmd)
-			print ("Data exported to %s/manualSync_devices.csv" % glb.dsappdata)
+			print ("Data exported to %s/manualSync_devices-%s.csv" % glb.dsappdata, DATE)
 		print()

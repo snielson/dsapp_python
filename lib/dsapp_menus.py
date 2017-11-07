@@ -609,11 +609,12 @@ def performance_menu():
 	loop = True
 	while loop:
 		show_menu(menu)
+		ds.print_there(23,6, "DEBUG logging required. Logs parsed for data")
 		choice = get_choice(available)
 		if choice == '1':
 			ds.datasyncBanner()
 			if ds.askYesOrNo("Parse debug log for top device requests"):
-				log = ds.getFilePath("Enter path to mobility-agent log file: ")
+				log = ds.getFilePath("mobility-agent log file",'/var/log/datasync/connectors/mobility-agent.log')
 				if log is None:
 					return
 				dsPerformance.getDeviceCommands(log)
@@ -622,7 +623,7 @@ def performance_menu():
 		elif choice == '2':
 			ds.datasyncBanner()
 			if ds.askYesOrNo("Parse debug log for devices set to manual sync"):
-				log = ds.getFilePath("Enter path to mobility-agent log file: ")
+				log = ds.getFilePath("mobility-agent log file",'/var/log/datasync/connectors/mobility-agent.log')
 				if log is None:
 					return
 				dsPerformance.getPinglessDevices(log)
