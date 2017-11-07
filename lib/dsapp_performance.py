@@ -234,7 +234,7 @@ def getDeviceCommands(log):
 			DATE = datetime.datetime.now().strftime('%Y%m%dT%H%M%S')
 			select_cmd = "sqlite3 -csv -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\", cmd as \"Command\", count(cmd) as \"Count\" from data group by userKey, cmd order by \"Count\" desc;' > %s/device_requests-%s.csv" % (environ_db, glb.dsappdata, DATE)
 			out = ds.util_subprocess(select_cmd)
-			print ("Data exported to %s/device_requests-%s.csv" % glb.dsappdata, DATE)
+			print ("Data exported to %s/device_requests-%s.csv" % (glb.dsappdata, DATE))
 		print()
 	
 
@@ -254,5 +254,5 @@ def getPinglessDevices(log):
 			DATE = datetime.datetime.now().strftime('%Y%m%dT%H%M%S')
 			select_cmd ="sqlite3 -csv -header %s 'select user as \"User\", deviceid as \"DeviceId\", address as \"Address\" from data where deviceid not in (select deviceid from data where cmd=\"Ping\") group by deviceid;' > %s/manualSync_devices-%s.csv" % (environ_db, glb.dsappdata, DATE)
 			out = ds.util_subprocess(select_cmd)
-			print ("Data exported to %s/manualSync_devices-%s.csv" % glb.dsappdata, DATE)
+			print ("Data exported to %s/manualSync_devices-%s.csv" % (glb.dsappdata, DATE))
 		print()
