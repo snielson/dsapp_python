@@ -1,4 +1,4 @@
-## [248 - Unreleased] - 2017-10-09
+## [249 - Unreleased] - 2017-11-07
 ### Added
 - xmllint ran on main XML files before starting
 - Protected path in debug logging
@@ -9,6 +9,7 @@
 ### Changed
 - LetsEncrypt menu is more dynamic for what's installed
 
+## [248] - 2017-10-09
 ### Fixed
 - dsapp_acme.py now prompts to install socat for LetsEncrypt functionality
 
