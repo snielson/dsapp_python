@@ -111,6 +111,8 @@ def initMiscSettings(): # Misc variables
 	global COMPANY_BU
 	global DISCLAIMER
 	global forceMode
+	global mobileCertPath
+	global serverCertPath
 
 	serverinfo = "/etc/*release"
 	initScripts = "/etc/init.d/"
@@ -128,6 +130,8 @@ def initMiscSettings(): # Misc variables
 	COMPANY_BU = 'Micro Focus'
 	DISCLAIMER = "%s accepts no liability for the consequences of any actions taken\n     by the use of this application. Use at your own discretion" % COMPANY_BU
 	forceMode = False
+	mobileCertPath = '/var/lib/datasync/device/mobility.pem'
+	serverCertPath = '/var/lib/datasync/webadmin/server.pem'
 
 def initDictonaries():
 	global XMLconfig
