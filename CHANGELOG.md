@@ -1,7 +1,13 @@
-## [248] - 2017-10-09
+## [248 - Unreleased] - 2017-10-09
 ### Added
 - xmllint ran on main XML files before starting
 - Protected path in debug logging
+- Default log path in performance checks
+- Expiry dates show in certificate menu
+- Option to use .gz files for performance checks
+
+### Changed
+- LetsEncrypt menu is more dynamic for what's installed
 
 ### Fixed
 - dsapp_acme.py now prompts to install socat for LetsEncrypt functionality
