@@ -51,6 +51,8 @@ class acme:
 		self.acmeInstalled = False
 		self.cronInstalled = False
 
+	def clearDNS(self):
+		self.DNS = None
 
 	def setDNS(self):
 		pattern = re.compile("^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$")

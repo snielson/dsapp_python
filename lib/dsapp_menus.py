@@ -26,6 +26,7 @@ from tabulate import tabulate
 import dsapp_ghc as ghc
 import dsapp_Soap as dsSOAP
 import dsapp_performance as dsPerformance
+import dsapp_acme as acme
 
 # Globals
 import dsapp_global as glb
@@ -327,10 +328,16 @@ def certificate_menu():
 		show_menu(menu)
 
 		# Check certs each loop (If they are changed)
-		mob_result = ds.getExpiry('/var/lib/datasync/device/mobility.pem')[0].split('=')[1]
-		ser_result = ds.getExpiry('/var/lib/datasync/webadmin/server.pem')[0].split('=')[1]
-		ds.print_there(22,6, "mobility.pem expiry date: %s" % mob_result)
-		ds.print_there(23,6, "server.pem expiry date: %s" % ser_result)
+		try:
+			mob_result = ds.getExpiry(glb.mobileCertPath)[0].split('=')[1]
+			ds.print_there(22,6, "Device (mobility.pem) expiry date: %s" % mob_result)
+		except:
+			pass
+		try:
+			ser_result = ds.getExpiry(glb.serverCertPath)[0].split('=')[1]
+			ds.print_there(23,6, "Webadmin (server.pem) expiry date: %s" % ser_result)
+		except:
+			pass
 
 		choice = get_choice(available)
 		if choice == '1':
@@ -353,12 +360,11 @@ def certificate_menu():
 
 ### Start ### Sub menu for letsEncrypt_menu ###
 def letsEncrypt_menu():
-	import dsapp_acme as acme
 	a = acme.acme()
 	
 	loop = True
 	while loop:
-
+		a.clearDNS()
 		# Make dynamic menu
 		if a.getAcmeInstalled():
 			is_acmeInstalled = "Uninstall"
