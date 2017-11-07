@@ -320,11 +320,18 @@ def cuso_menu():
 
 def certificate_menu():
 	menu = ['1. Generate CSR & Private key', '2. Generate self-signed certificate', '3. Apply certificates (Generate PEM)', '4. Verify certificate / key pair', '\n     5. LetsEncrypt..','\n     0. Back']
-
+	
 	available = build_avaialbe(menu)
 	loop = True
 	while loop:
 		show_menu(menu)
+
+		# Check certs each loop (If they are changed)
+		mob_result = ds.getExpiry('/var/lib/datasync/device/mobility.pem')[0].split('=')[1]
+		ser_result = ds.getExpiry('/var/lib/datasync/webadmin/server.pem')[0].split('=')[1]
+		ds.print_there(22,6, "mobility.pem expiry date: %s" % mob_result)
+		ds.print_there(23,6, "server.pem expiry date: %s" % ser_result)
+
 		choice = get_choice(available)
 		if choice == '1':
 			ds.createCSRKey()

@@ -3078,13 +3078,15 @@ def createPEM(sign = None, commonName = None, keyPass = None, key = None, crt = 
 	intermediateCAList = []
 	if askYesOrNo("Any intermediate certificate files or bundles"):
 		intermedFile = autoCompleteInput("Intermediate certificate: ")
-		intermediateCAList.append(intermedFile)
-		logger.debug("Adding intermediate file: %s" % intermedFile)
+		if intermedFile:
+			intermediateCAList.append(intermedFile)
+			logger.debug("Adding intermediate file: %s" % intermedFile)
 		while True:
 			if askYesOrNo("Any additional intermediate certificate files or bundles"):
 				intermedFile = autoCompleteInput("Intermediate certificate: ")
-				intermediateCAList.append(intermedFile)
-				logger.debug("Adding intermediate file: %s" % intermedFile)
+				if intermedFile:
+					intermediateCAList.append(intermedFile)
+					logger.debug("Adding intermediate file: %s" % intermedFile)
 			else:
 				break
 
@@ -3232,6 +3234,10 @@ def verifyCertifiateMatch(key = None, keyPass = None, crt = None, path = None):
 		logger.warning("Public certificate and private key mismatch")
 		return False
 
+def getExpiry(certFile):
+	cmd = "openssl x509 -enddate -noout -in %s" % certFile
+	out = util_subprocess(cmd, True)
+	return out
 
 ##################################################################################################
 #	End of Certificate
