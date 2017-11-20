@@ -1,4 +1,4 @@
-## [249 - Unreleased] - 2017-11-07
+## [249] - 2017-11-07
 ### Added
 - xmllint ran on main XML files before starting
 - Protected path in debug logging
