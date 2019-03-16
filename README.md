@@ -1,3 +1,5 @@
+#### Note: Development has stopped on this repo
+
 ### dsapp (python)
 dsapp - rewritten in python<br />
 Created by Shane Nielson <snielson@projectuminfinitas.com><br />
